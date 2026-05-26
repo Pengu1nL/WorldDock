@@ -1,0 +1,152 @@
+/* WorldDock — Design Tokens
+ * Dark professional IDE aesthetic
+ * Linear whitespace × VS Code status bar × GitHub repo tags
+ */
+
+:root {
+  /* Surfaces — deep cool charcoal, low saturation */
+  --bg:           #0b0d10;   /* app background */
+  --bg-1:        #101317;   /* sunken */
+  --surface:     #14171c;   /* card / panel */
+  --surface-2:   #191d23;   /* raised / hover */
+  --surface-3:   #1f242b;   /* active / selected */
+  --overlay:     #0e1115ee;
+
+  /* Borders — barely-there */
+  --border:      #23272d;   /* default */
+  --border-2:    #2c3138;   /* visible */
+  --border-3:    #3a3f47;   /* focus */
+  --hairline:    #1c2026;   /* dividers */
+
+  /* Text */
+  --fg:          #e8e6e1;   /* primary */
+  --fg-1:        #c8c5be;   /* secondary */
+  --fg-2:        #8e8d87;   /* muted */
+  --fg-3:        #6a6c70;   /* tertiary */
+  --fg-4:        #4b4d51;   /* faint */
+
+  /* Accents — sage / amber / brick + cool slate-blue */
+  --sage:        #7fb39a;   /* success, save, connected, ready */
+  --sage-dim:    #5c8275;
+  --sage-bg:     #1a2620;
+
+  --amber:       #c9a96e;   /* warning, pending, draft, unsaved */
+  --amber-dim:   #8b774a;
+  --amber-bg:    #261f12;
+
+  --brick:       #c87060;   /* conflict, danger, disconnect */
+  --brick-dim:   #8a4f44;
+  --brick-bg:    #261612;
+
+  --slate:       #7a96b8;   /* info, Cloud mode */
+  --slate-dim:   #506a87;
+  --slate-bg:    #141a22;
+
+  --violet:      #9a8fc4;   /* seeds, accents */
+  --violet-bg:   #1a1722;
+
+  /* Type */
+  --font-sans:   "Geist", "Inter Tight", -apple-system, BlinkMacSystemFont,
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+                 "Helvetica Neue", system-ui, sans-serif;
+  --font-mono:   "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
+  --font-serif:  "Source Serif 4", "Noto Serif SC", "Songti SC", Georgia, serif;
+
+  /* Sizing — compact density baseline */
+  --t-12: 11.5px;
+  --t-13: 12.5px;
+  --t-14: 13.5px;
+  --t-15: 14.5px;
+  --t-16: 15.5px;
+  --t-18: 17px;
+  --t-22: 21px;
+  --t-28: 26px;
+  --t-36: 34px;
+
+  --r-2: 2px;
+  --r-3: 3px;
+  --r-4: 4px;
+  --r-6: 6px;
+  --r-8: 8px;
+
+  /* Layout */
+  --statusbar-h: 36px;
+  --rail-w:      52px;
+  --drawer-w:    400px;
+  --max-chat:    760px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(.2,.7,.2,1);
+  --ease-in:  cubic-bezier(.4,0,.7,.3);
+}
+
+/* Density variants — driven by tweak panel */
+:root[data-density="comfy"] {
+  --t-13: 13.5px;
+  --t-14: 14.5px;
+  --t-15: 15.5px;
+  --t-16: 16.5px;
+  --t-18: 18px;
+  --max-chat: 820px;
+}
+
+:root[data-density="compact"] {
+  --t-13: 11.5px;
+  --t-14: 12.5px;
+  --t-15: 13.5px;
+  --t-16: 14.5px;
+  --max-chat: 720px;
+}
+
+/* Light theme — default; activated by :root[data-app-theme="light"] on <html> */
+:root[data-app-theme="light"] {
+  --bg:           #f6f4ee;
+  --bg-1:         #ede9df;
+  --surface:      #fcfbf6;
+  --surface-2:    #f1ede2;
+  --surface-3:    #e6e1d3;
+  --overlay:      #fdfcf8ee;
+
+  --border:       #d4cebd;
+  --border-2:     #b8b1a0;
+  --border-3:     #8a8475;
+  --hairline:     #e3ddcc;
+
+  --fg:           #1c1c1d;
+  --fg-1:         #3e3e40;
+  --fg-2:         #6a6863;
+  --fg-3:         #8c897f;
+  --fg-4:         #b3afa3;
+
+  --sage:         #3f7160;
+  --sage-dim:     #6e9587;
+  --sage-bg:      #e1ebe4;
+
+  --amber:        #936c1e;
+  --amber-dim:    #b8985a;
+  --amber-bg:     #f1e7cd;
+
+  --brick:        #ad4936;
+  --brick-dim:    #c47b6c;
+  --brick-bg:     #f3dcd3;
+
+  --slate:        #455e7a;
+  --slate-dim:    #7d92ab;
+  --slate-bg:     #dde4ed;
+
+  --violet:       #574b87;
+  --violet-bg:    #e4e0ed;
+
+  /* Light-theme component-level overrides */
+  --btn-primary-fg: #fdfdfb;
+  --sage-hover: #4d8771;
+  --badge-fg: #fdfdfb;
+}
+
+/* Title font tweak */
+:root[data-title-font="serif"] .title-font,
+:root[data-title-font="serif"] h1,
+:root[data-title-font="serif"] h2 {
+  font-family: var(--font-serif);
+  letter-spacing: -0.005em;
+}
