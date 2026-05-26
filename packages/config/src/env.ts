@@ -13,6 +13,9 @@ export const worldDockEnvSchema = z.object({
   NODE_ENV: nodeEnvironmentSchema.default("development"),
   APP_ENV: runtimeEnvironmentSchema.default("development"),
   API_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+  API_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1048576),
+  API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
+  TRUSTED_ORIGINS: z.string().optional(),
   WEB_APP_URL: z.string().url(),
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
@@ -28,6 +31,7 @@ export const worldDockEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(16),
   SENTRY_DSN: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+  OTEL_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   AI_PROVIDER: z.enum(["openai", "anthropic", "mock"]).default("mock"),
 });
 

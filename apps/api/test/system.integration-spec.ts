@@ -30,11 +30,27 @@ describe("system endpoints", () => {
       .expect(200);
 
     expect(response.headers["x-request-id"]).toBe("req_test_health");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
     expect(response.body).toMatchObject({
       status: "ok",
       service: "worlddock-api",
       requestId: "req_test_health",
     });
+  });
+
+  it("returns baseline process metrics", async () => {
+    app = await createTestApp([
+      { name: "database", check: async () => undefined },
+      { name: "redis", check: async () => undefined },
+      { name: "search", check: async () => undefined },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get("/v1/system/metrics")
+      .expect(200);
+
+    expect(response.body).toMatchObject({ service: "worlddock-api" });
+    expect(response.body.memory.rss).toBeGreaterThan(0);
   });
 
   it("returns readiness details when dependencies are healthy", async () => {

@@ -6,6 +6,7 @@ import {
   type ExceptionFilter,
 } from "@nestjs/common";
 import { apiErrorSchema, type ApiError } from "@worlddock/domain";
+import { captureException } from "./observability";
 import { getRequestId, type RequestWithRequestId } from "./request-id";
 
 type ErrorResponse = {
@@ -28,6 +29,9 @@ export class ApiErrorFilter implements ExceptionFilter {
     const response = context.getResponse<HttpResponse>();
     const payload = this.toApiError(exception, getRequestId(request));
     const status = this.getStatus(exception);
+    if (!(exception instanceof HttpException)) {
+      captureException(exception);
+    }
 
     if (typeof response.code === "function") {
       response.code(status).send(payload);

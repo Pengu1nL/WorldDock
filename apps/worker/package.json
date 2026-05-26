@@ -10,6 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@sentry/node": "^10.54.0",
     "@worlddock/config": "workspace:*",
     "@worlddock/db": "workspace:*",
     "@worlddock/domain": "workspace:*",

@@ -3,18 +3,22 @@ import { createPrismaClient } from "@worlddock/db";
 import { pathToFileURL } from "node:url";
 import { configureMeilisearchRepositoryIndex, createMeilisearchSearchIndex } from "./meilisearch-index";
 import { createModerationScanQueue, createModerationScanWorker, enqueuePendingModerationScanEvents } from "./moderation-scan";
+import { initWorkerObservability } from "./observability";
 import { createPrismaRepositorySearchSource } from "./repository-source";
 import { rebuildRepositorySearchIndex } from "./search-indexing";
 import { createRepositorySearchQueue, createRepositorySearchWorker, enqueuePendingSearchOutboxEvents } from "./search-indexing.queue";
 
 export * from "./meilisearch-index";
 export * from "./moderation-scan";
+export * from "./observability";
 export * from "./repository-source";
 export * from "./search-indexing";
 export * from "./search-indexing.queue";
 export * from "./storage-cleanup";
+export * from "./worker-alerts";
 
 async function runSearchWorkerCommand(command: string) {
+  initWorkerObservability();
   const env = parseWorldDockEnv(process.env);
   const prisma = createPrismaClient(env.DATABASE_URL);
   const source = createPrismaRepositorySearchSource(prisma);

@@ -643,19 +643,19 @@ type ApiError = {
 
 任务：
 
-- [ ] 接入 pino 结构化日志和敏感字段 redaction。
-- [ ] 接入 Sentry，覆盖 API 和 Worker。
-- [ ] 接入 OpenTelemetry trace，串联 request id、run id、job id。
-- [ ] 增加 API rate limit。
-- [ ] 增加 request body size limit。
-- [ ] 增加 CORS 和 trusted origin 配置。
-- [ ] 增加 security headers。
-- [ ] 增加数据库备份和恢复演练文档。
-- [ ] 增加 migration 发布流程文档。
-- [ ] 增加 worker 失败告警。
-- [ ] 增加 health、readiness、metrics 基线。
-- [ ] 增加 staging 环境部署配置。
-- [ ] 编写生产发布 checklist。
+- [x] 接入 pino 结构化日志和敏感字段 redaction。
+- [x] 接入 Sentry，覆盖 API 和 Worker。
+- [x] 接入 OpenTelemetry trace，串联 request id、run id、job id。
+- [x] 增加 API rate limit。
+- [x] 增加 request body size limit。
+- [x] 增加 CORS 和 trusted origin 配置。
+- [x] 增加 security headers。
+- [x] 增加数据库备份和恢复演练文档。
+- [x] 增加 migration 发布流程文档。
+- [x] 增加 worker 失败告警。
+- [x] 增加 health、readiness、metrics 基线。
+- [x] 增加 staging 环境部署配置。
+- [x] 编写生产发布 checklist。
 
 验收标准：
 

@@ -27,7 +27,7 @@ describeLocal("local docker readiness", () => {
     await app.close();
   });
 
-  it("returns ready against local PostgreSQL and Redis", async () => {
+  it("returns ready against local PostgreSQL, Redis, and Meilisearch", async () => {
     const response = await request(app.getHttpServer())
       .get("/v1/system/readiness")
       .expect(200);
@@ -37,6 +37,7 @@ describeLocal("local docker readiness", () => {
       dependencies: [
         { name: "database", status: "ok" },
         { name: "redis", status: "ok" },
+        { name: "search", status: "ok" },
       ],
     });
   });

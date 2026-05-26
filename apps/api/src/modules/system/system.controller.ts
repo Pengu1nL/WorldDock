@@ -38,4 +38,16 @@ export class SystemController {
       requestId: getRequestId(request),
     };
   }
+
+  @Get("metrics")
+  metrics(@Req() request: RequestWithRequestId) {
+    const memory = process.memoryUsage();
+    return {
+      service: "worlddock-api",
+      uptimeSeconds: process.uptime(),
+      memory,
+      timestamp: new Date().toISOString(),
+      requestId: getRequestId(request),
+    };
+  }
 }
