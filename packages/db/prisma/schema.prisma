@@ -20,6 +20,8 @@ model User {
   sessions      Session[]
   accessTokens  AccessToken[]
   worlds        World[]
+  billingAccount BillingAccount?
+  usageLedger   UsageLedgerEntry[]
 
   @@map("users")
 }
@@ -199,6 +201,7 @@ model AgentRun {
   events         AgentEvent[]
   suggestions    AgentSuggestion[]
   contextRefs    ContextRef[]
+  usageLedger     UsageLedgerEntry[]
 
   @@index([worldId])
   @@index([userId])
@@ -248,4 +251,37 @@ model ContextRef {
 
   @@index([runId])
   @@map("context_refs")
+}
+
+model BillingAccount {
+  id                  String             @id @default(cuid())
+  userId              String             @unique
+  currency            String             @default("CNY")
+  freeCreditGrantedAt DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries             UsageLedgerEntry[]
+
+  @@map("billing_accounts")
+}
+
+model UsageLedgerEntry {
+  id          String         @id @default(cuid())
+  accountId   String
+  userId      String
+  agentRunId  String?
+  type        String
+  amountCents Int
+  tokenUsage  Json?
+  reason      String?
+  createdAt   DateTime       @default(now())
+  account     BillingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentRun    AgentRun?      @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, createdAt])
+  @@index([userId])
+  @@index([agentRunId])
+  @@map("usage_ledger")
 }

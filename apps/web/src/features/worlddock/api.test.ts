@@ -5,6 +5,8 @@ import {
   createAgentRun,
   createWorld,
   fetchAgentEvents,
+  getBillingBalance,
+  getBillingUsage,
   listArchiveEntries,
   listAccessTokens,
   listConflicts,
@@ -56,6 +58,19 @@ describe("worlddock API client", () => {
         authorization: "Bearer session_valid",
       },
     });
+  });
+
+  it("reads billing balance and usage from the backend API", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ balance: { userId: "user_1", currency: "CNY", balanceCents: 9950 } }))
+      .mockResolvedValueOnce(jsonResponse({ usage: { entries: [], lastAgentRun: null } }));
+
+    await getBillingBalance({ sessionToken: "session_valid", fetcher });
+    await getBillingUsage({ sessionToken: "session_valid", fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/billing/balance", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/billing/usage", expect.objectContaining({ method: "GET" }));
   });
 
   it("creates worlds and archive entries through the backend API", async () => {

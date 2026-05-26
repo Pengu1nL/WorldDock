@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { BillingModule } from "../billing/billing.module";
 import { WorldsModule } from "../worlds/worlds.module";
 import { AgentController } from "./agent.controller";
 import { AGENT_PROVIDER, MockAgentProvider, VercelAiSdkAgentProvider } from "./agent.provider";
@@ -8,7 +9,7 @@ import { AgentService } from "./agent.service";
 import { PrismaAgentRepository } from "./prisma-agent.repository";
 
 @Module({
-  imports: [AuthModule, WorldsModule],
+  imports: [AuthModule, BillingModule, WorldsModule],
   controllers: [AgentController],
   providers: [
     AgentService,

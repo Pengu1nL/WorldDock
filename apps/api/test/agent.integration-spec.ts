@@ -8,6 +8,7 @@ import { configureApiApp } from "../src/configure-api-app";
 import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord, type ContextRefRecord } from "../src/modules/agent/agent.repository";
 import { AGENT_PROVIDER, type AgentProvider } from "../src/modules/agent/agent.provider";
+import { BILLING_REPOSITORY, type BillingAccountRecord, type BillingRepository, type UsageLedgerEntryRecord } from "../src/modules/billing/billing.repository";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -29,6 +30,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
+    const billing = createInMemoryBillingRepository();
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -38,7 +40,7 @@ describe("agent run endpoints", () => {
       tags: ["记忆"],
       mode: "cloud",
     });
-    app = await createTestApp(auth, worlds, agent, createMockAgentProvider());
+    app = await createTestApp(auth, worlds, agent, createMockAgentProvider(), billing);
 
     const createRun = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-runs`)
@@ -49,6 +51,7 @@ describe("agent run endpoints", () => {
     expect(createRun.body.run).toMatchObject({ worldId: world.id, status: "running" });
     expect(createRun.body.suggestions).toEqual([]);
     expect(await agent.listSuggestions(createRun.body.run.id)).toEqual([]);
+    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved"]);
     expect((await worlds.countAssets(world.id)).archive).toBe(0);
 
     const sse = await request(app.getHttpServer())
@@ -60,6 +63,7 @@ describe("agent run endpoints", () => {
     expect(sse.text).toContain("event: message.delta");
     expect(sse.text).toContain("event: suggestion.created");
     expect(sse.text).toContain("event: run.completed");
+    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_settled"]);
 
     const suggestionId = (await agent.listSuggestions(createRun.body.run.id))[0].id;
     await request(app.getHttpServer())
@@ -74,6 +78,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
+    const billing = createInMemoryBillingRepository();
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -83,7 +88,7 @@ describe("agent run endpoints", () => {
       tags: [],
       mode: "cloud",
     });
-    app = await createTestApp(auth, worlds, agent, createMockAgentProvider());
+    app = await createTestApp(auth, worlds, agent, createMockAgentProvider(), billing);
 
     const createRun = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-runs`)
@@ -104,12 +109,14 @@ describe("agent run endpoints", () => {
     expect(sse.text).toContain("event: run.cancelled");
     expect(sse.text).not.toContain("event: message.delta");
     expect(sse.text).not.toContain("event: suggestion.created");
+    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
   });
 
   it("records provider failures as MODEL_UNAVAILABLE in the SSE stream", async () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
+    const billing = createInMemoryBillingRepository();
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -119,7 +126,7 @@ describe("agent run endpoints", () => {
       tags: [],
       mode: "cloud",
     });
-    app = await createTestApp(auth, worlds, agent, createFailingAgentProvider());
+    app = await createTestApp(auth, worlds, agent, createFailingAgentProvider(), billing);
 
     const createRun = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-runs`)
@@ -134,6 +141,36 @@ describe("agent run endpoints", () => {
 
     expect(sse.text).toContain("event: run.failed");
     expect(sse.text).toContain("MODEL_UNAVAILABLE");
+    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
+  });
+
+  it("blocks agent runs when balance cannot cover the reserve", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const agent = createInMemoryAgentRepository();
+    const billing = createInMemoryBillingRepository();
+    addSession(auth, "session_user_1", "user_1");
+    seedBillingAccount(billing, "user_1", 50);
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "低余额世界",
+      type: "科幻",
+      summary: "余额不足路径。",
+      tags: [],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, agent, createMockAgentProvider(), billing);
+
+    const response = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-runs`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ prompt: "余额不足", mode: "expand" })
+      .expect(402);
+
+    expect(response.body).toMatchObject({
+      code: "INSUFFICIENT_BALANCE",
+      message: "Insufficient balance for Agent Run.",
+    });
   });
 });
 
@@ -142,6 +179,7 @@ async function createTestApp(
   worldRepository: WorldRepository,
   agentRepository: AgentRepository,
   agentProvider: AgentProvider,
+  billingRepository: BillingRepository = createInMemoryBillingRepository(),
 ) {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -154,6 +192,8 @@ async function createTestApp(
     .useValue(agentRepository)
     .overrideProvider(AGENT_PROVIDER)
     .useValue(agentProvider)
+    .overrideProvider(BILLING_REPOSITORY)
+    .useValue(billingRepository)
     .compile();
 
   const testApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -321,4 +361,78 @@ function createInMemoryAgentRepository() {
   };
 
   return repository;
+}
+
+function createInMemoryBillingRepository() {
+  const accounts = new Map<string, BillingAccountRecord>();
+  const entries = new Map<string, UsageLedgerEntryRecord>();
+
+  const repository = {
+    accounts,
+    entries,
+    async findAccountByUserId(userId: string) {
+      return [...accounts.values()].find((account) => account.userId === userId) ?? null;
+    },
+    async createAccount(input: { userId: string; freeCreditGrantedAt?: Date | null }) {
+      const now = new Date();
+      const account: BillingAccountRecord = {
+        id: `ba_${accounts.size + 1}`,
+        userId: input.userId,
+        currency: "CNY",
+        freeCreditGrantedAt: input.freeCreditGrantedAt ?? null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      accounts.set(account.id, account);
+      return account;
+    },
+    async markFreeCreditGranted(accountId: string, grantedAt: Date) {
+      const account = accounts.get(accountId);
+      if (!account) return null;
+      const next = { ...account, freeCreditGrantedAt: grantedAt, updatedAt: new Date() };
+      accounts.set(accountId, next);
+      return next;
+    },
+    async createLedgerEntry(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
+      const entry: UsageLedgerEntryRecord = {
+        id: `ule_${entries.size + 1}`,
+        createdAt: new Date(),
+        ...input,
+      };
+      entries.set(entry.id, entry);
+      return entry;
+    },
+    async listLedgerEntries(userId: string) {
+      return [...entries.values()].filter((entry) => entry.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    async listLedgerEntriesForRun(agentRunId: string) {
+      return [...entries.values()].filter((entry) => entry.agentRunId === agentRunId);
+    },
+  } satisfies BillingRepository & { accounts: typeof accounts; entries: typeof entries };
+
+  return repository;
+}
+
+function seedBillingAccount(repository: ReturnType<typeof createInMemoryBillingRepository>, userId: string, balanceCents: number) {
+  const now = new Date();
+  const account: BillingAccountRecord = {
+    id: `ba_seed_${userId}`,
+    userId,
+    currency: "CNY",
+    freeCreditGrantedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  };
+  repository.accounts.set(account.id, account);
+  repository.entries.set(`ule_seed_${userId}`, {
+    id: `ule_seed_${userId}`,
+    accountId: account.id,
+    userId,
+    agentRunId: null,
+    type: "credit_granted",
+    amountCents: balanceCents,
+    tokenUsage: null,
+    reason: "seed test balance",
+    createdAt: now,
+  });
 }

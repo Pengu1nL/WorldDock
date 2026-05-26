@@ -496,16 +496,16 @@ type ApiError = {
 
 任务：
 
-- [ ] 设计并迁移 `billing_accounts` 和 `usage_ledger` 表。
-- [ ] 定义 ledger entry 类型：`credit_granted`、`model_run_reserved`、`model_run_settled`、`model_run_refunded`、`admin_adjusted`。
-- [ ] 实现余额聚合查询。
-- [ ] 在新用户创建时发放初始免费额度。
-- [ ] 在 Agent Run 启动前执行余额预检查。
-- [ ] Agent Run 启动时写入 reserve ledger。
-- [ ] Agent Run 完成时按真实 token usage 写入 settle ledger。
-- [ ] Agent Run 失败或取消时写入 refund 或 partial settle ledger。
-- [ ] 实现 `GET /v1/billing/balance` 和 `GET /v1/billing/usage`。
-- [ ] 前端设置页接入真实余额和最近一次 Agent Run 用量。
+- [x] 设计并迁移 `billing_accounts` 和 `usage_ledger` 表。
+- [x] 定义 ledger entry 类型：`credit_granted`、`model_run_reserved`、`model_run_settled`、`model_run_refunded`、`admin_adjusted`。
+- [x] 实现余额聚合查询。
+- [x] 在新用户创建时发放初始免费额度。
+- [x] 在 Agent Run 启动前执行余额预检查。
+- [x] Agent Run 启动时写入 reserve ledger。
+- [x] Agent Run 完成时按真实 token usage 写入 settle ledger。
+- [x] Agent Run 失败或取消时写入 refund 或 partial settle ledger。
+- [x] 实现 `GET /v1/billing/balance` 和 `GET /v1/billing/usage`。
+- [x] 前端设置页接入真实余额和最近一次 Agent Run 用量。
 
 验收标准：
 

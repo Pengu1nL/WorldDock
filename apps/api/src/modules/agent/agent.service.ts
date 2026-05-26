@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldSuggestion } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
+import { BillingService } from "../billing/billing.service";
 import { WORLD_REPOSITORY, type WorldRepository, type WorldRecord } from "../worlds/world.repository";
 import { AGENT_PROVIDER, type AgentProvider } from "./agent.provider";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord } from "./agent.repository";
@@ -11,10 +12,12 @@ export class AgentService {
     @Inject(AGENT_REPOSITORY) private readonly agents: AgentRepository,
     @Inject(AGENT_PROVIDER) private readonly provider: AgentProvider,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    private readonly billing: BillingService,
   ) {}
 
   async createRun(subject: AuthSubject, worldId: string, input: { prompt: string; mode: "expand" | "challenge" | "fork" | "polish" }) {
     await this.requireOwnedWorld(subject, worldId);
+    await this.billing.assertCanReserve(subject.user.id);
     const run = await this.agents.createRun({
       worldId,
       userId: subject.user.id,
@@ -23,6 +26,7 @@ export class AgentService {
       model: process.env.AI_MODEL ?? "mock",
     });
     await this.append(run.id, 1, "run.started", { runId: run.id, mode: input.mode });
+    await this.billing.reserveAgentRun(subject.user.id, run.id);
     return { run, suggestions: [] };
   }
 
@@ -82,6 +86,7 @@ export class AgentService {
         tokenUsage,
         completedAt: new Date(),
       });
+      await this.billing.settleAgentRun(run.userId, run.id, tokenUsage);
       yield await this.append(run.id, sequence++, "run.completed", { tokenUsage });
     } catch {
       await this.agents.updateRun(run.id, {
@@ -90,6 +95,7 @@ export class AgentService {
         errorCode: "MODEL_UNAVAILABLE",
         errorMessage: "Agent provider is unavailable.",
       });
+      await this.billing.refundAgentRun(run.userId, run.id, "model_unavailable");
       yield await this.append(run.id, sequence++, "run.failed", { code: "MODEL_UNAVAILABLE", message: "Agent provider is unavailable." });
     }
   }
@@ -104,6 +110,7 @@ export class AgentService {
       status: "cancelled",
       cancelledAt: new Date(),
     });
+    await this.billing.refundAgentRun(run.userId, run.id, "user_cancelled");
     await this.append(run.id, nextSequence, "run.cancelled", { reason: "user_cancelled" });
     return cancelled ?? run;
   }

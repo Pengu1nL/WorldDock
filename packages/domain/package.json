@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./agent": "./src/agent/index.ts",
     "./api": "./src/api/index.ts",
+    "./billing": "./src/billing/index.ts",
     "./repository": "./src/repository/index.ts",
     "./world": "./src/world/index.ts"
   },

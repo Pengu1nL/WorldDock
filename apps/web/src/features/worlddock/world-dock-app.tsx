@@ -8,12 +8,14 @@ import {
   cancelAgentRun,
   createAgentRun,
   discardAgentSuggestion,
+  getBillingBalance,
   listArchiveEntries,
   listConflicts,
   listStorySeeds,
   listWorlds,
   saveAgentSuggestion,
   streamAgentEvents,
+  WorldDockApiError,
 } from "./api";
 import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
 import { CommunityView } from "./view-community";
@@ -250,12 +252,26 @@ function WorldDockRuntime() {
         setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id
           ? { ...m, streaming: false, suggestions, contextRefs }
           : m));
+        try {
+          const billing = await getBillingBalance({ sessionToken });
+          setBalance(billing.balance.balanceCents / 100);
+        } catch {
+          pushToast({ kind: "info", text: "Agent 已完成，用量稍后同步" });
+        }
         if (agentAbortRef.current === abortController) agentAbortRef.current = null;
         setAgentBusy(false);
         setActiveAgentRunId(null);
         return;
       } catch (error) {
         if (isAbortError(error)) return;
+        if (error instanceof WorldDockApiError && error.code === "INSUFFICIENT_BALANCE") {
+          agentAbortRef.current = null;
+          setMessages((prev: any[]) => prev.filter((m: any) => m.id !== agentMsg.id));
+          setAgentBusy(false);
+          setActiveAgentRunId(null);
+          pushToast({ kind: "warn", text: "余额不足 · 请充值后继续推演" });
+          return;
+        }
         agentAbortRef.current = null;
         setMessages((prev: any[]) => prev.filter((m: any) => m.id !== agentMsg.id));
         setAgentBusy(false);

@@ -11,6 +11,18 @@ export type AccessTokenSummary = {
   createdAt: string;
 };
 
+export class WorldDockApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = "WorldDockApiError";
+  }
+}
+
 export type ApiClientOptions = {
   sessionToken: string;
   fetcher?: typeof fetch;
@@ -59,6 +71,37 @@ export type AgentEvent = {
   [key: string]: any;
 };
 
+export type BillingBalance = {
+  userId: string;
+  currency: "CNY";
+  balanceCents: number;
+  lowBalanceThresholdCents: number;
+  updatedAt: string;
+};
+
+export type UsageLedgerEntry = {
+  id: string;
+  accountId: string;
+  userId: string;
+  agentRunId?: string | null;
+  type: string;
+  amountCents: number;
+  tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number } | null;
+  reason?: string | null;
+  createdAt: string;
+};
+
+export type BillingUsage = {
+  balance: BillingBalance;
+  lastAgentRun: {
+    agentRunId: string;
+    tokenUsage: { inputTokens: number; outputTokens: number; totalTokens: number };
+    costCents: number;
+    createdAt: string;
+  } | null;
+  entries: UsageLedgerEntry[];
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -92,6 +135,26 @@ export async function revokeAccessToken(
     sessionToken: options.sessionToken,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
+  });
+}
+
+export async function getBillingBalance(options: ApiClientOptions): Promise<{ balance: BillingBalance }> {
+  return requestJson("/v1/billing/balance", {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getBillingUsage(options: ApiClientOptions): Promise<{ usage: BillingUsage }> {
+  return requestJson("/v1/billing/usage", {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
   });
 }
 
@@ -334,7 +397,12 @@ async function requestJson<T>(
 
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload?.message ?? `WorldDock API request failed with ${response.status}`);
+    throw new WorldDockApiError(
+      payload?.message ?? `WorldDock API request failed with ${response.status}`,
+      response.status,
+      payload?.code,
+      payload?.details,
+    );
   }
 
   return payload as T;

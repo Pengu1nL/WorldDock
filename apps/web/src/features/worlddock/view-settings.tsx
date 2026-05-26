@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
 import {
   createAccessToken,
+  getBillingUsage,
   listAccessTokens,
   revokeAccessToken,
   type AccessTokenSummary,
+  type BillingUsage,
 } from "./api";
 import { Icon } from "./components";
 
@@ -31,11 +33,32 @@ export function SettingsView({
   const [tokenStatus, setTokenStatus] = useState(communityConnected ? "Token 已保存 · Push 权限正常" : "未连接");
   const [cloudTokens, setCloudTokens] = useState<AccessTokenSummary[]>([]);
   const [cloudTokenBusy, setCloudTokenBusy] = useState(false);
+  const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
+  const [billingBusy, setBillingBusy] = useState(false);
 
   const sessionToken = () => {
     if (typeof window === "undefined") return "";
     return window.localStorage.getItem("worlddock.sessionToken") ?? "";
   };
+
+  const refreshBilling = useCallback(async () => {
+    const session = sessionToken();
+    if (!session) return;
+
+    setBillingBusy(true);
+    try {
+      const result = await getBillingUsage({ sessionToken: session });
+      setBillingUsage(result.usage);
+    } catch {
+      onToast({ kind: "warn", text: "云端用量同步失败" });
+    } finally {
+      setBillingBusy(false);
+    }
+  }, [onToast]);
+
+  useEffect(() => {
+    if (tab === "billing") void refreshBilling();
+  }, [refreshBilling, tab]);
 
   const refreshCloudTokens = async () => {
     const session = sessionToken();
@@ -132,10 +155,25 @@ export function SettingsView({
         {tab === "billing" && (
           <section className="card" style={{ padding: 18 }}>
             <h2 className="title-font" style={{ marginTop: 0 }}>用量与余额</h2>
-            <Metric label="当前余额" value={`¥${balance.toFixed(2)}`} />
-            <Metric label="本月消耗" value="¥37.60" />
-            <Metric label="最近一次 Agent Run" value="1,283 tokens / ¥1.83" />
+            <Metric label="当前余额" value={formatCents(billingUsage?.balance.balanceCents ?? Math.round(balance * 100))} />
+            <Metric label="最近一次 Agent Run" value={formatLastAgentRun(billingUsage)} />
+            <Metric label="最近账本条目" value={billingUsage ? `${billingUsage.entries.length} 条` : "未同步"} />
             <div className="badge amber">余额低于 ¥5.00 时会拦截新的 Agent Run</div>
+            <div style={{ marginTop: 12 }}>
+              <button className="btn ghost" disabled={billingBusy} onClick={refreshBilling}>
+                <Icon name="refresh" size={12} /><span>{billingBusy ? "同步中" : "刷新用量"}</span>
+              </button>
+            </div>
+            {billingUsage && billingUsage.entries.length > 0 && (
+              <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+                {billingUsage.entries.slice(0, 5).map((entry) => (
+                  <div key={entry.id} className="row gap-2" style={{ justifyContent: "space-between", borderTop: "1px solid var(--hairline)", paddingTop: 8 }}>
+                    <span className="mono">{entry.type}</span>
+                    <span className="mono">{formatSignedCents(entry.amountCents)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
         {tab === "model" && (
@@ -246,4 +284,18 @@ function Field({ label, value }: { label: string; value: string }) {
       <input className="input" aria-label={label} value={value} readOnly style={{ width: "min(100%, 360px)" }} />
     </label>
   );
+}
+
+function formatCents(cents: number) {
+  return `¥${(cents / 100).toFixed(2)}`;
+}
+
+function formatSignedCents(cents: number) {
+  const prefix = cents > 0 ? "+" : "";
+  return `${prefix}${formatCents(cents)}`;
+}
+
+function formatLastAgentRun(usage: BillingUsage | null) {
+  if (!usage?.lastAgentRun) return "暂无真实记录";
+  return `${usage.lastAgentRun.tokenUsage.totalTokens} tokens / ${formatCents(usage.lastAgentRun.costCents)}`;
 }
