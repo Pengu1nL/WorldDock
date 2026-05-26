@@ -4,7 +4,7 @@ import {
   agentSeedSchema,
   publicRepositorySchema,
   worldSchema,
-} from "../domain";
+} from "@worlddock/domain";
 
 describe("worlddock domain schemas", () => {
   it("validates every premade world", () => {

@@ -1,4 +1,4 @@
-import type { PublicRepository } from "./domain";
+import type { PublicRepository } from "@worlddock/domain";
 
 export const PUBLIC_REPOSITORIES: PublicRepository[] = [
   {

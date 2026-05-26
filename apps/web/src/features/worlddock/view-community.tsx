@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { PublicRepository } from "./domain";
+import type { PublicRepository } from "@worlddock/domain";
 import { PUBLIC_REPOSITORIES } from "./fixtures";
 import { Icon } from "./components";
 

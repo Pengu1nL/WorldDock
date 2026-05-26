@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { WorldMode } from "./domain";
+import type { WorldMode } from "@worlddock/domain";
 import { Icon } from "./components";
 
 type SettingsViewProps = {

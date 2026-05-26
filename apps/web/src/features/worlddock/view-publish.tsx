@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { World, WorldMode } from "./domain";
+import type { World, WorldMode } from "@worlddock/domain";
 import { Icon } from "./components";
 
 const PUBLIC_ITEMS = [

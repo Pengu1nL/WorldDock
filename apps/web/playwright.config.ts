@@ -4,6 +4,14 @@ import { defineConfig, devices } from "playwright/test";
 
 const chromiumExecutablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || findCachedChromiumHeadlessShell();
+const chromiumLaunchOptions = chromiumExecutablePath
+  ? {
+      launchOptions: {
+        executablePath: chromiumExecutablePath,
+        env: createBrowserEnv(chromiumExecutablePath),
+      },
+    }
+  : {};
 
 function findCachedChromiumHeadlessShell() {
   const cacheDir = join(process.env.HOME ?? "", "Library", "Caches", "ms-playwright");
@@ -35,12 +43,7 @@ export default defineConfig({
       name: "chromium",
       use: {
         ...devices["Desktop Chrome"],
-        launchOptions: chromiumExecutablePath
-          ? {
-              executablePath: chromiumExecutablePath,
-              env: createBrowserEnv(chromiumExecutablePath),
-            }
-          : undefined,
+        ...chromiumLaunchOptions,
       },
     },
   ],

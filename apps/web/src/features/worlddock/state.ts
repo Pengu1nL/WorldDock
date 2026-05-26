@@ -1,4 +1,4 @@
-import type { PublicRepository, World, WorldSuggestion } from "./domain";
+import type { PublicRepository, World, WorldSuggestion } from "@worlddock/domain";
 
 export type WorldDockState = {
   worlds: World[];

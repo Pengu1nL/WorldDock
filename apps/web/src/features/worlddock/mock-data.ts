@@ -1,7 +1,7 @@
 // mock-data.ts — WorldDock seed data + agent script
 // Quality content per PRD §9.3 — memory trading default + alternatives
 
-import type { AgentSeed, World } from "./domain";
+import type { AgentSeed, World } from "@worlddock/domain";
 
 export const SEEDS = {
   memory: {

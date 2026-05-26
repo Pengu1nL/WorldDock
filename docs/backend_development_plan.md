@@ -364,15 +364,15 @@ type ApiError = {
 
 任务：
 
-- [ ] 新增 `pnpm-workspace.yaml`，声明 `apps/*` 和 `packages/*`。
-- [ ] 新增根级 `tsconfig.base.json`，统一 strict TypeScript 配置。
-- [ ] 将当前 Next.js 前端迁移到 `apps/web`，保留现有页面、样式、测试和脚本行为。
-- [ ] 调整根级 `package.json` scripts，支持 `pnpm --filter @worlddock/web dev`、`build`、`test`、`lint`。
-- [ ] 新增 `packages/domain`，从 `src/features/worlddock/domain.ts` 迁移 world、suggestion、repository、release、error schema。
-- [ ] 新增 `packages/config`，提供 env schema 与运行环境枚举。
-- [ ] 新增 `packages/logger`，提供 pino logger、request id helper 和 redaction 规则。
-- [ ] 更新前端 import，让前端从 `@worlddock/domain` 读取共享类型。
-- [ ] 保留现有前端 E2E 测试路径，确保迁移后行为不变。
+- [x] 新增 `pnpm-workspace.yaml`，声明 `apps/*` 和 `packages/*`。
+- [x] 新增根级 `tsconfig.base.json`，统一 strict TypeScript 配置。
+- [x] 将当前 Next.js 前端迁移到 `apps/web`，保留现有页面、样式、测试和脚本行为。
+- [x] 调整根级 `package.json` scripts，支持 `pnpm --filter @worlddock/web dev`、`build`、`test`、`lint`。
+- [x] 新增 `packages/domain`，从 `src/features/worlddock/domain.ts` 迁移 world、suggestion、repository、release、error schema。
+- [x] 新增 `packages/config`，提供 env schema 与运行环境枚举。
+- [x] 新增 `packages/logger`，提供 pino logger、request id helper 和 redaction 规则。
+- [x] 更新前端 import，让前端从 `@worlddock/domain` 读取共享类型。
+- [x] 保留现有前端 E2E 测试路径，确保迁移后行为不变。
 
 验收标准：
 
