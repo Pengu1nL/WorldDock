@@ -437,18 +437,18 @@ type ApiError = {
 
 任务：
 
-- [ ] 设计并迁移 `worlds` 表，包含 owner、name、type、summary、tags、status、visibility、mode、maturity。
-- [ ] 设计并迁移 `archive_entries` 表，承载设定条目。
-- [ ] 设计并迁移 `story_seeds` 表，承载故事种子。
-- [ ] 设计并迁移 `conflicts` 表，承载世界冲突。
-- [ ] 设计并迁移 `consistency_issues` 表，承载一致性提醒。
-- [ ] 实现 world repository 和 domain mapper。
-- [ ] 实现 world CRUD API。
-- [ ] 实现 archive / seed / conflict 列表和创建 API。
-- [ ] 实现 owner 权限检查，私有世界仅 owner 可读写。
-- [ ] 建立 seed 数据，覆盖当前前端 Mock 中的示例世界。
-- [ ] 前端 `view-worlds`、`view-archive`、工作台资产计数接入真实 API。
-- [ ] 用 TanStack Query 管理 worlds、archive、seeds、conflicts server state。
+- [x] 设计并迁移 `worlds` 表，包含 owner、name、type、summary、tags、status、visibility、mode、maturity。
+- [x] 设计并迁移 `archive_entries` 表，承载设定条目。
+- [x] 设计并迁移 `story_seeds` 表，承载故事种子。
+- [x] 设计并迁移 `conflicts` 表，承载世界冲突。
+- [x] 设计并迁移 `consistency_issues` 表，承载一致性提醒。
+- [x] 实现 world repository 和 domain mapper。
+- [x] 实现 world CRUD API。
+- [x] 实现 archive / seed / conflict 列表和创建 API。
+- [x] 实现 owner 权限检查，私有世界仅 owner 可读写。
+- [x] 建立 seed 数据，覆盖当前前端 Mock 中的示例世界。
+- [x] 前端 `view-worlds`、`view-archive`、工作台资产计数接入真实 API。
+- [x] 用 TanStack Query 管理 worlds、archive、seeds、conflicts server state。
 
 验收标准：
 

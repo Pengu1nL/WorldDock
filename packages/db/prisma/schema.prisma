@@ -19,6 +19,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   accessTokens  AccessToken[]
+  worlds        World[]
 
   @@map("users")
 }
@@ -87,4 +88,91 @@ model AccessToken {
   @@index([userId])
   @@index([prefix])
   @@map("access_tokens")
+}
+
+model World {
+  id                String             @id @default(cuid())
+  ownerId           String
+  name              String
+  type              String
+  summary           String
+  tags              String[]           @default([])
+  status            String             @default("draft")
+  visibility        String             @default("private")
+  mode              String             @default("cloud")
+  maturity          Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  archiveEntries    ArchiveEntry[]
+  storySeeds        StorySeed[]
+  conflicts         Conflict[]
+  consistencyIssues ConsistencyIssue[]
+
+  @@index([ownerId])
+  @@map("worlds")
+}
+
+model ArchiveEntry {
+  id        String   @id @default(cuid())
+  worldId   String
+  title     String
+  category  String
+  summary   String
+  body      String
+  relations String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId])
+  @@map("archive_entries")
+}
+
+model StorySeed {
+  id           String   @id @default(cuid())
+  worldId      String
+  title        String
+  hook         String
+  trigger      String?
+  conflict     String
+  protagonists String?
+  questions    String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId])
+  @@map("story_seeds")
+}
+
+model Conflict {
+  id           String   @id @default(cuid())
+  worldId      String
+  title        String
+  summary      String
+  body         String
+  related      String[] @default([])
+  derivedSeeds String[] @default([])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId])
+  @@map("conflicts")
+}
+
+model ConsistencyIssue {
+  id          String   @id @default(cuid())
+  worldId     String
+  title       String
+  description String
+  involves    String[] @default([])
+  severity    String   @default("normal")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([worldId])
+  @@map("consistency_issues")
 }

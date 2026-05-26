@@ -3,6 +3,8 @@
 // world-dock-app.tsx — Main app shell, routing, agent simulation
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { listArchiveEntries, listConflicts, listStorySeeds, listWorlds } from "./api";
 import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
 import { CommunityView } from "./view-community";
 import { MOCK } from "./mock-data";
@@ -35,7 +37,17 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "appTheme": "light"
 }/*EDITMODE-END*/;
 
+const worldDockQueryClient = new QueryClient();
+
 export function WorldDockApp() {
+  return (
+    <QueryClientProvider client={worldDockQueryClient}>
+      <WorldDockRuntime />
+    </QueryClientProvider>
+  );
+}
+
+function WorldDockRuntime() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   // Apply density / font tweaks
@@ -66,11 +78,80 @@ export function WorldDockApp() {
   const [modeFlash, setModeFlash] = useState<any>(null);  // flash banner when agent mode changes mid-thread
   const [mockFailure, setMockFailure] = useState<any>(null); // null | save-failed | model-unavailable | insufficient-balance
   const [communityConnected, setCommunityConnected] = useState(false);
+  const [sessionToken, setSessionToken] = useState("");
 
   const streamingTimer = useRef<any>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   // worldId → { messages, savedSettings, savedSeeds, savedConflicts, savedIds, agentMode }
   const worldStatesRef = useRef<any>({});
+
+  useEffect(() => {
+    setSessionToken(window.localStorage.getItem("worlddock.sessionToken") ?? "");
+  }, []);
+
+  const worldsQuery = useQuery({
+    queryKey: ["worlds", sessionToken],
+    queryFn: async () => listWorlds({ sessionToken }) as Promise<{ worlds: any[] }>,
+    enabled: Boolean(sessionToken),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (worldsQuery.data?.worlds) setWorlds(worldsQuery.data.worlds);
+  }, [worldsQuery.data]);
+
+  const archiveQuery = useQuery({
+    queryKey: ["archive", sessionToken, currentWorld?.id],
+    queryFn: async () => listArchiveEntries(currentWorld.id, { sessionToken }) as Promise<{ archiveEntries: any[] }>,
+    enabled: Boolean(sessionToken && currentWorld?.id),
+    retry: false,
+  });
+  const seedsQuery = useQuery({
+    queryKey: ["seeds", sessionToken, currentWorld?.id],
+    queryFn: async () => listStorySeeds(currentWorld.id, { sessionToken }) as Promise<{ storySeeds: any[] }>,
+    enabled: Boolean(sessionToken && currentWorld?.id),
+    retry: false,
+  });
+  const conflictsQuery = useQuery({
+    queryKey: ["conflicts", sessionToken, currentWorld?.id],
+    queryFn: async () => listConflicts(currentWorld.id, { sessionToken }) as Promise<{ conflicts: any[] }>,
+    enabled: Boolean(sessionToken && currentWorld?.id),
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!archiveQuery.data?.archiveEntries) return;
+    setSavedSettings(archiveQuery.data.archiveEntries.map((entry: any) => ({ ...entry, kind: "setting" })));
+  }, [archiveQuery.data]);
+
+  useEffect(() => {
+    if (!seedsQuery.data?.storySeeds) return;
+    setSavedSeeds(seedsQuery.data.storySeeds.map((seed: any) => ({ ...seed, kind: "seed", questions: seed.questions || [] })));
+  }, [seedsQuery.data]);
+
+  useEffect(() => {
+    if (!conflictsQuery.data?.conflicts) return;
+    setSavedConflicts(conflictsQuery.data.conflicts.map((conflict: any) => ({ ...conflict, kind: "conflict" })));
+  }, [conflictsQuery.data]);
+
+  useEffect(() => {
+    if (!currentWorld || !sessionToken) return;
+    const nextCounts = {
+      archive: archiveQuery.data?.archiveEntries?.length ?? currentWorld.archive,
+      seeds: seedsQuery.data?.storySeeds?.length ?? currentWorld.seeds,
+      conflicts: conflictsQuery.data?.conflicts?.length ?? currentWorld.conflicts,
+    };
+    if (
+      currentWorld.archive === nextCounts.archive &&
+      currentWorld.seeds === nextCounts.seeds &&
+      currentWorld.conflicts === nextCounts.conflicts
+    ) {
+      return;
+    }
+    const nextWorld = { ...currentWorld, ...nextCounts };
+    setCurrentWorld(nextWorld);
+    setWorlds((prev: any[]) => prev.map((world: any) => world.id === nextWorld.id ? nextWorld : world));
+  }, [archiveQuery.data, conflictsQuery.data, currentWorld, seedsQuery.data, sessionToken]);
 
   // Persist current world's workbench state whenever it changes
   useEffect(() => {

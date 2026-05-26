@@ -15,6 +15,6 @@ import { PrismaAuthRepository } from "./prisma-auth.repository";
       useExisting: PrismaAuthRepository,
     },
   ],
-  exports: [AuthService, AUTH_REPOSITORY],
+  exports: [AuthService, AUTH_REPOSITORY, WorldDockAuthGuard],
 })
 export class AuthModule {}
