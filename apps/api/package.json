@@ -1,0 +1,42 @@
+{
+  "name": "@worlddock/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "prebuild": "pnpm --filter @worlddock/db prisma:generate",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "prelint": "pnpm --filter @worlddock/db prisma:generate",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "pretest": "pnpm --filter @worlddock/db prisma:generate",
+    "test": "vitest run --config vitest.config.ts",
+    "pretest:integration": "pnpm --filter @worlddock/db prisma:generate",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "pretest:readiness:local": "pnpm --filter @worlddock/db prisma:generate",
+    "test:readiness:local": "WORLD_DOCK_LOCAL_READINESS=1 vitest run --config vitest.integration.config.ts test/readiness-local.integration-spec.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "latest",
+    "@nestjs/common": "latest",
+    "@nestjs/core": "latest",
+    "@nestjs/platform-fastify": "latest",
+    "@prisma/client": "latest",
+    "@worlddock/db": "workspace:*",
+    "@worlddock/domain": "workspace:*",
+    "ioredis": "latest",
+    "reflect-metadata": "latest",
+    "rxjs": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "latest",
+    "@types/node": "latest",
+    "@types/supertest": "latest",
+    "supertest": "latest",
+    "tsx": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

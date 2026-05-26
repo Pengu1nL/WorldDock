@@ -389,16 +389,16 @@ type ApiError = {
 
 任务：
 
-- [ ] 新增 `apps/api`，使用 NestJS + Fastify Adapter。
-- [ ] 新增 `packages/db`，配置 Prisma、PostgreSQL provider、Prisma Client 导出。
-- [ ] 新增 `docker-compose.yml`，提供本地 PostgreSQL、Redis、Meilisearch、S3 兼容服务。
-- [ ] 新增 `.env.example`，列出 API、数据库、Redis、搜索、对象存储、Auth、模型供应商配置。
-- [ ] 实现 `GET /v1/system/health`，返回进程健康状态。
-- [ ] 实现 `GET /v1/system/readiness`，检查数据库和 Redis 连接。
-- [ ] 建立 API 全局错误过滤器，将异常转换为统一 `ApiError`。
-- [ ] 建立 request id middleware / interceptor。
-- [ ] 建立 Zod validation pipe，统一校验 request body、params、query。
-- [ ] 增加 API 单元测试和 Supertest 集成测试。
+- [x] 新增 `apps/api`，使用 NestJS + Fastify Adapter。
+- [x] 新增 `packages/db`，配置 Prisma、PostgreSQL provider、Prisma Client 导出。
+- [x] 新增 `docker-compose.yml`，提供本地 PostgreSQL、Redis、Meilisearch、S3 兼容服务。
+- [x] 新增 `.env.example`，列出 API、数据库、Redis、搜索、对象存储、Auth、模型供应商配置。
+- [x] 实现 `GET /v1/system/health`，返回进程健康状态。
+- [x] 实现 `GET /v1/system/readiness`，检查数据库和 Redis 连接。
+- [x] 建立 API 全局错误过滤器，将异常转换为统一 `ApiError`。
+- [x] 建立 request id middleware / interceptor。
+- [x] 建立 Zod validation pipe，统一校验 request body、params、query。
+- [x] 增加 API 单元测试和 Supertest 集成测试。
 
 验收标准：
 
