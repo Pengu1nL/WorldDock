@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PublicRepository } from "@worlddock/domain";
-import { listPublicRepositories } from "./api";
+import { forkRepository, listPublicRepositories, starRepository, unstarRepository } from "./api";
 import { PUBLIC_REPOSITORIES } from "./fixtures";
 import { Icon } from "./components";
 
@@ -20,12 +20,12 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
   const [activeRepository, setActiveRepository] = useState<PublicRepository | null>(null);
   const [starredIds, setStarredIds] = useState<string[]>([]);
   const [repositories, setRepositories] = useState<PublicRepository[]>(PUBLIC_REPOSITORIES);
+  const sessionToken = useCallback(() => typeof window === "undefined"
+    ? ""
+    : window.localStorage.getItem("worlddock.sessionToken") ?? "", []);
 
   useEffect(() => {
-    const sessionToken = typeof window === "undefined"
-      ? ""
-      : window.localStorage.getItem("worlddock.sessionToken") ?? "";
-    void listPublicRepositories({ sessionToken })
+    void listPublicRepositories({ sessionToken: sessionToken() })
       .then((result: any) => {
         if (Array.isArray(result.repositories) && result.repositories.length > 0) {
           setRepositories(result.repositories);
@@ -34,7 +34,7 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
       .catch(() => {
         setRepositories(PUBLIC_REPOSITORIES);
       });
-  }, []);
+  }, [sessionToken]);
 
   const filtered = useMemo(() => {
     return repositories.filter((repository) => {
@@ -49,13 +49,34 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
         repository={activeRepository}
         starred={starredIds.includes(activeRepository.id)}
         onBack={() => setActiveRepository(null)}
-        onStar={() => {
-          setStarredIds((prev) => prev.includes(activeRepository.id)
+        onStar={async () => {
+          const alreadyStarred = starredIds.includes(activeRepository.id);
+          const session = sessionToken();
+          try {
+            if (session) {
+              const result: any = alreadyStarred
+                ? await unstarRepository(activeRepository.id, { sessionToken: session })
+                : await starRepository(activeRepository.id, { sessionToken: session });
+              setActiveRepository(result.repository);
+              setRepositories((prev) => prev.map((item) => item.id === result.repository.id ? result.repository : item));
+            }
+          } catch {
+            onToast({ kind: "info", text: "云端 Star 暂不可用，已更新本地状态" });
+          }
+          setStarredIds((prev) => alreadyStarred
             ? prev.filter((id) => id !== activeRepository.id)
             : [...prev, activeRepository.id]);
-          onToast({ kind: "save", text: "已 Star · " + activeRepository.name });
+          onToast({ kind: "save", text: (alreadyStarred ? "已取消 Star · " : "已 Star · ") + activeRepository.name });
         }}
-        onFork={() => {
+        onFork={async () => {
+          const session = sessionToken();
+          if (session) {
+            try {
+              await forkRepository(activeRepository.id, { sessionToken: session });
+            } catch {
+              onToast({ kind: "info", text: "云端 Fork 暂不可用，已生成本地演示副本" });
+            }
+          }
           onFork(activeRepository);
           onToast({ kind: "save", text: "Fork 成功 · 已生成私有世界" });
         }}

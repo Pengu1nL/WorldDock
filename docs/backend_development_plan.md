@@ -547,15 +547,16 @@ type ApiError = {
 
 任务：
 
-- [ ] 设计并迁移 `stars` 和 `forks` 表。
-- [ ] 实现 Star / Unstar API，使用唯一约束保证幂等。
-- [ ] 实现 Fork API，从指定 repository release 生成私有 draft world。
-- [ ] Fork 记录 source repository、source release、target world、license snapshot。
-- [ ] 实现 Local Push API，要求 Access Token 具备 `repository:push` scope。
-- [ ] Local Push 只接收明确上传的公开快照，不读取本地私有数据。
-- [ ] 实现授权规则校验，禁止 Fork 的仓库不可 Fork。
-- [ ] 前端社区页接入真实 Star、Fork、举报入口。
-- [ ] 设置页 token 状态与 Local Push 禁用态接入真实 API。
+- [x] 设计并迁移 `stars` 和 `forks` 表。
+- [x] 实现 Star / Unstar API，使用唯一约束保证幂等。
+- [x] 实现 Fork API，从指定 repository release 生成私有 draft world。
+- [x] Fork 记录 source repository、source release、target world、license snapshot。
+- [x] 实现 Local Push API，要求 Access Token 具备 `repository:push` scope。
+- [x] Local Push 只接收明确上传的公开快照，不读取本地私有数据。
+- [x] 实现授权规则校验，禁止 Fork 的仓库不可 Fork。
+- [x] 前端社区页接入真实 Star、Fork。
+- [ ] 前端公开仓库举报入口接入真实 API（并入 Phase 10 审核举报）。
+- [x] 设置页 token 状态与 Local Push 禁用态接入真实 API。
 
 验收标准：
 

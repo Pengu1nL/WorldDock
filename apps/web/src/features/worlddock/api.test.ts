@@ -15,10 +15,14 @@ import {
   listRepositoryReleases,
   listStorySeeds,
   listWorlds,
+  localPushRepository,
   publishWorld,
   revokeAccessToken,
   saveAgentSuggestion,
+  starRepository,
   streamAgentEvents,
+  unstarRepository,
+  forkRepository,
 } from "./api";
 
 describe("worlddock API client", () => {
@@ -151,6 +155,32 @@ describe("worlddock API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/repositories", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/repositories/ren/memory-market", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/repositories/repo_1/releases", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("stars, unstars, forks, and local-pushes repositories", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ repository: { id: "repo_1", stars: 1 } }))
+      .mockResolvedValueOnce(jsonResponse({ repository: { id: "repo_1", stars: 0 } }))
+      .mockResolvedValueOnce(jsonResponse({ world: { id: "world_2" }, fork: { id: "fork_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ repository: { id: "repo_local" }, release: { id: "rel_1" } }));
+
+    await starRepository("repo_1", { sessionToken: "session_valid", fetcher });
+    await unstarRepository("repo_1", { sessionToken: "session_valid", fetcher });
+    await forkRepository("repo_1", { sessionToken: "session_valid", fetcher });
+    await localPushRepository({
+      name: "Local World",
+      summary: "本地快照",
+      tags: [],
+      releaseNote: "Local Push",
+      license: "free-fork-attribution",
+      snapshot: { world: { name: "Local World", type: "本地", summary: "本地快照", tags: [], maturity: 0 }, archiveEntries: [], storySeeds: [], conflicts: [] },
+    }, { sessionToken: "wdl_push_secret", fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/repositories/repo_1/star", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/repositories/repo_1/star", expect.objectContaining({ method: "DELETE" }));
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/repositories/repo_1/fork", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/repositories/local-push", expect.objectContaining({ method: "POST" }));
   });
 
   it("streams agent SSE events as chunks arrive", async () => {

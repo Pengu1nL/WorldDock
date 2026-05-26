@@ -23,6 +23,8 @@ model User {
   billingAccount BillingAccount?
   usageLedger   UsageLedgerEntry[]
   repositories  PublicRepository[]
+  stars         RepositoryStar[]
+  forks         RepositoryFork[]
 
   @@map("users")
 }
@@ -114,6 +116,7 @@ model World {
   agentRuns         AgentRun[]
   agentSuggestions  AgentSuggestion[]
   repository        PublicRepository?
+  forkRecords       RepositoryFork[]
 
   @@index([ownerId])
   @@map("worlds")
@@ -290,7 +293,7 @@ model UsageLedgerEntry {
 
 model PublicRepository {
   id        String              @id @default(cuid())
-  worldId   String              @unique
+  worldId   String?             @unique
   ownerId   String
   ownerName String
   slug      String
@@ -303,9 +306,11 @@ model PublicRepository {
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
   owner     User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  world     World               @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  world     World?              @relation(fields: [worldId], references: [id], onDelete: Cascade)
   releases  RepositoryRelease[]
   snapshots ReleaseSnapshot[]
+  starRecords RepositoryStar[]
+  forkRecords RepositoryFork[]
 
   @@unique([ownerName, slug])
   @@index([ownerId])
@@ -323,6 +328,7 @@ model RepositoryRelease {
   createdAt    DateTime        @default(now())
   repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   snapshot     ReleaseSnapshot?
+  forks        RepositoryFork[]
 
   @@unique([repositoryId, version])
   @@index([repositoryId])
@@ -340,4 +346,36 @@ model ReleaseSnapshot {
 
   @@index([repositoryId])
   @@map("release_snapshots")
+}
+
+model RepositoryStar {
+  id           String           @id @default(cuid())
+  repositoryId String
+  userId       String
+  createdAt    DateTime         @default(now())
+  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, userId])
+  @@index([userId])
+  @@map("stars")
+}
+
+model RepositoryFork {
+  id                 String           @id @default(cuid())
+  repositoryId       String
+  sourceReleaseId    String
+  targetWorldId      String
+  userId             String
+  licenseSnapshot    String
+  createdAt          DateTime         @default(now())
+  repository         PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  sourceRelease      RepositoryRelease @relation(fields: [sourceReleaseId], references: [id], onDelete: Cascade)
+  targetWorld        World            @relation(fields: [targetWorldId], references: [id], onDelete: Cascade)
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryId])
+  @@index([userId])
+  @@index([targetWorldId])
+  @@map("forks")
 }

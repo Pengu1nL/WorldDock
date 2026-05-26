@@ -27,6 +27,104 @@ export class RepositoryService {
     return releases.map(toReleaseDetail);
   }
 
+  async starRepository(subject: AuthSubject, repositoryId: string) {
+    const repository = await this.repositories.starRepository(repositoryId, subject.user.id);
+    if (!repository) throw this.notFound("Repository not found.");
+    return this.toRepositoryDetail(repository);
+  }
+
+  async unstarRepository(subject: AuthSubject, repositoryId: string) {
+    const repository = await this.repositories.unstarRepository(repositoryId, subject.user.id);
+    if (!repository) throw this.notFound("Repository not found.");
+    return this.toRepositoryDetail(repository);
+  }
+
+  async forkRepository(subject: AuthSubject, repositoryId: string) {
+    const repository = await this.repositories.findById(repositoryId);
+    if (!repository) throw this.notFound("Repository not found.");
+    if (repository.license === "no-fork") {
+      throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "This repository does not allow forks." });
+    }
+
+    const latestRelease = (await this.repositories.listReleases(repository.id))[0];
+    if (!latestRelease) throw this.notFound("Release not found.");
+    const snapshot = await this.repositories.findSnapshotByReleaseId(latestRelease.id);
+    if (!snapshot) throw this.notFound("Release snapshot not found.");
+
+    const world = await this.worlds.createWorld({
+      ownerId: subject.user.id,
+      name: `${snapshot.snapshot.world.name} Fork`,
+      type: snapshot.snapshot.world.type,
+      summary: snapshot.snapshot.world.summary,
+      tags: snapshot.snapshot.world.tags,
+      mode: "cloud",
+      maturity: snapshot.snapshot.world.maturity,
+    });
+    await Promise.all([
+      ...snapshot.snapshot.archiveEntries.map((entry) => this.worlds.createArchiveEntry({ worldId: world.id, ...entry })),
+      ...snapshot.snapshot.storySeeds.map((seed) => this.worlds.createStorySeed({ worldId: world.id, ...seed })),
+      ...snapshot.snapshot.conflicts.map((conflict) => this.worlds.createConflict({ worldId: world.id, ...conflict })),
+    ]);
+    const fork = await this.repositories.createFork({
+      repositoryId: repository.id,
+      sourceReleaseId: latestRelease.id,
+      targetWorldId: world.id,
+      userId: subject.user.id,
+      licenseSnapshot: repository.license,
+    });
+
+    return { world, fork };
+  }
+
+  async localPush(subject: AuthSubject, input: {
+    name: string;
+    summary: string;
+    tags: string[];
+    releaseNote: string;
+    license: string;
+    snapshot: {
+      world: { name: string; type: string; summary: string; tags: string[]; maturity: number };
+      archiveEntries: unknown[];
+      storySeeds: unknown[];
+      conflicts: unknown[];
+    };
+  }) {
+    if (subject.kind !== "access-token") {
+      throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "Local Push requires an access token." });
+    }
+    const license = licenseSchema.parse(input.license);
+    const repository = await this.repositories.createRepository({
+      worldId: null,
+      ownerId: subject.user.id,
+      ownerName: subject.user.name,
+      slug: slugify(input.name),
+      name: input.name,
+      summary: input.summary,
+      tags: input.tags,
+      license,
+    });
+    const diff = buildDiff(true, input.snapshot.archiveEntries.length, input.snapshot.storySeeds.length);
+    const release = await this.repositories.createRelease({
+      repositoryId: repository.id,
+      version: "v1.0.0",
+      note: input.releaseNote,
+      license,
+      diff,
+      source: "local-push",
+    });
+    const snapshot = releaseSnapshotSchema.parse({
+      repositoryId: repository.id,
+      releaseId: release.id,
+      ...input.snapshot,
+      createdAt: release.createdAt.toISOString(),
+    });
+    await this.repositories.createSnapshot({ repositoryId: repository.id, releaseId: release.id, snapshot });
+    return {
+      repository: await this.toRepositoryDetail(repository),
+      release: toReleaseDetail(release),
+    };
+  }
+
   async publishWorld(subject: AuthSubject, worldId: string, input: { releaseNote: string; license: string }) {
     const world = await this.requireOwnedWorld(subject, worldId);
     const license = licenseSchema.parse(input.license);

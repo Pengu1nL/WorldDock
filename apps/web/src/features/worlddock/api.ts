@@ -107,6 +107,18 @@ export type PublishWorldInput = {
   license: string;
 };
 
+export type LocalPushInput = PublishWorldInput & {
+  name: string;
+  summary: string;
+  tags: string[];
+  snapshot: {
+    world: { name: string; type: string; summary: string; tags: string[]; maturity: number };
+    archiveEntries: unknown[];
+    storySeeds: unknown[];
+    conflicts: unknown[];
+  };
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -278,6 +290,47 @@ export async function listRepositoryReleases(repositoryId: string, options: ApiC
   return requestJson(`/v1/repositories/${repositoryId}/releases`, {
     method: "GET",
     sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function starRepository(repositoryId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/repositories/${repositoryId}/star`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function unstarRepository(repositoryId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/repositories/${repositoryId}/star`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function forkRepository(repositoryId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/repositories/${repositoryId}/fork`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function localPushRepository(input: LocalPushInput, options: ApiClientOptions) {
+  return requestJson("/v1/repositories/local-push", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
     signal: options.signal,

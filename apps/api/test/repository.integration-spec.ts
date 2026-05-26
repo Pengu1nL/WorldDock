@@ -5,7 +5,7 @@ import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApiApp } from "../src/configure-api-app";
-import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import { AUTH_REPOSITORY, hashToken, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
 import {
   REPOSITORY_REPOSITORY,
   type PublicRepositoryRecord,
@@ -131,6 +131,120 @@ describe("repository publish endpoints", () => {
       .send({ releaseNote: "越权发布", license: "free-fork-attribution" })
       .expect(403);
   });
+
+  it("stars and unstars repositories idempotently", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addSession(auth, "session_user_1", "user_1", "ren");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Star World",
+      type: "奇幻",
+      summary: "可被收藏。",
+      tags: [],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, repositories);
+    const publish = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "free-fork-attribution" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/star`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(201);
+    const secondStar = await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/star`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(201);
+    expect(secondStar.body.repository.stars).toBe(1);
+
+    await request(app.getHttpServer())
+      .delete(`/v1/repositories/${publish.body.repository.id}/star`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(200);
+    const secondUnstar = await request(app.getHttpServer())
+      .delete(`/v1/repositories/${publish.body.repository.id}/star`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(200);
+    expect(secondUnstar.body.repository.stars).toBe(0);
+  });
+
+  it("forks a public repository into a private draft world", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addSession(auth, "session_user_1", "user_1", "ren");
+    addSession(auth, "session_user_2", "user_2", "lin");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Forkable World",
+      type: "奇幻",
+      summary: "允许 fork。",
+      tags: ["可分叉"],
+      mode: "cloud",
+    });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "规则", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
+    app = await createTestApp(auth, worlds, repositories);
+    const publish = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "free-fork-attribution" })
+      .expect(201);
+
+    const fork = await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/fork`)
+      .set("authorization", "Bearer session_user_2")
+      .expect(201);
+
+    expect(fork.body.world).toMatchObject({ ownerId: "user_2", status: "draft", visibility: "private" });
+    expect(await repositories.listForksForRepository(publish.body.repository.id)).toHaveLength(1);
+  });
+
+  it("accepts Local Push only from access tokens with repository:push scope", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addAccessToken(auth, "wdl_push_secret", "user_1", "ren", ["repository:push"]);
+    addAccessToken(auth, "wdl_read_secret", "user_2", "lin", ["world:read"]);
+    app = await createTestApp(auth, worlds, repositories);
+
+    const pushed = await request(app.getHttpServer())
+      .post("/v1/repositories/local-push")
+      .set("authorization", "Bearer wdl_push_secret")
+      .send({
+        name: "Local World",
+        summary: "来自本地公开快照。",
+        tags: ["local"],
+        releaseNote: "Local Push",
+        license: "free-fork-attribution",
+        snapshot: {
+          world: { name: "Local World", type: "本地", summary: "来自本地公开快照。", tags: ["local"], maturity: 12 },
+          archiveEntries: [],
+          storySeeds: [],
+          conflicts: [],
+        },
+      })
+      .expect(201);
+
+    expect(pushed.body.repository.slug).toBe("local-world");
+
+    await request(app.getHttpServer())
+      .post("/v1/repositories/local-push")
+      .set("authorization", "Bearer wdl_read_secret")
+      .send({
+        name: "Denied",
+        summary: "scope 不足。",
+        tags: [],
+        releaseNote: "Denied",
+        license: "free-fork-attribution",
+        snapshot: { world: { name: "Denied", type: "本地", summary: "scope 不足。", tags: [], maturity: 1 }, archiveEntries: [], storySeeds: [], conflicts: [] },
+      })
+      .expect(403);
+  });
 });
 
 async function createTestApp(
@@ -159,6 +273,22 @@ async function createTestApp(
 function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string) {
   repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name, role: "user" });
   repository.sessions.set(token, { token, userId, expiresAt: new Date(Date.now() + 60_000) });
+}
+
+function addAccessToken(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string, scopes: string[]) {
+  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name, role: "user" });
+  repository.accessTokens.set(`at_${userId}`, {
+    id: `at_${userId}`,
+    userId,
+    name: "Local Push",
+    tokenHash: hashToken(token),
+    prefix: "push",
+    scopes,
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+    createdAt: new Date(),
+  });
 }
 
 function createInMemoryAuthRepository() {
@@ -237,8 +367,11 @@ function createInMemoryRepositoryRepository() {
   const repositories = new Map<string, PublicRepositoryRecord>();
   const releases = new Map<string, ReleaseRecord>();
   const snapshots = new Map<string, ReleaseSnapshotRecord>();
+  const stars = new Set<string>();
+  const forks: any[] = [];
 
   const repository: RepositoryRepository = {
+    async findById(id) { return repositories.get(id) ?? null; },
     async findByWorldId(worldId) { return [...repositories.values()].find((item) => item.worldId === worldId) ?? null; },
     async createRepository(input) {
       const now = new Date();
@@ -270,6 +403,33 @@ function createInMemoryRepositoryRepository() {
     },
     async findSnapshotByReleaseId(releaseId) {
       return [...snapshots.values()].find((snapshot) => snapshot.releaseId === releaseId) ?? null;
+    },
+    async starRepository(repositoryId, userId) {
+      const key = `${repositoryId}:${userId}`;
+      if (!stars.has(key)) {
+        stars.add(key);
+        const repository = repositories.get(repositoryId);
+        if (repository) repositories.set(repositoryId, { ...repository, stars: repository.stars + 1, updatedAt: new Date() });
+      }
+      return repositories.get(repositoryId) ?? null;
+    },
+    async unstarRepository(repositoryId, userId) {
+      const key = `${repositoryId}:${userId}`;
+      if (stars.delete(key)) {
+        const repository = repositories.get(repositoryId);
+        if (repository) repositories.set(repositoryId, { ...repository, stars: Math.max(0, repository.stars - 1), updatedAt: new Date() });
+      }
+      return repositories.get(repositoryId) ?? null;
+    },
+    async createFork(input) {
+      const fork = { id: `fork_${forks.length + 1}`, createdAt: new Date(), ...input };
+      forks.push(fork);
+      const repository = repositories.get(input.repositoryId);
+      if (repository) repositories.set(input.repositoryId, { ...repository, forks: repository.forks + 1, updatedAt: new Date() });
+      return fork;
+    },
+    async listForksForRepository(repositoryId) {
+      return forks.filter((fork) => fork.repositoryId === repositoryId);
     },
   };
 

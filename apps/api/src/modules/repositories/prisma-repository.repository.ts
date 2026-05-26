@@ -7,6 +7,11 @@ import type { PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, Repo
 export class PrismaRepositoryRepository implements RepositoryRepository, OnModuleDestroy {
   private readonly prisma: PrismaClient = createPrismaClient();
 
+  async findById(id: string) {
+    const repository = await this.prisma.publicRepository.findUnique({ where: { id } });
+    return repository ? mapRepository(repository) : null;
+  }
+
   async findByWorldId(worldId: string) {
     const repository = await this.prisma.publicRepository.findUnique({ where: { worldId } });
     return repository ? mapRepository(repository) : null;
@@ -57,6 +62,41 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
   async findSnapshotByReleaseId(releaseId: string) {
     const snapshot = await this.prisma.releaseSnapshot.findUnique({ where: { releaseId } });
     return snapshot ? mapSnapshot(snapshot) : null;
+  }
+
+  async starRepository(repositoryId: string, userId: string) {
+    await this.prisma.repositoryStar.upsert({
+      where: { repositoryId_userId: { repositoryId, userId } },
+      create: { repositoryId, userId },
+      update: {},
+    });
+    const stars = await this.prisma.repositoryStar.count({ where: { repositoryId } });
+    const repository = await this.prisma.publicRepository.update({
+      where: { id: repositoryId },
+      data: { stars },
+    });
+    return mapRepository(repository);
+  }
+
+  async unstarRepository(repositoryId: string, userId: string) {
+    await this.prisma.repositoryStar.deleteMany({ where: { repositoryId, userId } });
+    const stars = await this.prisma.repositoryStar.count({ where: { repositoryId } });
+    const repository = await this.prisma.publicRepository.update({
+      where: { id: repositoryId },
+      data: { stars },
+    });
+    return mapRepository(repository);
+  }
+
+  async createFork(input: Parameters<RepositoryRepository["createFork"]>[0]) {
+    const fork = await this.prisma.repositoryFork.create({ data: input });
+    const forks = await this.prisma.repositoryFork.count({ where: { repositoryId: input.repositoryId } });
+    await this.prisma.publicRepository.update({ where: { id: input.repositoryId }, data: { forks } });
+    return fork;
+  }
+
+  async listForksForRepository(repositoryId: string) {
+    return this.prisma.repositoryFork.findMany({ where: { repositoryId }, orderBy: { createdAt: "desc" } });
   }
 
   async onModuleDestroy() {
