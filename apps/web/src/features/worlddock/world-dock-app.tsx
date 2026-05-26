@@ -4,7 +4,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { listArchiveEntries, listConflicts, listStorySeeds, listWorlds } from "./api";
+import {
+  cancelAgentRun,
+  createAgentRun,
+  discardAgentSuggestion,
+  listArchiveEntries,
+  listConflicts,
+  listStorySeeds,
+  listWorlds,
+  saveAgentSuggestion,
+  streamAgentEvents,
+} from "./api";
 import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
 import { CommunityView } from "./view-community";
 import { MOCK } from "./mock-data";
@@ -79,8 +89,10 @@ function WorldDockRuntime() {
   const [mockFailure, setMockFailure] = useState<any>(null); // null | save-failed | model-unavailable | insufficient-balance
   const [communityConnected, setCommunityConnected] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
+  const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
 
   const streamingTimer = useRef<any>(null);
+  const agentAbortRef = useRef<AbortController | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   // worldId → { messages, savedSettings, savedSeeds, savedConflicts, savedIds, agentMode }
   const worldStatesRef = useRef<any>({});
@@ -170,7 +182,7 @@ function WorldDockRuntime() {
   // ────────── Mock Agent streaming ──────────
   const seedData = (MOCK.SEEDS as any)[t.seedKey] || MOCK.SEEDS.memory;
 
-  const startAgentRun = useCallback((userText: string, isInitial = false) => {
+  const startAgentRun = useCallback(async (userText: string, isInitial = false) => {
     if (agentBusy) return;
     if (mockFailure === "model-unavailable") {
       pushToast({ kind: "warn", text: "模型不可用 · 请检查模型配置或稍后重试" });
@@ -180,6 +192,78 @@ function WorldDockRuntime() {
       pushToast({ kind: "warn", text: "余额不足 · 请充值后继续推演" });
       return;
     }
+
+    const canUseBackendAgent = Boolean(
+      sessionToken &&
+      currentWorld?.id &&
+      !String(currentWorld.id).startsWith("new_") &&
+      !String(currentWorld.id).startsWith("copy_") &&
+      !String(currentWorld.id).startsWith("fork_"),
+    );
+
+    if (canUseBackendAgent && currentWorld) {
+      const agentMsg = {
+        id: "m_" + Date.now(),
+        role: "agent",
+        mode: agentMode,
+        text: "",
+        tools: null,
+        suggestions: null,
+        streaming: true,
+        contextRefs: null,
+      };
+      setAgentBusy(true);
+      setRunTokens(0);
+      setMessages(prev => [...prev, agentMsg]);
+
+      try {
+        const abortController = new AbortController();
+        agentAbortRef.current = abortController;
+        const created: any = await createAgentRun(
+          currentWorld.id,
+          { prompt: userText, mode: getBackendAgentMode(agentMode) },
+          { sessionToken },
+        );
+        setActiveAgentRunId(created.run.id);
+        let currentText = "";
+        let contextRefs = 0;
+        const suggestions: any[] = [];
+
+        await streamAgentEvents(created.run.id, { sessionToken, signal: abortController.signal }, (event) => {
+          if (event.type === "message.delta") {
+            currentText += event.payload.text;
+            setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id ? { ...m, text: currentText } : m));
+            setRunTokens((tk: number) => tk + Math.max(1, Math.ceil(event.payload.text.length / 2)));
+          }
+          if (event.type === "context.used") contextRefs++;
+          if (event.type === "suggestion.created") {
+            suggestions.push({ ...event.payload.suggestion, agentSuggestionId: event.payload.suggestionId });
+          }
+          if (event.type === "run.completed" && event.payload.tokenUsage) {
+            setRunTokens(event.payload.tokenUsage.totalTokens);
+          }
+          if (event.type === "run.failed") {
+            pushToast({ kind: "warn", text: event.payload.message || "模型不可用" });
+          }
+        });
+
+        setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id
+          ? { ...m, streaming: false, suggestions, contextRefs }
+          : m));
+        if (agentAbortRef.current === abortController) agentAbortRef.current = null;
+        setAgentBusy(false);
+        setActiveAgentRunId(null);
+        return;
+      } catch (error) {
+        if (isAbortError(error)) return;
+        agentAbortRef.current = null;
+        setMessages((prev: any[]) => prev.filter((m: any) => m.id !== agentMsg.id));
+        setAgentBusy(false);
+        setActiveAgentRunId(null);
+        pushToast({ kind: "info", text: "云端 Agent 暂不可用，已切回本地演示流" });
+      }
+    }
+
     setAgentBusy(true);
     setRunTokens(0);
 
@@ -249,14 +333,20 @@ function WorldDockRuntime() {
       streamingTimer.current = null;
     };
     tick();
-  }, [agentBusy, agentMode, balance, mockFailure, pushToast, seedData, t.mode]);
+  }, [agentBusy, agentMode, balance, currentWorld, mockFailure, pushToast, seedData, sessionToken, t.mode]);
 
   const stopAgent = useCallback(() => {
+    if (activeAgentRunId && sessionToken) {
+      void cancelAgentRun(activeAgentRunId, { sessionToken });
+      setActiveAgentRunId(null);
+    }
+    agentAbortRef.current?.abort();
+    agentAbortRef.current = null;
     if (streamingTimer.current) clearTimeout(streamingTimer.current);
     streamingTimer.current = null;
     setAgentBusy(false);
     setMessages((prev: any[]) => prev.map((m: any) => m.streaming ? { ...m, streaming: false, text: m.text + " [已停止]" } : m));
-  }, []);
+  }, [activeAgentRunId, sessionToken]);
 
   // Reset streaming if seedKey or world changes
   useEffect(() => () => { if (streamingTimer.current) clearTimeout(streamingTimer.current); }, []);
@@ -345,11 +435,19 @@ function WorldDockRuntime() {
   };
 
   // Save suggestion handler
-  const handleSave = (item: any) => {
+  const handleSave = async (item: any) => {
     if (savedIds.includes(item.id)) return;
     if (mockFailure === "save-failed") {
       pushToast({ kind: "warn", text: "保存失败 · 请检查网络后重试" });
       return;
+    }
+    if (sessionToken && item.agentSuggestionId) {
+      try {
+        await saveAgentSuggestion(item.agentSuggestionId, { sessionToken });
+      } catch {
+        pushToast({ kind: "warn", text: "云端保存失败 · 请检查网络后重试" });
+        return;
+      }
     }
     setSavedIds((prev: any[]) => [...prev, item.id]);
     if (item.kind === "setting") {
@@ -377,7 +475,15 @@ function WorldDockRuntime() {
     setDrawerOpen(null);
   };
 
-  const handleDiscard = (item: any) => {
+  const handleDiscard = async (item: any) => {
+    if (sessionToken && item.agentSuggestionId) {
+      try {
+        await discardAgentSuggestion(item.agentSuggestionId, { sessionToken });
+      } catch {
+        pushToast({ kind: "warn", text: "云端丢弃失败 · 请检查网络后重试" });
+        return;
+      }
+    }
     setSavedIds((prev: any[]) => [...prev, item.id]);
     pushToast({ kind: "warn", text: `已丢弃 · ${item.title}` });
     setDrawerOpen(null);
@@ -757,6 +863,17 @@ const WorkbenchEmpty = ({ world }: any) => (
 );
 
 // ────────── Helper: follow-up agent responses ──────────
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function getBackendAgentMode(mode: string): "expand" | "challenge" | "fork" | "polish" {
+  if (mode === "critique" || mode === "tension" || mode === "consequence") return "challenge";
+  if (mode === "fork") return "fork";
+  if (mode === "polish" || mode === "settle") return "polish";
+  return "expand";
+}
+
 function getFollowUpResponse(mode: string, userText: string) {
   const presets = {
     expand: `沿着这条线继续推：${userText.slice(0, 30)}…\n\n第一层：制度层面会自然衍生出**配套监管机制**。第二层：技术层面意味着记忆的"完整副本"是否合法——这是世界里最敏感的灰色地带。第三层：经济层面会形成新的阶级分层。\n\n要不要我从其中一层收束为可保存的设定？`,

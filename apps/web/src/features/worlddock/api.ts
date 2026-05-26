@@ -15,6 +15,7 @@ export type ApiClientOptions = {
   sessionToken: string;
   fetcher?: typeof fetch;
   baseUrl?: string;
+  signal?: AbortSignal;
 };
 
 export type CreateWorldInput = {
@@ -48,6 +49,14 @@ export type CreateConflictInput = {
   body: string;
   related?: string[];
   derivedSeeds?: string[];
+};
+
+export type AgentRunMode = "expand" | "challenge" | "fork" | "polish";
+
+export type AgentEvent = {
+  type: string;
+  payload: any;
+  [key: string]: any;
 };
 
 export async function createAccessToken(
@@ -166,6 +175,135 @@ export async function createConflict(worldId: string, input: CreateConflictInput
   });
 }
 
+export async function createAgentRun(
+  worldId: string,
+  input: { prompt: string; mode: AgentRunMode },
+  options: ApiClientOptions,
+) {
+  return requestJson(`/v1/worlds/${worldId}/agent-runs`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function fetchAgentEvents(runId: string, options: ApiClientOptions): Promise<AgentEvent[]> {
+  const response = await openAgentEventResponse(runId, options);
+  const text = await response.text();
+  return parseSseEvents(text);
+}
+
+export async function streamAgentEvents(
+  runId: string,
+  options: ApiClientOptions,
+  onEvent: (event: AgentEvent) => void,
+): Promise<void> {
+  const response = await openAgentEventResponse(runId, options);
+
+  if (!response.body) {
+    for (const event of parseSseEvents(await response.text())) onEvent(event);
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+    let boundary = findSseBoundary(buffer);
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary);
+      const parsed = parseSseBlock(block);
+      if (parsed) onEvent(parsed);
+      buffer = buffer.slice(boundary + getBoundaryLength(buffer, boundary));
+      boundary = findSseBoundary(buffer);
+    }
+
+    if (done) break;
+  }
+
+  const trailing = parseSseBlock(buffer);
+  if (trailing) onEvent(trailing);
+}
+
+export async function cancelAgentRun(runId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/agent-runs/${runId}/cancel`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function saveAgentSuggestion(suggestionId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/agent-suggestions/${suggestionId}/save`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function discardAgentSuggestion(suggestionId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/agent-suggestions/${suggestionId}/discard`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+function parseSseEvents(text: string): AgentEvent[] {
+  return text
+    .split(/\r?\n\r?\n+/)
+    .map(parseSseBlock)
+    .filter((event): event is AgentEvent => Boolean(event));
+}
+
+async function openAgentEventResponse(runId: string, options: ApiClientOptions): Promise<Response> {
+  const fetcher = options.fetcher ?? fetch;
+  const response = await fetcher(`${options.baseUrl ?? getApiBaseUrl()}/v1/agent-runs/${runId}/events`, {
+    method: "GET",
+    headers: {
+      authorization: `Bearer ${options.sessionToken}`,
+    },
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent event stream failed with ${response.status}`);
+  }
+
+  return response;
+}
+
+function parseSseBlock(block: string): AgentEvent | null {
+  const data = block
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.replace(/^data:\s?/, ""))
+    .join("\n");
+
+  return data ? JSON.parse(data) as AgentEvent : null;
+}
+
+function findSseBoundary(text: string) {
+  const lf = text.indexOf("\n\n");
+  const crlf = text.indexOf("\r\n\r\n");
+  if (lf === -1) return crlf;
+  if (crlf === -1) return lf;
+  return Math.min(lf, crlf);
+}
+
+function getBoundaryLength(text: string, boundary: number) {
+  return text.startsWith("\r\n\r\n", boundary) ? 4 : 2;
+}
+
 async function requestJson<T>(
   path: string,
   options: {
@@ -174,6 +312,7 @@ async function requestJson<T>(
     body?: unknown;
     fetcher?: typeof fetch;
     baseUrl?: string;
+    signal?: AbortSignal;
   },
 ): Promise<T> {
   const fetcher = options.fetcher ?? fetch;
@@ -189,6 +328,7 @@ async function requestJson<T>(
   const response = await fetcher(url, {
     method: options.method,
     headers,
+    signal: options.signal,
     ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
   });
 

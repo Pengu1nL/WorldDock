@@ -70,6 +70,97 @@ export const agentSeedSchema = z.object({
   issues: z.array(consistencyIssueSchema),
 });
 
+export const tokenUsageSchema = z.object({
+  inputTokens: z.number().int().min(0),
+  outputTokens: z.number().int().min(0),
+  totalTokens: z.number().int().min(0),
+});
+
+export const agentRunStatusSchema = z.enum(["queued", "running", "completed", "failed", "cancelled"]);
+export const agentRunModeSchema = z.enum(["expand", "challenge", "fork", "polish"]);
+
+export const agentRunSchema = z.object({
+  id: z.string().min(1),
+  worldId: z.string().min(1),
+  userId: z.string().min(1),
+  status: agentRunStatusSchema,
+  mode: agentRunModeSchema,
+  prompt: z.string().min(1),
+  model: z.string().min(1).optional(),
+  tokenUsage: tokenUsageSchema.optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable().optional(),
+  failedAt: z.string().datetime().nullable().optional(),
+  cancelledAt: z.string().datetime().nullable().optional(),
+  errorCode: z.string().min(1).nullable().optional(),
+  errorMessage: z.string().min(1).nullable().optional(),
+});
+
+export const contextRefSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  kind: z.enum(["world", "archive", "seed", "conflict", "repository"]),
+  title: z.string().min(1),
+  excerpt: z.string().min(1),
+  targetId: z.string().min(1).optional(),
+});
+
+export const agentSuggestionRecordSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  worldId: z.string().min(1),
+  status: z.enum(["pending", "saved", "discarded"]),
+  suggestion: suggestionSchema,
+  savedAssetId: z.string().min(1).nullable().optional(),
+});
+
+const baseAgentEventSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  sequence: z.number().int().min(1),
+  createdAt: z.string().datetime(),
+});
+
+export const agentEventSchema = z.discriminatedUnion("type", [
+  baseAgentEventSchema.extend({
+    type: z.literal("run.started"),
+    payload: z.object({ runId: z.string().min(1), mode: agentRunModeSchema }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("context.used"),
+    payload: z.object({ contextRef: contextRefSchema.omit({ runId: true }) }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("message.delta"),
+    payload: z.object({ text: z.string() }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("suggestion.created"),
+    payload: z.object({
+      suggestionId: z.string().min(1),
+      suggestion: suggestionSchema,
+    }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("run.completed"),
+    payload: z.object({ tokenUsage: tokenUsageSchema.optional() }).default({}),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("run.failed"),
+    payload: z.object({ code: z.string().min(1), message: z.string().min(1) }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("run.cancelled"),
+    payload: z.object({ reason: z.string().min(1).optional() }).default({}),
+  }),
+]);
+
 export type AgentSeed = z.infer<typeof agentSeedSchema>;
 export type WorldSuggestion = z.infer<typeof suggestionSchema>;
 export type ConsistencyIssue = z.infer<typeof consistencyIssueSchema>;
+export type TokenUsage = z.infer<typeof tokenUsageSchema>;
+export type AgentRun = z.infer<typeof agentRunSchema>;
+export type AgentEvent = z.infer<typeof agentEventSchema>;
+export type ContextRef = z.infer<typeof contextRefSchema>;
+export type AgentSuggestionRecord = z.infer<typeof agentSuggestionRecordSchema>;

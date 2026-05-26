@@ -466,19 +466,19 @@ type ApiError = {
 
 任务：
 
-- [ ] 在 `packages/domain` 定义 `AgentEvent`、`AgentRun`、`AgentSuggestion`、`ContextRef`、`TokenUsage` schema。
-- [ ] 设计并迁移 `agent_runs`、`agent_events`、`agent_suggestions`、`context_refs` 表。
-- [ ] 实现 `POST /v1/worlds/:worldId/agent-runs`，创建 run 并返回 run id。
-- [ ] 实现 `GET /v1/agent-runs/:runId/events`，以 SSE 输出 WorldDock AgentEvent。
-- [ ] 接入 server-side Vercel AI SDK，先支持一个默认模型供应商。
-- [ ] 将模型文本流转换为 `message.delta` 事件。
-- [ ] 将结构化输出转换为 `suggestion.created` 事件，并通过 Zod 校验。
-- [ ] 将上下文引用转换为 `context.used` 事件。
-- [ ] 实现 `POST /v1/agent-runs/:runId/cancel`。
-- [ ] 实现 suggestion save / discard API。
-- [ ] suggestion save 根据 kind 写入 archive / seed / conflict。
-- [ ] 记录 run completed、failed、cancelled 状态。
-- [ ] 前端工作台接入真实 SSE，保留停止、错误、余额不足、模型不可用反馈。
+- [x] 在 `packages/domain` 定义 `AgentEvent`、`AgentRun`、`AgentSuggestion`、`ContextRef`、`TokenUsage` schema。
+- [x] 设计并迁移 `agent_runs`、`agent_events`、`agent_suggestions`、`context_refs` 表。
+- [x] 实现 `POST /v1/worlds/:worldId/agent-runs`，创建 run 并返回 run id。
+- [x] 实现 `GET /v1/agent-runs/:runId/events`，以 SSE 输出 WorldDock AgentEvent。
+- [x] 接入 server-side Vercel AI SDK，先支持一个默认模型供应商。
+- [x] 将模型文本流转换为 `message.delta` 事件。
+- [x] 将结构化输出转换为 `suggestion.created` 事件，并通过 Zod 校验。
+- [x] 将上下文引用转换为 `context.used` 事件。
+- [x] 实现 `POST /v1/agent-runs/:runId/cancel`。
+- [x] 实现 suggestion save / discard API。
+- [x] suggestion save 根据 kind 写入 archive / seed / conflict。
+- [x] 记录 run completed、failed、cancelled 状态。
+- [x] 前端工作台接入真实 SSE，保留停止、错误、余额不足、模型不可用反馈。
 
 验收标准：
 

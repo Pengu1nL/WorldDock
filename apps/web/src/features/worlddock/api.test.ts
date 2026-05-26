@@ -2,13 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createAccessToken,
   createArchiveEntry,
+  createAgentRun,
   createWorld,
+  fetchAgentEvents,
   listArchiveEntries,
   listAccessTokens,
   listConflicts,
   listStorySeeds,
   listWorlds,
   revokeAccessToken,
+  saveAgentSuggestion,
+  streamAgentEvents,
 } from "./api";
 
 describe("worlddock API client", () => {
@@ -81,6 +85,64 @@ describe("worlddock API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/worlds/world_1/archive", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(5, "http://localhost:4000/v1/worlds/world_1/seeds", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(6, "http://localhost:4000/v1/worlds/world_1/conflicts", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("creates agent runs, parses SSE events, and saves suggestions", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ run: { id: "run_1" }, suggestions: [] }))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => [
+          "event: message.delta",
+          "data: {\"type\":\"message.delta\",\"payload\":{\"text\":\"好。\"}}",
+          "",
+          "event: suggestion.created",
+          "data: {\"type\":\"suggestion.created\",\"payload\":{\"suggestionId\":\"ags_1\",\"suggestion\":{\"id\":\"s1\",\"kind\":\"setting\",\"category\":\"世界规则\",\"title\":\"规则\",\"summary\":\"摘要\",\"body\":\"正文\"}}}",
+          "",
+        ].join("\n"),
+      } as Response)
+      .mockResolvedValueOnce(jsonResponse({ suggestion: { id: "ags_1", status: "saved" } }));
+
+    await createAgentRun("world_1", { prompt: "继续推演", mode: "expand" }, { sessionToken: "session_valid", fetcher });
+    const events = await fetchAgentEvents("run_1", { sessionToken: "session_valid", fetcher });
+    await saveAgentSuggestion("ags_1", { sessionToken: "session_valid", fetcher });
+
+    expect(events.map((event) => event.type)).toEqual(["message.delta", "suggestion.created"]);
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-runs", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/agent-runs/run_1/events", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/agent-suggestions/ags_1/save", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("streams agent SSE events as chunks arrive", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode([
+          "event: message.delta",
+          "data: {\"type\":\"message.delta\",\"payload\":{\"text\":\"好。\"}}",
+        ].join("\n") + "\n\n"));
+        controller.enqueue(encoder.encode([
+          "event: run.completed",
+          "data: {\"type\":\"run.completed\",\"payload\":{\"tokenUsage\":{\"inputTokens\":1,\"outputTokens\":2,\"totalTokens\":3}}}",
+        ].join("\n") + "\n\n"));
+        controller.close();
+      },
+    });
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      body: stream,
+      text: async () => "",
+    } as Response));
+    const events: string[] = [];
+
+    await streamAgentEvents("run_1", { sessionToken: "session_valid", fetcher }, (event) => {
+      events.push(event.type);
+    });
+
+    expect(events).toEqual(["message.delta", "run.completed"]);
   });
 });
 

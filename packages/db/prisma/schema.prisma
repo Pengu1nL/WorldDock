@@ -108,6 +108,8 @@ model World {
   storySeeds        StorySeed[]
   conflicts         Conflict[]
   consistencyIssues ConsistencyIssue[]
+  agentRuns         AgentRun[]
+  agentSuggestions  AgentSuggestion[]
 
   @@index([ownerId])
   @@map("worlds")
@@ -175,4 +177,75 @@ model ConsistencyIssue {
 
   @@index([worldId])
   @@map("consistency_issues")
+}
+
+model AgentRun {
+  id             String            @id @default(cuid())
+  worldId        String
+  userId         String
+  status         String            @default("running")
+  mode           String
+  prompt         String
+  model          String?
+  tokenUsage     Json?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  completedAt    DateTime?
+  failedAt       DateTime?
+  cancelledAt    DateTime?
+  world          World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  events         AgentEvent[]
+  suggestions    AgentSuggestion[]
+  contextRefs    ContextRef[]
+
+  @@index([worldId])
+  @@index([userId])
+  @@map("agent_runs")
+}
+
+model AgentEvent {
+  id        String   @id @default(cuid())
+  runId     String
+  type      String
+  sequence  Int
+  payload   Json
+  createdAt DateTime @default(now())
+  run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, sequence])
+  @@index([runId])
+  @@map("agent_events")
+}
+
+model AgentSuggestion {
+  id           String   @id @default(cuid())
+  runId        String
+  worldId      String
+  status       String   @default("pending")
+  suggestion   Json
+  savedAssetId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  run          AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([worldId])
+  @@map("agent_suggestions")
+}
+
+model ContextRef {
+  id        String   @id @default(cuid())
+  runId     String
+  kind      String
+  title     String
+  excerpt   String
+  targetId  String?
+  createdAt DateTime @default(now())
+  run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("context_refs")
 }

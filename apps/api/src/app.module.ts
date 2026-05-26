@@ -1,12 +1,13 @@
 import "reflect-metadata";
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { RequestIdMiddleware } from "./common/request-id.middleware";
+import { AgentModule } from "./modules/agent/agent.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { SystemModule } from "./modules/system/system.module";
 import { WorldsModule } from "./modules/worlds/worlds.module";
 
 @Module({
-  imports: [AuthModule, SystemModule, WorldsModule],
+  imports: [AgentModule, AuthModule, SystemModule, WorldsModule],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
