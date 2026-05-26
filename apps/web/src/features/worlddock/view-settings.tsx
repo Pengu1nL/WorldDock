@@ -1,5 +1,11 @@
 import { useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
+import {
+  createAccessToken,
+  listAccessTokens,
+  revokeAccessToken,
+  type AccessTokenSummary,
+} from "./api";
 import { Icon } from "./components";
 
 type SettingsViewProps = {
@@ -23,6 +29,80 @@ export function SettingsView({
   const [modelStatus, setModelStatus] = useState("未测试");
   const [token, setToken] = useState(communityConnected ? "wd_mock_token" : "");
   const [tokenStatus, setTokenStatus] = useState(communityConnected ? "Token 已保存 · Push 权限正常" : "未连接");
+  const [cloudTokens, setCloudTokens] = useState<AccessTokenSummary[]>([]);
+  const [cloudTokenBusy, setCloudTokenBusy] = useState(false);
+
+  const sessionToken = () => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("worlddock.sessionToken") ?? "";
+  };
+
+  const refreshCloudTokens = async () => {
+    const session = sessionToken();
+    if (!session) {
+      setTokenStatus("未登录 Cloud，无法读取云端 Token");
+      return;
+    }
+
+    setCloudTokenBusy(true);
+    try {
+      const result = await listAccessTokens({ sessionToken: session });
+      setCloudTokens(result.accessTokens);
+      setTokenStatus(`已同步 ${result.accessTokens.length} 个云端 Token`);
+    } catch {
+      setTokenStatus("云端 Token 同步失败");
+    } finally {
+      setCloudTokenBusy(false);
+    }
+  };
+
+  const createCloudToken = async () => {
+    const session = sessionToken();
+    if (!session) {
+      setTokenStatus("未登录 Cloud，无法创建云端 Token");
+      return;
+    }
+
+    setCloudTokenBusy(true);
+    try {
+      const result = await createAccessToken(
+        { name: "Local Push", scopes: ["world:read", "world:write", "repository:push"] },
+        { sessionToken: session },
+      );
+      setToken(result.token);
+      setCloudTokens((tokens) => [result.accessToken, ...tokens]);
+      setTokenStatus("云端 Token 已创建 · 明文仅显示一次");
+      onCommunityConnected(true);
+      onToast({ kind: "save", text: "云端 Token 已创建" });
+    } catch {
+      setTokenStatus("云端 Token 创建失败");
+      onToast({ kind: "warn", text: "云端 Token 创建失败" });
+    } finally {
+      setCloudTokenBusy(false);
+    }
+  };
+
+  const revokeCloudToken = async (tokenId: string) => {
+    const session = sessionToken();
+    if (!session) {
+      setTokenStatus("未登录 Cloud，无法撤销云端 Token");
+      return;
+    }
+
+    setCloudTokenBusy(true);
+    try {
+      const result = await revokeAccessToken(tokenId, { sessionToken: session });
+      setCloudTokens((tokens) =>
+        tokens.map((item) => item.id === tokenId ? result.accessToken : item),
+      );
+      setTokenStatus("云端 Token 已撤销");
+      onToast({ kind: "warn", text: "云端 Token 已撤销" });
+    } catch {
+      setTokenStatus("云端 Token 撤销失败");
+    } finally {
+      setCloudTokenBusy(false);
+    }
+  };
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
@@ -115,8 +195,27 @@ export function SettingsView({
               >
                 断开连接
               </button>
+              <button className="btn" disabled={cloudTokenBusy} onClick={createCloudToken}>
+                创建云端 Token
+              </button>
+              <button className="btn ghost" disabled={cloudTokenBusy} onClick={refreshCloudTokens}>
+                刷新云端 Token
+              </button>
             </div>
             <div style={{ marginTop: 12, fontSize: 13 }}>{tokenStatus}</div>
+            {cloudTokens.length > 0 && (
+              <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+                {cloudTokens.map((item) => (
+                  <div key={item.id} className="row gap-2" style={{ justifyContent: "space-between", borderTop: "1px solid var(--hairline)", paddingTop: 8 }}>
+                    <span className="mono">wdl_{item.prefix}_...</span>
+                    <span>{item.revokedAt ? "已撤销" : item.scopes.join(" · ")}</span>
+                    <button className="icon-btn" aria-label={`撤销 ${item.name}`} disabled={Boolean(item.revokedAt) || cloudTokenBusy} onClick={() => revokeCloudToken(item.id)}>
+                      <Icon name="trash" size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
         {tab === "data" && (

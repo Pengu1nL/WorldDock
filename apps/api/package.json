@@ -25,6 +25,7 @@
     "@prisma/client": "latest",
     "@worlddock/db": "workspace:*",
     "@worlddock/domain": "workspace:*",
+    "better-auth": "latest",
     "ioredis": "latest",
     "reflect-metadata": "latest",
     "rxjs": "latest",

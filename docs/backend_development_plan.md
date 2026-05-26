@@ -413,15 +413,15 @@ type ApiError = {
 
 任务：
 
-- [ ] 接入 Better Auth，使用 PostgreSQL 持久化用户、账号和 session。
-- [ ] 实现 `GET /v1/me`，返回当前用户基础资料。
-- [ ] 实现 API auth guard，区分匿名、登录用户、管理员、Access Token subject。
-- [ ] 实现 Local Access Token 创建、列表、撤销。
-- [ ] 为 Access Token 增加 scope：`world:read`、`world:write`、`repository:push`。
-- [ ] 存储 token hash，不保存明文 token。
-- [ ] 增加 token 最后使用时间、过期时间和撤销时间。
-- [ ] 前端设置页接入真实 token 创建和撤销接口。
-- [ ] 增加认证集成测试：未登录、已登录、token scope 不足、token 撤销。
+- [x] 接入 Better Auth，使用 PostgreSQL 持久化用户、账号和 session。
+- [x] 实现 `GET /v1/me`，返回当前用户基础资料。
+- [x] 实现 API auth guard，区分匿名、登录用户、管理员、Access Token subject。
+- [x] 实现 Local Access Token 创建、列表、撤销。
+- [x] 为 Access Token 增加 scope：`world:read`、`world:write`、`repository:push`。
+- [x] 存储 token hash，不保存明文 token。
+- [x] 增加 token 最后使用时间、过期时间和撤销时间。
+- [x] 前端设置页接入真实 token 创建和撤销接口。
+- [x] 增加认证集成测试：未登录、已登录、token scope 不足、token 撤销。
 
 验收标准：
 
