@@ -18,6 +18,8 @@
     "test:readiness:local": "WORLD_DOCK_LOCAL_READINESS=1 vitest run --config vitest.integration.config.ts test/readiness-local.integration-spec.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "@aws-sdk/s3-request-presigner": "^3.1053.0",
     "@fastify/cors": "latest",
     "@nestjs/common": "latest",
     "@nestjs/core": "latest",

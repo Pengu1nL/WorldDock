@@ -12,6 +12,7 @@ export * from "./moderation-scan";
 export * from "./repository-source";
 export * from "./search-indexing";
 export * from "./search-indexing.queue";
+export * from "./storage-cleanup";
 
 async function runSearchWorkerCommand(command: string) {
   const env = parseWorldDockEnv(process.env);

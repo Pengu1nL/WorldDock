@@ -11,6 +11,7 @@ export type WorldRecord = {
   visibility: "private" | "public";
   mode: "cloud" | "local";
   maturity: number;
+  coverObjectId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -70,7 +71,7 @@ export type WorldRepository = {
   }): Promise<WorldRecord>;
   listWorlds(ownerId: string): Promise<WorldRecord[]>;
   findWorldById(id: string): Promise<WorldRecord | null>;
-  updateWorld(id: string, input: Partial<Pick<WorldRecord, "name" | "type" | "summary" | "tags" | "status" | "visibility" | "mode" | "maturity">>): Promise<WorldRecord | null>;
+  updateWorld(id: string, input: Partial<Pick<WorldRecord, "name" | "type" | "summary" | "tags" | "status" | "visibility" | "mode" | "maturity" | "coverObjectId">>): Promise<WorldRecord | null>;
   archiveWorld(id: string): Promise<WorldRecord | null>;
   listArchiveEntries(worldId: string): Promise<ArchiveEntryRecord[]>;
   createArchiveEntry(input: Omit<ArchiveEntryRecord, "id" | "createdAt" | "updatedAt">): Promise<ArchiveEntryRecord>;

@@ -527,7 +527,7 @@ type ApiError = {
 - [x] 实现发布隐私过滤，排除原始私密对话、模型配置、API Key、未选择公开资产。
 - [x] 实现实体级 diff：新增设定、修改设定、移除设定、新增故事种子。
 - [x] 将 release snapshot 保存为数据库 JSONB。
-- [ ] 支持 release snapshot 大附件写入 S3（并入 Phase 11 对象存储）。
+- [x] 支持 release snapshot 大附件写入 S3（并入 Phase 11 对象存储）。
 - [x] 实现 `GET /v1/repositories/:owner/:slug`。
 - [x] 实现 `GET /v1/repositories/:repositoryId/releases`。
 - [x] 前端发布页接入真实 diff、授权、更新说明和发布结果。
@@ -621,14 +621,14 @@ type ApiError = {
 
 任务：
 
-- [ ] 新增 storage module，封装 S3-compatible client。
-- [ ] 定义 `storage_objects` 或在业务表中保存 object metadata。
-- [ ] 实现 signed upload URL。
-- [ ] 实现 signed download URL。
-- [ ] 为用户头像和世界封面接入对象存储。
-- [ ] 为 release snapshot 大附件接入对象存储。
-- [ ] 实现 storage cleanup worker，清理孤儿对象。
-- [ ] 增加文件大小、mime type、owner、visibility 校验。
+- [x] 新增 storage module，封装 S3-compatible client。
+- [x] 定义 `storage_objects` 或在业务表中保存 object metadata。
+- [x] 实现 signed upload URL。
+- [x] 实现 signed download URL。
+- [x] 为用户头像和世界封面接入对象存储。
+- [x] 为 release snapshot 大附件接入对象存储。
+- [x] 实现 storage cleanup worker，清理孤儿对象。
+- [x] 增加文件大小、mime type、owner、visibility 校验。
 
 验收标准：
 

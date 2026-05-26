@@ -27,6 +27,7 @@ model User {
   forks         RepositoryFork[]
   reports       Report[]
   moderationActions ModerationAction[]
+  storageObjects StorageObject[]
 
   @@map("users")
 }
@@ -108,6 +109,7 @@ model World {
   visibility        String             @default("private")
   mode              String             @default("cloud")
   maturity          Int                @default(0)
+  coverObjectId     String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -119,8 +121,11 @@ model World {
   agentSuggestions  AgentSuggestion[]
   repository        PublicRepository?
   forkRecords       RepositoryFork[]
+  coverObject       StorageObject?     @relation("WorldCoverObject", fields: [coverObjectId], references: [id], onDelete: SetNull)
+  storageObjects    StorageObject[]
 
   @@index([ownerId])
+  @@index([coverObjectId])
   @@map("worlds")
 }
 
@@ -318,6 +323,7 @@ model PublicRepository {
   forkRecords RepositoryFork[]
   reports   Report[]
   moderationActions ModerationAction[]
+  storageObjects StorageObject[]
 
   @@unique([ownerName, slug])
   @@index([ownerId])
@@ -337,6 +343,7 @@ model RepositoryRelease {
   repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   snapshot     ReleaseSnapshot?
   forks        RepositoryFork[]
+  storageObjects StorageObject[]
 
   @@unique([repositoryId, version])
   @@index([repositoryId])
@@ -438,4 +445,36 @@ model ModerationAction {
   @@index([reportId])
   @@index([moderatorId])
   @@map("moderation_actions")
+}
+
+model StorageObject {
+  id           String             @id @default(cuid())
+  ownerId      String
+  bucket       String
+  key          String             @unique
+  filename     String
+  mimeType     String
+  sizeBytes    Int
+  checksum     String?
+  purpose      String
+  visibility   String             @default("private")
+  status       String             @default("pending")
+  worldId      String?
+  repositoryId String?
+  releaseId    String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+  owner        User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  world        World?             @relation(fields: [worldId], references: [id], onDelete: SetNull)
+  repository   PublicRepository?  @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  release      RepositoryRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  coverForWorlds World[]          @relation("WorldCoverObject")
+
+  @@index([ownerId])
+  @@index([status, createdAt])
+  @@index([worldId])
+  @@index([repositoryId])
+  @@index([releaseId])
+  @@map("storage_objects")
 }

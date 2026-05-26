@@ -20,6 +20,8 @@ import {
   type RepositorySearchOptions,
   type RepositorySearchClient,
 } from "../src/modules/repositories/repository-search.client";
+import { STORAGE_REPOSITORY, type StorageObjectRecord, type StorageRepository } from "../src/modules/storage/storage.repository";
+import { STORAGE_SIGNER, type StorageSigner } from "../src/modules/storage/storage.signer";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -387,6 +389,123 @@ describe("repository publish endpoints", () => {
     expect(outbox.events.map((event) => event.type)).toContain("repository.moderation_removed");
     expect(moderation.actions[0]).toMatchObject({ repositoryId: publish.body.repository.id, reason: "违反社区规范。" });
   });
+
+  it("creates signed storage URLs and attaches covers and release attachments", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    const storage = createInMemoryStorageRepository();
+    addSession(auth, "session_user_1", "user_1", "ren");
+    addSession(auth, "session_user_2", "user_2", "lin");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Storage World",
+      type: "科幻",
+      summary: "有封面和附件。",
+      tags: ["storage"],
+      mode: "cloud",
+    });
+    app = await createTestApp(
+      auth,
+      worlds,
+      repositories,
+      createInMemoryOutboxRepository(),
+      createInMemorySearchClient(),
+      createInMemoryModerationRepository(),
+      storage,
+      createFakeStorageSigner(),
+    );
+    const publish = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "free-fork-attribution" })
+      .expect(201);
+
+    const coverUpload = await request(app.getHttpServer())
+      .post("/v1/storage/upload-url")
+      .set("authorization", "Bearer session_user_1")
+      .send({
+        purpose: "world_cover",
+        filename: "cover.png",
+        mimeType: "image/png",
+        sizeBytes: 1024,
+        visibility: "private",
+        worldId: world.id,
+      })
+      .expect(201);
+    expect(coverUpload.body.upload).toMatchObject({ method: "PUT" });
+
+    await request(app.getHttpServer())
+      .get(`/v1/storage/objects/${coverUpload.body.object.id}/download-url`)
+      .set("authorization", "Bearer session_user_2")
+      .expect(403);
+
+    const ownerDownload = await request(app.getHttpServer())
+      .get(`/v1/storage/objects/${coverUpload.body.object.id}/download-url`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(200);
+    expect(ownerDownload.body.download.url).toContain("signed-get");
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/cover`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ objectId: coverUpload.body.object.id })
+      .expect(201);
+    expect((await worlds.findWorldById(world.id))?.coverObjectId).toBe(coverUpload.body.object.id);
+    expect(storage.objects.find((object) => object.id === coverUpload.body.object.id)?.status).toBe("attached");
+
+    const attachmentUpload = await request(app.getHttpServer())
+      .post("/v1/storage/upload-url")
+      .set("authorization", "Bearer session_user_1")
+      .send({
+        purpose: "release_attachment",
+        filename: "snapshot.zip",
+        mimeType: "application/zip",
+        sizeBytes: 4096,
+        visibility: "private",
+        repositoryId: publish.body.repository.id,
+        releaseId: publish.body.release.id,
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/releases/${publish.body.release.id}/attachments`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ objectId: attachmentUpload.body.object.id })
+      .expect(201);
+    expect(storage.objects.find((object) => object.id === attachmentUpload.body.object.id)).toMatchObject({
+      status: "attached",
+      releaseId: publish.body.release.id,
+    });
+
+    const publicObject = await request(app.getHttpServer())
+      .post("/v1/storage/upload-url")
+      .set("authorization", "Bearer session_user_1")
+      .send({
+        purpose: "import_export",
+        filename: "export.json",
+        mimeType: "application/json",
+        sizeBytes: 128,
+        visibility: "public",
+      })
+      .expect(201);
+    const publicDownload = await request(app.getHttpServer())
+      .get(`/v1/storage/objects/${publicObject.body.object.id}/download-url`)
+      .set("authorization", "Bearer session_user_2")
+      .expect(200);
+    expect(publicDownload.body.download.url).toContain("public");
+
+    await request(app.getHttpServer())
+      .post("/v1/storage/upload-url")
+      .set("authorization", "Bearer session_user_1")
+      .send({
+        purpose: "avatar",
+        filename: "avatar.exe",
+        mimeType: "application/x-msdownload",
+        sizeBytes: 10,
+        visibility: "private",
+      })
+      .expect(400);
+  });
 });
 
 async function createTestApp(
@@ -396,6 +515,8 @@ async function createTestApp(
   outboxRepository: OutboxRepository = createInMemoryOutboxRepository(),
   searchClient: RepositorySearchClient = createInMemorySearchClient(),
   moderationRepository: ModerationRepository = createInMemoryModerationRepository(),
+  storageRepository: StorageRepository = createInMemoryStorageRepository(),
+  storageSigner: StorageSigner = createFakeStorageSigner(),
 ) {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -412,6 +533,10 @@ async function createTestApp(
     .useValue(searchClient)
     .overrideProvider(MODERATION_REPOSITORY)
     .useValue(moderationRepository)
+    .overrideProvider(STORAGE_REPOSITORY)
+    .useValue(storageRepository)
+    .overrideProvider(STORAGE_SIGNER)
+    .useValue(storageSigner)
     .compile();
 
   const testApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -516,6 +641,7 @@ function createInMemoryWorldRepository() {
         visibility: "private",
         mode: input.mode,
         maturity: input.maturity ?? 0,
+        coverObjectId: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -542,6 +668,56 @@ function createInMemoryWorldRepository() {
   };
 
   return repository;
+}
+
+function createInMemoryStorageRepository() {
+  const objects: StorageObjectRecord[] = [];
+  const repository = {
+    objects,
+    async createObject(input: Omit<StorageObjectRecord, "id" | "status" | "createdAt" | "updatedAt" | "deletedAt">) {
+      const now = new Date();
+      const object = { id: `object_${objects.length + 1}`, status: "pending" as const, createdAt: now, updatedAt: now, deletedAt: null, ...input };
+      objects.push(object);
+      return object;
+    },
+    async findObjectById(id: string) {
+      return objects.find((object) => object.id === id) ?? null;
+    },
+    async attachObject(id: string, input: Partial<Pick<StorageObjectRecord, "worldId" | "repositoryId" | "releaseId">>) {
+      const object = objects.find((item) => item.id === id);
+      if (!object || object.deletedAt) return null;
+      Object.assign(object, input, { status: "attached" as const, updatedAt: new Date() });
+      return object;
+    },
+    async markDeleted(id: string, deletedAt: Date) {
+      const object = objects.find((item) => item.id === id);
+      if (!object) return null;
+      object.status = "deleted";
+      object.deletedAt = deletedAt;
+      object.updatedAt = deletedAt;
+      return object;
+    },
+    async listCleanupCandidates(before: Date, limit = 100) {
+      return objects
+        .filter((object) => !object.deletedAt && ["pending", "orphaned"].includes(object.status) && object.createdAt < before)
+        .slice(0, limit);
+    },
+  } satisfies StorageRepository & { objects: typeof objects };
+  return repository;
+}
+
+function createFakeStorageSigner() {
+  return {
+    async createUploadUrl(object: StorageObjectRecord) {
+      return { url: `https://signed-put.example/${object.key}`, method: "PUT" as const, headers: { "content-type": object.mimeType }, expiresAt: new Date(Date.now() + 60_000) };
+    },
+    async createDownloadUrl(object: StorageObjectRecord) {
+      return { url: `https://signed-get.example/${object.key}`, method: "GET" as const, expiresAt: new Date(Date.now() + 60_000) };
+    },
+    publicUrl(object: StorageObjectRecord) {
+      return `https://public.example/${object.key}`;
+    },
+  } satisfies StorageSigner;
 }
 
 function createInMemoryRepositoryRepository() {
