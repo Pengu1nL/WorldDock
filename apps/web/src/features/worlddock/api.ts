@@ -102,6 +102,11 @@ export type BillingUsage = {
   entries: UsageLedgerEntry[];
 };
 
+export type PublishWorldInput = {
+  releaseNote: string;
+  license: string;
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -235,6 +240,47 @@ export async function createConflict(worldId: string, input: CreateConflictInput
     body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
+  });
+}
+
+export async function publishWorld(worldId: string, input: PublishWorldInput, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/publish`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listPublicRepositories(options: ApiClientOptions) {
+  return requestJson("/v1/repositories", {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getPublicRepository(owner: string, slug: string, options: ApiClientOptions) {
+  return requestJson(`/v1/repositories/${owner}/${slug}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listRepositoryReleases(repositoryId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/repositories/${repositoryId}/releases`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
   });
 }
 

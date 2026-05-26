@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PublicRepository } from "@worlddock/domain";
+import { listPublicRepositories } from "./api";
 import { PUBLIC_REPOSITORIES } from "./fixtures";
 import { Icon } from "./components";
 
@@ -18,13 +19,29 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
   const [query, setQuery] = useState("");
   const [activeRepository, setActiveRepository] = useState<PublicRepository | null>(null);
   const [starredIds, setStarredIds] = useState<string[]>([]);
+  const [repositories, setRepositories] = useState<PublicRepository[]>(PUBLIC_REPOSITORIES);
+
+  useEffect(() => {
+    const sessionToken = typeof window === "undefined"
+      ? ""
+      : window.localStorage.getItem("worlddock.sessionToken") ?? "";
+    void listPublicRepositories({ sessionToken })
+      .then((result: any) => {
+        if (Array.isArray(result.repositories) && result.repositories.length > 0) {
+          setRepositories(result.repositories);
+        }
+      })
+      .catch(() => {
+        setRepositories(PUBLIC_REPOSITORIES);
+      });
+  }, []);
 
   const filtered = useMemo(() => {
-    return PUBLIC_REPOSITORIES.filter((repository) => {
+    return repositories.filter((repository) => {
       const text = `${repository.name} ${repository.summary} ${repository.tags.join(" ")}`;
       return !query || text.includes(query);
     });
-  }, [query]);
+  }, [query, repositories]);
 
   if (activeRepository) {
     return (

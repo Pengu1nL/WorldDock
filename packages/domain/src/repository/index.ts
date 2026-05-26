@@ -19,6 +19,23 @@ export const releaseSchema = z.object({
   source: z.enum(["cloud-publish", "local-push"]),
 });
 
+export const releaseDiffSchema = z.object({
+  addedSettings: z.number().int().min(0),
+  changedSettings: z.number().int().min(0),
+  removedSettings: z.number().int().min(0),
+  addedSeeds: z.number().int().min(0),
+});
+
+export const releaseDetailSchema = z.object({
+  id: z.string().min(1),
+  repositoryId: z.string().min(1),
+  version: z.string().min(1),
+  note: z.string().min(1),
+  license: licenseSchema,
+  diff: releaseDiffSchema,
+  createdAt: z.string().datetime(),
+});
+
 export const publicRepositorySchema = z.object({
   id: z.string().min(1),
   owner: z.string().min(1),
@@ -39,5 +56,61 @@ export const publicRepositorySchema = z.object({
   releases: z.array(releaseSchema).default([]),
 });
 
+export const repositoryDetailSchema = publicRepositorySchema;
+
+const snapshotArchiveEntrySchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  category: z.string().min(1),
+  summary: z.string().min(1),
+  body: z.string().min(1),
+  relations: z.array(z.string().min(1)).optional(),
+});
+
+const snapshotStorySeedSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  hook: z.string().min(1),
+  trigger: z.string().nullable().optional(),
+  conflict: z.string().min(1),
+  protagonists: z.string().nullable().optional(),
+  questions: z.array(z.string().min(1)).optional(),
+});
+
+const snapshotConflictSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().min(1),
+  body: z.string().min(1),
+  related: z.array(z.string().min(1)).optional(),
+  derivedSeeds: z.array(z.string().min(1)).optional(),
+});
+
+export const releaseSnapshotSchema = z.object({
+  repositoryId: z.string().min(1),
+  releaseId: z.string().min(1),
+  world: z.object({
+    name: z.string().min(1),
+    type: z.string().min(1),
+    summary: z.string().min(1),
+    tags: z.array(z.string().min(1)),
+    maturity: z.number().int().min(0).max(100),
+  }),
+  archiveEntries: z.array(snapshotArchiveEntrySchema),
+  storySeeds: z.array(snapshotStorySeedSchema),
+  conflicts: z.array(snapshotConflictSchema),
+  createdAt: z.string().datetime(),
+});
+
+export const publishWorldResponseSchema = z.object({
+  repository: repositoryDetailSchema,
+  release: releaseDetailSchema,
+});
+
 export type PublicRepository = z.infer<typeof publicRepositorySchema>;
 export type Release = z.infer<typeof releaseSchema>;
+export type ReleaseDiff = z.infer<typeof releaseDiffSchema>;
+export type ReleaseDetail = z.infer<typeof releaseDetailSchema>;
+export type RepositoryDetail = z.infer<typeof repositoryDetailSchema>;
+export type ReleaseSnapshot = z.infer<typeof releaseSnapshotSchema>;
+export type PublishWorldResponse = z.infer<typeof publishWorldResponseSchema>;

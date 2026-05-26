@@ -521,16 +521,17 @@ type ApiError = {
 
 任务：
 
-- [ ] 设计并迁移 `repositories`、`releases`、`release_snapshots` 表。
-- [ ] 实现 world 到 public repository 的首次发布。
-- [ ] 实现后续发布生成新 release。
-- [ ] 实现发布隐私过滤，排除原始私密对话、模型配置、API Key、未选择公开资产。
-- [ ] 实现实体级 diff：新增设定、修改设定、移除设定、新增故事种子。
-- [ ] 将 release snapshot 保存为数据库 JSONB，并支持大附件写入 S3。
-- [ ] 实现 `GET /v1/repositories/:owner/:slug`。
-- [ ] 实现 `GET /v1/repositories/:repositoryId/releases`。
-- [ ] 前端发布页接入真实 diff、授权、更新说明和发布结果。
-- [ ] 公开仓库详情页接入真实 repository 和 release 数据。
+- [x] 设计并迁移 `repositories`、`releases`、`release_snapshots` 表。
+- [x] 实现 world 到 public repository 的首次发布。
+- [x] 实现后续发布生成新 release。
+- [x] 实现发布隐私过滤，排除原始私密对话、模型配置、API Key、未选择公开资产。
+- [x] 实现实体级 diff：新增设定、修改设定、移除设定、新增故事种子。
+- [x] 将 release snapshot 保存为数据库 JSONB。
+- [ ] 支持 release snapshot 大附件写入 S3（并入 Phase 11 对象存储）。
+- [x] 实现 `GET /v1/repositories/:owner/:slug`。
+- [x] 实现 `GET /v1/repositories/:repositoryId/releases`。
+- [x] 前端发布页接入真实 diff、授权、更新说明和发布结果。
+- [x] 公开仓库详情页接入真实 repository 和 release 数据。
 
 验收标准：
 

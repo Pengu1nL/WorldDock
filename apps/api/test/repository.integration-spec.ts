@@ -1,0 +1,277 @@
+import { type INestApplication } from "@nestjs/common";
+import { Test } from "@nestjs/testing";
+import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import request from "supertest";
+import { afterEach, describe, expect, it } from "vitest";
+import { AppModule } from "../src/app.module";
+import { configureApiApp } from "../src/configure-api-app";
+import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import {
+  REPOSITORY_REPOSITORY,
+  type PublicRepositoryRecord,
+  type ReleaseRecord,
+  type ReleaseSnapshotRecord,
+  type RepositoryRepository,
+} from "../src/modules/repositories/repository.repository";
+import {
+  WORLD_REPOSITORY,
+  type ArchiveEntryRecord,
+  type ConflictRecord,
+  type StorySeedRecord,
+  type WorldRecord,
+  type WorldRepository,
+} from "../src/modules/worlds/world.repository";
+
+describe("repository publish endpoints", () => {
+  let app: INestApplication | undefined;
+
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it("publishes an owned world as a public repository with release snapshot", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addSession(auth, "session_user_1", "user_1", "ren");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Memory Market",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "cloud",
+      maturity: 64,
+    });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "交易法", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
+    await worlds.createStorySeed({ worldId: world.id, title: "继承的童年", hook: "钩子", trigger: "触发", conflict: "冲突", protagonists: "主角", questions: ["问题"] });
+    await worlds.createConflict({ worldId: world.id, title: "人格权冲突", summary: "摘要", body: "正文", related: [], derivedSeeds: [] });
+    app = await createTestApp(auth, worlds, repositories);
+
+    const publish = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "free-fork-attribution" })
+      .expect(201);
+
+    expect(publish.body.repository).toMatchObject({
+      owner: "ren",
+      slug: "memory-market",
+      visibility: "public",
+      version: "v1.0.0",
+    });
+    expect(publish.body.release).toMatchObject({
+      version: "v1.0.0",
+      diff: { addedSettings: 1, changedSettings: 0, removedSettings: 0, addedSeeds: 1 },
+    });
+
+    const snapshot = await repositories.findSnapshotByReleaseId(publish.body.release.id);
+    expect(snapshot?.snapshot.archiveEntries).toHaveLength(1);
+    expect(JSON.stringify(snapshot?.snapshot)).not.toContain("token");
+
+    const list = await request(app.getHttpServer())
+      .get("/v1/repositories")
+      .expect(200);
+    expect(list.body.repositories[0].slug).toBe("memory-market");
+
+    const detail = await request(app.getHttpServer())
+      .get("/v1/repositories/ren/memory-market")
+      .expect(200);
+    expect(detail.body.repository.releases).toHaveLength(1);
+  });
+
+  it("creates a new release version on subsequent publishes", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addSession(auth, "session_user_1", "user_1", "ren");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Ledger World",
+      type: "蒸汽朋克",
+      summary: "承诺必须入账。",
+      tags: ["账本"],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, repositories);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "non-commercial-attribution" })
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "补充设定", license: "non-commercial-attribution" })
+      .expect(201);
+
+    expect(second.body.release.version).toBe("v1.1.0");
+  });
+
+  it("rejects publishing a world owned by another user", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addSession(auth, "session_user_2", "user_2", "lin");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Private World",
+      type: "科幻",
+      summary: "不是你的世界。",
+      tags: [],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, repositories);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_2")
+      .send({ releaseNote: "越权发布", license: "free-fork-attribution" })
+      .expect(403);
+  });
+});
+
+async function createTestApp(
+  authRepository: AuthRepository,
+  worldRepository: WorldRepository,
+  repositoryRepository: RepositoryRepository,
+) {
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+  })
+    .overrideProvider(AUTH_REPOSITORY)
+    .useValue(authRepository)
+    .overrideProvider(WORLD_REPOSITORY)
+    .useValue(worldRepository)
+    .overrideProvider(REPOSITORY_REPOSITORY)
+    .useValue(repositoryRepository)
+    .compile();
+
+  const testApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  configureApiApp(testApp);
+  await testApp.init();
+  await testApp.getHttpAdapter().getInstance().ready();
+  return testApp;
+}
+
+function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string) {
+  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name, role: "user" });
+  repository.sessions.set(token, { token, userId, expiresAt: new Date(Date.now() + 60_000) });
+}
+
+function createInMemoryAuthRepository() {
+  const users = new Map<string, StoredUser>();
+  const sessions = new Map<string, StoredSession>();
+  const accessTokens = new Map<string, StoredAccessToken>();
+  return {
+    users,
+    sessions,
+    accessTokens,
+    async findUserById(id: string) { return users.get(id) ?? null; },
+    async findSessionByToken(token: string) { return sessions.get(token) ?? null; },
+    async deleteSession(token: string) { sessions.delete(token); },
+    async listAccessTokens(userId: string) { return [...accessTokens.values()].filter((item) => item.userId === userId); },
+    async createAccessToken(input: StoredAccessToken) { accessTokens.set(input.id, input); return input; },
+    async findAccessTokenByHash(tokenHash: string) { return [...accessTokens.values()].find((item) => item.tokenHash === tokenHash) ?? null; },
+    async markAccessTokenUsed(id: string, usedAt: Date) { const token = accessTokens.get(id); if (token) token.lastUsedAt = usedAt; },
+    async revokeAccessToken(userId: string, tokenId: string, revokedAt: Date) {
+      const token = accessTokens.get(tokenId);
+      if (!token || token.userId !== userId) return null;
+      token.revokedAt = revokedAt;
+      return token;
+    },
+  } satisfies AuthRepository & { users: typeof users; sessions: typeof sessions; accessTokens: typeof accessTokens };
+}
+
+function createInMemoryWorldRepository() {
+  const worlds = new Map<string, WorldRecord>();
+  const archiveEntries = new Map<string, ArchiveEntryRecord>();
+  const storySeeds = new Map<string, StorySeedRecord>();
+  const conflicts = new Map<string, ConflictRecord>();
+
+  const repository: WorldRepository = {
+    async createWorld(input) {
+      const now = new Date();
+      const world: WorldRecord = {
+        id: `world_${worlds.size + 1}`,
+        ownerId: input.ownerId,
+        name: input.name,
+        type: input.type,
+        summary: input.summary,
+        tags: input.tags,
+        status: "draft",
+        visibility: "private",
+        mode: input.mode,
+        maturity: input.maturity ?? 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      worlds.set(world.id, world);
+      return world;
+    },
+    async listWorlds(ownerId) { return [...worlds.values()].filter((world) => world.ownerId === ownerId); },
+    async findWorldById(id) { return worlds.get(id) ?? null; },
+    async updateWorld(id, input) { const world = worlds.get(id); if (!world) return null; const next = { ...world, ...input, updatedAt: new Date() }; worlds.set(id, next); return next; },
+    async archiveWorld(id) { const world = worlds.get(id); if (!world) return null; const next = { ...world, status: "unpublished" as const, updatedAt: new Date() }; worlds.set(id, next); return next; },
+    async listArchiveEntries(worldId) { return [...archiveEntries.values()].filter((entry) => entry.worldId === worldId); },
+    async createArchiveEntry(input) { const entry = { id: `archive_${archiveEntries.size + 1}`, ...input, relations: input.relations ?? [], createdAt: new Date(), updatedAt: new Date() }; archiveEntries.set(entry.id, entry); return entry; },
+    async listStorySeeds(worldId) { return [...storySeeds.values()].filter((seed) => seed.worldId === worldId); },
+    async createStorySeed(input) { const seed = { id: `seed_${storySeeds.size + 1}`, ...input, questions: input.questions ?? [], createdAt: new Date(), updatedAt: new Date() }; storySeeds.set(seed.id, seed); return seed; },
+    async listConflicts(worldId) { return [...conflicts.values()].filter((conflict) => conflict.worldId === worldId); },
+    async createConflict(input) { const conflict = { id: `conflict_${conflicts.size + 1}`, ...input, related: input.related ?? [], derivedSeeds: input.derivedSeeds ?? [], createdAt: new Date(), updatedAt: new Date() }; conflicts.set(conflict.id, conflict); return conflict; },
+    async countAssets(worldId) {
+      return {
+        archive: [...archiveEntries.values()].filter((entry) => entry.worldId === worldId).length,
+        seeds: [...storySeeds.values()].filter((seed) => seed.worldId === worldId).length,
+        conflicts: [...conflicts.values()].filter((conflict) => conflict.worldId === worldId).length,
+      };
+    },
+  };
+
+  return repository;
+}
+
+function createInMemoryRepositoryRepository() {
+  const repositories = new Map<string, PublicRepositoryRecord>();
+  const releases = new Map<string, ReleaseRecord>();
+  const snapshots = new Map<string, ReleaseSnapshotRecord>();
+
+  const repository: RepositoryRepository = {
+    async findByWorldId(worldId) { return [...repositories.values()].find((item) => item.worldId === worldId) ?? null; },
+    async createRepository(input) {
+      const now = new Date();
+      const record = { id: `repo_${repositories.size + 1}`, stars: 0, forks: 0, createdAt: now, updatedAt: now, ...input };
+      repositories.set(record.id, record);
+      return record;
+    },
+    async updateRepository(id, input) {
+      const record = repositories.get(id);
+      if (!record) return null;
+      const next = { ...record, ...input, updatedAt: new Date() };
+      repositories.set(id, next);
+      return next;
+    },
+    async listPublic() { return [...repositories.values()].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); },
+    async findPublicByOwnerSlug(ownerName, slug) { return [...repositories.values()].find((item) => item.ownerName === ownerName && item.slug === slug) ?? null; },
+    async createRelease(input) {
+      const release = { id: `rel_${releases.size + 1}`, createdAt: new Date(), ...input };
+      releases.set(release.id, release);
+      return release;
+    },
+    async listReleases(repositoryId) {
+      return [...releases.values()].filter((release) => release.repositoryId === repositoryId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    },
+    async createSnapshot(input) {
+      const snapshot = { id: `snap_${snapshots.size + 1}`, createdAt: new Date(), ...input };
+      snapshots.set(snapshot.id, snapshot);
+      return snapshot;
+    },
+    async findSnapshotByReleaseId(releaseId) {
+      return [...snapshots.values()].find((snapshot) => snapshot.releaseId === releaseId) ?? null;
+    },
+  };
+
+  return repository;
+}

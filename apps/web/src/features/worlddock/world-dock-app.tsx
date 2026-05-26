@@ -13,6 +13,7 @@ import {
   listConflicts,
   listStorySeeds,
   listWorlds,
+  publishWorld,
   saveAgentSuggestion,
   streamAgentEvents,
   WorldDockApiError,
@@ -662,7 +663,22 @@ function WorldDockRuntime() {
               world={currentWorld}
               communityConnected={communityConnected}
               onBack={() => setView("workbench")}
-              onConfirm={({ releaseNote }: any) => {
+              onConfirm={async ({ releaseNote, license }: any) => {
+                const canPublishToBackend = Boolean(
+                  sessionToken &&
+                  currentWorld?.id &&
+                  !String(currentWorld.id).startsWith("new_") &&
+                  !String(currentWorld.id).startsWith("copy_") &&
+                  !String(currentWorld.id).startsWith("fork_"),
+                );
+
+                if (canPublishToBackend) {
+                  try {
+                    await publishWorld(currentWorld.id, { releaseNote, license }, { sessionToken });
+                  } catch {
+                    pushToast({ kind: "warn", text: "云端发布失败，已保留本地演示状态" });
+                  }
+                }
                 setCurrentWorld((prev: any) => prev
                   ? { ...prev, status: "published", visibility: "public", hasUnpushed: false, hasUnsaved: false }
                   : prev);

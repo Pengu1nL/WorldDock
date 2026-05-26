@@ -7,11 +7,15 @@ import {
   fetchAgentEvents,
   getBillingBalance,
   getBillingUsage,
+  getPublicRepository,
   listArchiveEntries,
   listAccessTokens,
   listConflicts,
+  listPublicRepositories,
+  listRepositoryReleases,
   listStorySeeds,
   listWorlds,
+  publishWorld,
   revokeAccessToken,
   saveAgentSuggestion,
   streamAgentEvents,
@@ -128,6 +132,25 @@ describe("worlddock API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-runs", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/agent-runs/run_1/events", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/agent-suggestions/ags_1/save", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("publishes worlds and reads public repositories", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ repository: { id: "repo_1" }, release: { id: "rel_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ repositories: [] }))
+      .mockResolvedValueOnce(jsonResponse({ repository: { id: "repo_1", slug: "memory-market" } }))
+      .mockResolvedValueOnce(jsonResponse({ releases: [] }));
+
+    await publishWorld("world_1", { releaseNote: "初始发布", license: "free-fork-attribution" }, { sessionToken: "session_valid", fetcher });
+    await listPublicRepositories({ sessionToken: "session_valid", fetcher });
+    await getPublicRepository("ren", "memory-market", { sessionToken: "session_valid", fetcher });
+    await listRepositoryReleases("repo_1", { sessionToken: "session_valid", fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/publish", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/repositories", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/repositories/ren/memory-market", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/repositories/repo_1/releases", expect.objectContaining({ method: "GET" }));
   });
 
   it("streams agent SSE events as chunks arrive", async () => {

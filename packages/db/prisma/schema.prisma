@@ -22,6 +22,7 @@ model User {
   worlds        World[]
   billingAccount BillingAccount?
   usageLedger   UsageLedgerEntry[]
+  repositories  PublicRepository[]
 
   @@map("users")
 }
@@ -112,6 +113,7 @@ model World {
   consistencyIssues ConsistencyIssue[]
   agentRuns         AgentRun[]
   agentSuggestions  AgentSuggestion[]
+  repository        PublicRepository?
 
   @@index([ownerId])
   @@map("worlds")
@@ -284,4 +286,58 @@ model UsageLedgerEntry {
   @@index([userId])
   @@index([agentRunId])
   @@map("usage_ledger")
+}
+
+model PublicRepository {
+  id        String              @id @default(cuid())
+  worldId   String              @unique
+  ownerId   String
+  ownerName String
+  slug      String
+  name      String
+  summary   String
+  tags      String[]            @default([])
+  license   String
+  stars     Int                 @default(0)
+  forks     Int                 @default(0)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  owner     User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  world     World               @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  releases  RepositoryRelease[]
+  snapshots ReleaseSnapshot[]
+
+  @@unique([ownerName, slug])
+  @@index([ownerId])
+  @@map("repositories")
+}
+
+model RepositoryRelease {
+  id           String          @id @default(cuid())
+  repositoryId String
+  version      String
+  note         String
+  license      String
+  diff         Json
+  source       String
+  createdAt    DateTime        @default(now())
+  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  snapshot     ReleaseSnapshot?
+
+  @@unique([repositoryId, version])
+  @@index([repositoryId])
+  @@map("releases")
+}
+
+model ReleaseSnapshot {
+  id           String            @id @default(cuid())
+  repositoryId String
+  releaseId    String            @unique
+  snapshot     Json
+  createdAt    DateTime          @default(now())
+  repository   PublicRepository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  release      RepositoryRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryId])
+  @@map("release_snapshots")
 }
