@@ -17,6 +17,8 @@ export const PUBLIC_REPOSITORIES: PublicRepository[] = [
     version: "v1.2.0",
     visibility: "public",
     license: "free-fork-attribution",
+    moderationStatus: "visible",
+    moderationReason: null,
     releases: [
       {
         version: "v1.2.0",
@@ -46,6 +48,8 @@ export const PUBLIC_REPOSITORIES: PublicRepository[] = [
     version: "v0.8.0",
     visibility: "public",
     license: "non-commercial-attribution",
+    moderationStatus: "visible",
+    moderationReason: null,
     releases: [
       {
         version: "v0.8.0",

@@ -41,7 +41,7 @@ export class RepositoryService {
       );
       return Promise.all(
         repositories
-          .filter((repository): repository is PublicRepositoryRecord => Boolean(repository))
+          .filter((repository): repository is PublicRepositoryRecord => repository !== null && repository.moderationStatus !== "removed")
           .map((repository) => this.toRepositoryDetail(repository)),
       );
     }
@@ -64,6 +64,7 @@ export class RepositoryService {
   }
 
   async starRepository(subject: AuthSubject, repositoryId: string) {
+    await this.requirePubliclyVisibleRepository(repositoryId);
     const repository = await this.repositories.starRepository(repositoryId, subject.user.id);
     if (!repository) throw this.notFound("Repository not found.");
     await this.emitRepositoryEvent("repository.starred", repository.id, { repositoryId: repository.id, userId: subject.user.id });
@@ -71,6 +72,7 @@ export class RepositoryService {
   }
 
   async unstarRepository(subject: AuthSubject, repositoryId: string) {
+    await this.requirePubliclyVisibleRepository(repositoryId);
     const repository = await this.repositories.unstarRepository(repositoryId, subject.user.id);
     if (!repository) throw this.notFound("Repository not found.");
     await this.emitRepositoryEvent("repository.unstarred", repository.id, { repositoryId: repository.id, userId: subject.user.id });
@@ -79,7 +81,7 @@ export class RepositoryService {
 
   async forkRepository(subject: AuthSubject, repositoryId: string) {
     const repository = await this.repositories.findById(repositoryId);
-    if (!repository) throw this.notFound("Repository not found.");
+    if (!repository || repository.moderationStatus === "removed") throw this.notFound("Repository not found.");
     if (repository.license === "no-fork") {
       throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "This repository does not allow forks." });
     }
@@ -159,6 +161,7 @@ export class RepositoryService {
     });
     await this.repositories.createSnapshot({ repositoryId: repository.id, releaseId: release.id, snapshot });
     await this.emitRepositoryEvent("repository.local_pushed", repository.id, { repositoryId: repository.id, releaseId: release.id });
+    await this.emitRepositoryEvent("repository.moderation_scan_requested", repository.id, { repositoryId: repository.id, releaseId: release.id, source: "local-push" });
     return {
       repository: await this.toRepositoryDetail(repository),
       release: toReleaseDetail(release),
@@ -224,6 +227,7 @@ export class RepositoryService {
     });
     await this.worlds.updateWorld(world.id, { status: "published", visibility: "public" });
     await this.emitRepositoryEvent("repository.published", repository.id, { repositoryId: repository.id, releaseId: release.id, worldId: world.id });
+    await this.emitRepositoryEvent("repository.moderation_scan_requested", repository.id, { repositoryId: repository.id, releaseId: release.id, worldId: world.id, source: "cloud-publish" });
 
     return {
       repository: await this.toRepositoryDetail(repository),
@@ -248,8 +252,18 @@ export class RepositoryService {
       version: latest?.version ?? "v0.0.0",
       visibility: "public" as const,
       license: repository.license,
+      moderationStatus: repository.moderationStatus,
+      moderationReason: repository.moderationReason,
       releases: releases.map(toReleaseSummary),
     };
+  }
+
+  private async requirePubliclyVisibleRepository(repositoryId: string) {
+    const repository = await this.repositories.findById(repositoryId);
+    if (!repository || repository.moderationStatus === "removed") {
+      throw this.notFound("Repository not found.");
+    }
+    return repository;
   }
 
   private async requireOwnedWorld(subject: AuthSubject, worldId: string): Promise<WorldRecord> {

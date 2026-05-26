@@ -16,6 +16,8 @@ const repository = {
   version: "v1.0.0",
   visibility: "public" as const,
   license: "free-fork-attribution" as const,
+  moderationStatus: "visible" as const,
+  moderationReason: null,
   releases: [],
 };
 

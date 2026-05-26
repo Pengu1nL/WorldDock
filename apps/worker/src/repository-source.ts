@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@worlddock/db";
-import { licenseSchema, type PublicRepository } from "@worlddock/domain";
+import { licenseSchema, moderationStatusSchema, type PublicRepository } from "@worlddock/domain";
 import type { SearchOutboxEvent } from "./search-indexing";
 
 type PrismaOutboxEvent = {
@@ -24,6 +24,7 @@ export function createPrismaRepositorySearchSource(prisma: PrismaClient): Reposi
   async function loadRepository(repositoryId: string): Promise<PublicRepository | null> {
     const repository = await prisma.publicRepository.findUnique({ where: { id: repositoryId } });
     if (!repository) return null;
+    if (repository.moderationStatus === "removed") return null;
     const latestRelease = await prisma.repositoryRelease.findFirst({
       where: { repositoryId },
       orderBy: { createdAt: "desc" },
@@ -42,6 +43,8 @@ export function createPrismaRepositorySearchSource(prisma: PrismaClient): Reposi
       version: latestRelease?.version ?? "v0.0.0",
       visibility: "public" as const,
       license: licenseSchema.parse(repository.license),
+      moderationStatus: moderationStatusSchema.parse(repository.moderationStatus),
+      moderationReason: repository.moderationReason,
       releases: [],
     };
   }

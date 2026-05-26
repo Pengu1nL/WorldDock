@@ -119,6 +119,11 @@ export type LocalPushInput = PublishWorldInput & {
   };
 };
 
+export type ReportRepositoryInput = {
+  reason: "spam" | "sensitive_content" | "abuse" | "copyright" | "other";
+  detail?: string;
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -339,6 +344,17 @@ export async function forkRepository(repositoryId: string, options: ApiClientOpt
   return requestJson(`/v1/repositories/${repositoryId}/fork`, {
     method: "POST",
     sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function reportRepository(repositoryId: string, input: ReportRepositoryInput, options: ApiClientOptions) {
+  return requestJson(`/v1/repositories/${repositoryId}/reports`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
     signal: options.signal,

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApiApp } from "../src/configure-api-app";
 import { AUTH_REPOSITORY, hashToken, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import { MODERATION_REPOSITORY, type ModerationActionRecord, type ModerationRepository, type ReportRecord } from "../src/modules/moderation/moderation.repository";
 import { OUTBOX_REPOSITORY, type OutboxEventRecord, type OutboxRepository } from "../src/modules/outbox/outbox.repository";
 import {
   REPOSITORY_REPOSITORY,
@@ -295,6 +296,7 @@ describe("repository publish endpoints", () => {
 
     expect(outbox.events.map((event) => event.type)).toEqual([
       "repository.published",
+      "repository.moderation_scan_requested",
       "repository.starred",
       "repository.forked",
     ]);
@@ -307,6 +309,84 @@ describe("repository publish endpoints", () => {
     expect(searchedOptions).toEqual({ tags: ["搜索"], sort: "stars" });
     expect(search.body.repositories[0].slug).toBe("searchable-archive");
   });
+
+  it("lets users report repositories and lets admins remove them", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    const outbox = createInMemoryOutboxRepository();
+    const moderation = createInMemoryModerationRepository();
+    addSession(auth, "session_user_1", "user_1", "ren");
+    addSession(auth, "session_admin", "admin_1", "admin", "admin");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Reported World",
+      type: "奇幻",
+      summary: "需要复核的公开世界。",
+      tags: ["审核"],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, repositories, outbox, createInMemorySearchClient(), moderation);
+    const publish = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "free-fork-attribution" })
+      .expect(201);
+
+    expect(outbox.events.map((event) => event.type)).toContain("repository.moderation_scan_requested");
+
+    const report = await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/reports`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ reason: "other", detail: "请管理员复核。" })
+      .expect(201);
+    expect(report.body.report).toMatchObject({ repositoryId: publish.body.repository.id, status: "open" });
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/reports`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ reason: "spam", detail: "重复举报阈值测试 1。" })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/reports`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ reason: "abuse", detail: "重复举报阈值测试 2。" })
+      .expect(201);
+    expect(outbox.events.filter((event) => event.type === "repository.moderation_scan_requested")).toHaveLength(2);
+
+    await request(app.getHttpServer())
+      .get("/v1/admin/reports")
+      .set("authorization", "Bearer session_user_1")
+      .expect(403);
+
+    const list = await request(app.getHttpServer())
+      .get("/v1/admin/reports")
+      .set("authorization", "Bearer session_admin")
+      .expect(200);
+    expect(list.body.reports[0]).toMatchObject({ id: report.body.report.id, repositoryId: publish.body.repository.id });
+
+    const action = await request(app.getHttpServer())
+      .post(`/v1/admin/reports/${report.body.report.id}/actions`)
+      .set("authorization", "Bearer session_admin")
+      .send({ action: "remove", reason: "违反社区规范。" })
+      .expect(201);
+    expect(action.body.action).toMatchObject({
+      moderatorId: "admin_1",
+      previousStatus: "visible",
+      nextStatus: "removed",
+    });
+
+    await request(app.getHttpServer())
+      .get("/v1/repositories/ren/reported-world")
+      .expect(404);
+
+    const search = await request(app.getHttpServer())
+      .get("/v1/repositories/search")
+      .query({ q: "Reported" })
+      .expect(200);
+    expect(search.body.repositories).toHaveLength(0);
+    expect(outbox.events.map((event) => event.type)).toContain("repository.moderation_removed");
+    expect(moderation.actions[0]).toMatchObject({ repositoryId: publish.body.repository.id, reason: "违反社区规范。" });
+  });
 });
 
 async function createTestApp(
@@ -315,6 +395,7 @@ async function createTestApp(
   repositoryRepository: RepositoryRepository,
   outboxRepository: OutboxRepository = createInMemoryOutboxRepository(),
   searchClient: RepositorySearchClient = createInMemorySearchClient(),
+  moderationRepository: ModerationRepository = createInMemoryModerationRepository(),
 ) {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -329,6 +410,8 @@ async function createTestApp(
     .useValue(outboxRepository)
     .overrideProvider(REPOSITORY_SEARCH_CLIENT)
     .useValue(searchClient)
+    .overrideProvider(MODERATION_REPOSITORY)
+    .useValue(moderationRepository)
     .compile();
 
   const testApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -368,8 +451,8 @@ function createInMemoryOutboxRepository() {
   return repository;
 }
 
-function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string) {
-  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name, role: "user" });
+function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string, role: "user" | "admin" = "user") {
+  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name, role });
   repository.sessions.set(token, { token, userId, expiresAt: new Date(Date.now() + 60_000) });
 }
 
@@ -473,7 +556,17 @@ function createInMemoryRepositoryRepository() {
     async findByWorldId(worldId) { return [...repositories.values()].find((item) => item.worldId === worldId) ?? null; },
     async createRepository(input) {
       const now = new Date();
-      const record = { id: `repo_${repositories.size + 1}`, stars: 0, forks: 0, createdAt: now, updatedAt: now, ...input };
+      const record = {
+        id: `repo_${repositories.size + 1}`,
+        moderationStatus: "visible" as const,
+        moderationReason: null,
+        moderatedAt: null,
+        stars: 0,
+        forks: 0,
+        createdAt: now,
+        updatedAt: now,
+        ...input,
+      };
       repositories.set(record.id, record);
       return record;
     },
@@ -484,8 +577,17 @@ function createInMemoryRepositoryRepository() {
       repositories.set(id, next);
       return next;
     },
-    async listPublic() { return [...repositories.values()].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); },
-    async findPublicByOwnerSlug(ownerName, slug) { return [...repositories.values()].find((item) => item.ownerName === ownerName && item.slug === slug) ?? null; },
+    async setModerationStatus(id, input) {
+      const record = repositories.get(id);
+      if (!record) return null;
+      const next = { ...record, moderationStatus: input.status, moderationReason: input.reason ?? null, moderatedAt: input.moderatedAt, updatedAt: new Date() };
+      repositories.set(id, next);
+      return next;
+    },
+    async listPublic() { return [...repositories.values()].filter((item) => item.moderationStatus !== "removed").sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()); },
+    async findPublicByOwnerSlug(ownerName, slug) {
+      return [...repositories.values()].find((item) => item.ownerName === ownerName && item.slug === slug && item.moderationStatus !== "removed") ?? null;
+    },
     async createRelease(input) {
       const release = { id: `rel_${releases.size + 1}`, createdAt: new Date(), ...input };
       releases.set(release.id, release);
@@ -531,5 +633,42 @@ function createInMemoryRepositoryRepository() {
     },
   };
 
+  return repository;
+}
+
+function createInMemoryModerationRepository() {
+  const reports: ReportRecord[] = [];
+  const actions: ModerationActionRecord[] = [];
+  const repository = {
+    reports,
+    actions,
+    async createReport(input: Omit<ReportRecord, "id" | "status" | "createdAt" | "updatedAt">) {
+      const now = new Date();
+      const report = { id: `report_${reports.length + 1}`, status: "open" as const, createdAt: now, updatedAt: now, ...input };
+      reports.push(report);
+      return report;
+    },
+    async listReports(status?: ReportRecord["status"]) {
+      return reports.filter((report) => !status || report.status === status);
+    },
+    async findReportById(id: string) {
+      return reports.find((report) => report.id === id) ?? null;
+    },
+    async updateReportStatus(id: string, status: ReportRecord["status"]) {
+      const report = reports.find((item) => item.id === id);
+      if (!report) return null;
+      report.status = status;
+      report.updatedAt = new Date();
+      return report;
+    },
+    async countOpenReports(repositoryId: string) {
+      return reports.filter((report) => report.repositoryId === repositoryId && report.status === "open").length;
+    },
+    async createAction(input: Omit<ModerationActionRecord, "id" | "createdAt">) {
+      const action = { id: `mod_${actions.length + 1}`, createdAt: new Date(), ...input };
+      actions.push(action);
+      return action;
+    },
+  } satisfies ModerationRepository & { reports: typeof reports; actions: typeof actions };
   return repository;
 }

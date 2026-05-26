@@ -1,6 +1,6 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
-import { releaseDiffSchema, releaseSnapshotSchema } from "@worlddock/domain";
+import { moderationStatusSchema, releaseDiffSchema, releaseSnapshotSchema } from "@worlddock/domain";
 import type { PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryRepository } from "./repository.repository";
 
 @Injectable()
@@ -30,7 +30,10 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
   }
 
   async listPublic() {
-    const repositories = await this.prisma.publicRepository.findMany({ orderBy: { updatedAt: "desc" } });
+    const repositories = await this.prisma.publicRepository.findMany({
+      where: { moderationStatus: { not: "removed" } },
+      orderBy: { updatedAt: "desc" },
+    });
     return repositories.map(mapRepository);
   }
 
@@ -38,6 +41,20 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
     const repository = await this.prisma.publicRepository.findUnique({
       where: { ownerName_slug: { ownerName, slug } },
     });
+    return repository && repository.moderationStatus !== "removed" ? mapRepository(repository) : null;
+  }
+
+  async setModerationStatus(id: string, input: Parameters<RepositoryRepository["setModerationStatus"]>[1]) {
+    const updated = await this.prisma.publicRepository.updateMany({
+      where: { id },
+      data: {
+        moderationStatus: input.status,
+        moderationReason: input.reason ?? null,
+        moderatedAt: input.moderatedAt,
+      },
+    });
+    if (updated.count === 0) return null;
+    const repository = await this.prisma.publicRepository.findUnique({ where: { id } });
     return repository ? mapRepository(repository) : null;
   }
 
@@ -104,8 +121,11 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
   }
 }
 
-function mapRepository(record: PublicRepositoryRecord): PublicRepositoryRecord {
-  return record;
+function mapRepository(record: Omit<PublicRepositoryRecord, "moderationStatus"> & { moderationStatus: string }): PublicRepositoryRecord {
+  return {
+    ...record,
+    moderationStatus: moderationStatusSchema.parse(record.moderationStatus),
+  };
 }
 
 function mapRelease(record: {

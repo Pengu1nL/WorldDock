@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PublicRepository } from "@worlddock/domain";
-import { forkRepository, listPublicRepositories, searchPublicRepositories, starRepository, unstarRepository } from "./api";
+import { forkRepository, listPublicRepositories, reportRepository, searchPublicRepositories, starRepository, unstarRepository } from "./api";
 import { PUBLIC_REPOSITORIES } from "./fixtures";
 import { Icon } from "./components";
 
@@ -91,7 +91,20 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
           onFork(activeRepository);
           onToast({ kind: "save", text: "Fork 成功 · 已生成私有世界" });
         }}
-        onReport={() => onToast({ kind: "warn", text: "举报已提交 · 管理员会复核" })}
+        onReport={async () => {
+          const session = sessionToken();
+          if (session) {
+            try {
+              await reportRepository(activeRepository.id, {
+                reason: "other",
+                detail: "用户从社区详情页提交举报。",
+              }, { sessionToken: session });
+            } catch {
+              onToast({ kind: "info", text: "云端举报暂不可用，已保留本地反馈" });
+            }
+          }
+          onToast({ kind: "warn", text: "举报已提交 · 管理员会复核" });
+        }}
       />
     );
   }

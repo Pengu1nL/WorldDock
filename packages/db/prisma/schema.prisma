@@ -25,6 +25,8 @@ model User {
   repositories  PublicRepository[]
   stars         RepositoryStar[]
   forks         RepositoryFork[]
+  reports       Report[]
+  moderationActions ModerationAction[]
 
   @@map("users")
 }
@@ -301,6 +303,9 @@ model PublicRepository {
   summary   String
   tags      String[]            @default([])
   license   String
+  moderationStatus String              @default("visible")
+  moderationReason String?
+  moderatedAt DateTime?
   stars     Int                 @default(0)
   forks     Int                 @default(0)
   createdAt DateTime            @default(now())
@@ -311,9 +316,12 @@ model PublicRepository {
   snapshots ReleaseSnapshot[]
   starRecords RepositoryStar[]
   forkRecords RepositoryFork[]
+  reports   Report[]
+  moderationActions ModerationAction[]
 
   @@unique([ownerName, slug])
   @@index([ownerId])
+  @@index([moderationStatus])
   @@map("repositories")
 }
 
@@ -391,4 +399,43 @@ model OutboxEvent {
   @@index([type])
   @@index([processedAt, createdAt])
   @@map("outbox_events")
+}
+
+model Report {
+  id           String           @id @default(cuid())
+  repositoryId String
+  reporterId   String
+  reason       String
+  detail       String?
+  status       String           @default("open")
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  reporter     User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  actions      ModerationAction[]
+
+  @@index([repositoryId, status])
+  @@index([reporterId])
+  @@index([status, createdAt])
+  @@map("reports")
+}
+
+model ModerationAction {
+  id             String           @id @default(cuid())
+  repositoryId   String
+  reportId       String?
+  moderatorId    String?
+  action         String
+  reason         String
+  previousStatus String
+  nextStatus     String
+  createdAt      DateTime         @default(now())
+  repository     PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  report         Report?          @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  moderator      User?            @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([repositoryId, createdAt])
+  @@index([reportId])
+  @@index([moderatorId])
+  @@map("moderation_actions")
 }

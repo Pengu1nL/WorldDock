@@ -2,11 +2,13 @@ import { parseWorldDockEnv } from "@worlddock/config";
 import { createPrismaClient } from "@worlddock/db";
 import { pathToFileURL } from "node:url";
 import { configureMeilisearchRepositoryIndex, createMeilisearchSearchIndex } from "./meilisearch-index";
+import { createModerationScanQueue, createModerationScanWorker, enqueuePendingModerationScanEvents } from "./moderation-scan";
 import { createPrismaRepositorySearchSource } from "./repository-source";
 import { rebuildRepositorySearchIndex } from "./search-indexing";
 import { createRepositorySearchQueue, createRepositorySearchWorker, enqueuePendingSearchOutboxEvents } from "./search-indexing.queue";
 
 export * from "./meilisearch-index";
+export * from "./moderation-scan";
 export * from "./repository-source";
 export * from "./search-indexing";
 export * from "./search-indexing.queue";
@@ -43,6 +45,73 @@ async function runSearchWorkerCommand(command: string) {
     } finally {
       await prisma.$disconnect();
     }
+    return;
+  }
+
+  if (command === "enqueue-moderation") {
+    const queue = createModerationScanQueue(env.REDIS_URL);
+    try {
+      const count = await enqueuePendingModerationScanEvents(source, queue);
+      console.log(`Enqueued ${count} moderation scan job(s).`);
+    } finally {
+      await queue.close();
+      await prisma.$disconnect();
+    }
+    return;
+  }
+
+  if (command === "work-moderation") {
+    createModerationScanWorker({
+      redisUrl: env.REDIS_URL,
+      source: {
+        async loadRepositoryForModeration(repositoryId) {
+          const repository = await source.loadRepository(repositoryId);
+          return repository ? {
+            id: repository.id,
+            name: repository.name,
+            summary: repository.summary,
+            tags: repository.tags,
+          } : null;
+        },
+        async countOpenReports(repositoryId) {
+          return prisma.report.count({ where: { repositoryId, status: "open" } });
+        },
+        async flagRepository(repositoryId, reason) {
+          const repository = await prisma.publicRepository.findUnique({ where: { id: repositoryId } });
+          if (!repository || repository.moderationStatus === "removed") return;
+          const now = new Date();
+          const action = await prisma.moderationAction.create({
+            data: {
+              repositoryId,
+              reportId: null,
+              moderatorId: null,
+              action: "scan_flagged",
+              reason,
+              previousStatus: repository.moderationStatus,
+              nextStatus: "limited",
+            },
+          });
+          await prisma.publicRepository.update({
+            where: { id: repositoryId },
+            data: { moderationStatus: "limited", moderationReason: reason, moderatedAt: now },
+          });
+          await prisma.outboxEvent.create({
+            data: {
+              type: "repository.moderation_limited",
+              aggregateId: repositoryId,
+              payload: {
+                repositoryId,
+                actionId: action.id,
+                previousStatus: repository.moderationStatus,
+                nextStatus: "limited",
+                reason,
+              },
+            },
+          });
+        },
+      },
+    });
+    console.log("Moderation scan worker started.");
     return;
   }
 

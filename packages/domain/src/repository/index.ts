@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { moderationStatusSchema } from "../moderation";
 
 export const licenseSchema = z.enum([
   "all-rights-reserved",
@@ -52,6 +53,8 @@ export const publicRepositorySchema = z.object({
   version: z.string().min(1),
   visibility: z.literal("public"),
   license: licenseSchema,
+  moderationStatus: moderationStatusSchema.default("visible"),
+  moderationReason: z.string().nullable().optional(),
   forkedFrom: z.string().min(1).optional(),
   releases: z.array(releaseSchema).default([]),
 });

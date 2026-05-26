@@ -1,4 +1,5 @@
 import type { ReleaseDiff, ReleaseSnapshot } from "@worlddock/domain";
+import type { ModerationStatus } from "@worlddock/domain";
 
 export const REPOSITORY_REPOSITORY = Symbol("REPOSITORY_REPOSITORY");
 
@@ -12,6 +13,9 @@ export type PublicRepositoryRecord = {
   summary: string;
   tags: string[];
   license: string;
+  moderationStatus: ModerationStatus;
+  moderationReason: string | null;
+  moderatedAt: Date | null;
   stars: number;
   forks: number;
   createdAt: Date;
@@ -50,8 +54,9 @@ export type ForkRecord = {
 export type RepositoryRepository = {
   findById(id: string): Promise<PublicRepositoryRecord | null>;
   findByWorldId(worldId: string): Promise<PublicRepositoryRecord | null>;
-  createRepository(input: Omit<PublicRepositoryRecord, "id" | "stars" | "forks" | "createdAt" | "updatedAt">): Promise<PublicRepositoryRecord>;
+  createRepository(input: Omit<PublicRepositoryRecord, "id" | "moderationStatus" | "moderationReason" | "moderatedAt" | "stars" | "forks" | "createdAt" | "updatedAt">): Promise<PublicRepositoryRecord>;
   updateRepository(id: string, input: Partial<Pick<PublicRepositoryRecord, "name" | "summary" | "tags" | "license">>): Promise<PublicRepositoryRecord | null>;
+  setModerationStatus(id: string, input: { status: ModerationStatus; reason?: string | null; moderatedAt: Date }): Promise<PublicRepositoryRecord | null>;
   listPublic(): Promise<PublicRepositoryRecord[]>;
   findPublicByOwnerSlug(ownerName: string, slug: string): Promise<PublicRepositoryRecord | null>;
   createRelease(input: Omit<ReleaseRecord, "id" | "createdAt">): Promise<ReleaseRecord>;

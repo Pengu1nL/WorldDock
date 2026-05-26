@@ -555,7 +555,7 @@ type ApiError = {
 - [x] Local Push 只接收明确上传的公开快照，不读取本地私有数据。
 - [x] 实现授权规则校验，禁止 Fork 的仓库不可 Fork。
 - [x] 前端社区页接入真实 Star、Fork。
-- [ ] 前端公开仓库举报入口接入真实 API（并入 Phase 10 审核举报）。
+- [x] 前端公开仓库举报入口接入真实 API（并入 Phase 10 审核举报）。
 - [x] 设置页 token 状态与 Local Push 禁用态接入真实 API。
 
 验收标准：
@@ -597,15 +597,15 @@ type ApiError = {
 
 任务：
 
-- [ ] 设计并迁移 `reports` 和 `moderation_actions` 表。
-- [ ] 实现 repository report API。
-- [ ] 实现管理员列表举报接口。
-- [ ] 实现管理员处理举报：保留、限制、下架。
-- [ ] 审核状态变更写入 `moderation_actions`。
-- [ ] 审核状态变更写入 outbox，触发搜索索引更新。
-- [ ] 发布后触发 `moderation-scan` queue，先实现规则型审核扫描：敏感词、空内容、重复举报阈值。
-- [ ] 前端公开仓库举报接入真实 API。
-- [ ] 提供最小管理员接口或内部脚本处理举报。
+- [x] 设计并迁移 `reports` 和 `moderation_actions` 表。
+- [x] 实现 repository report API。
+- [x] 实现管理员列表举报接口。
+- [x] 实现管理员处理举报：保留、限制、下架。
+- [x] 审核状态变更写入 `moderation_actions`。
+- [x] 审核状态变更写入 outbox，触发搜索索引更新。
+- [x] 发布后触发 `moderation-scan` queue，先实现规则型审核扫描：敏感词、空内容、重复举报阈值。
+- [x] 前端公开仓库举报接入真实 API。
+- [x] 提供最小管理员接口或内部脚本处理举报。
 
 验收标准：
 
