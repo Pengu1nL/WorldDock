@@ -276,6 +276,25 @@ export async function listPublicRepositories(options: ApiClientOptions) {
   });
 }
 
+export type RepositorySearchOptions = {
+  tags?: string[];
+  sort?: "relevance" | "stars" | "forks" | "updated";
+};
+
+export async function searchPublicRepositories(query: string, options: ApiClientOptions & RepositorySearchOptions) {
+  const params = new URLSearchParams({ q: query });
+  for (const tag of options.tags ?? []) params.append("tag", tag);
+  if (options.sort && options.sort !== "relevance") params.set("sort", options.sort);
+
+  return requestJson(`/v1/repositories/search?${params.toString()}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function getPublicRepository(owner: string, slug: string, options: ApiClientOptions) {
   return requestJson(`/v1/repositories/${owner}/${slug}`, {
     method: "GET",

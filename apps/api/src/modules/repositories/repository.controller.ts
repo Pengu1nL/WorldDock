@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -37,6 +37,20 @@ export class RepositoryController {
   @Get("repositories")
   async list() {
     return { repositories: await this.repositoryService.listPublicRepositories() };
+  }
+
+  @Get("repositories/search")
+  async search(
+    @Query("q") query = "",
+    @Query("tag") tag?: string | string[],
+    @Query("sort") sort = "relevance",
+  ) {
+    return {
+      repositories: await this.repositoryService.searchPublicRepositories(query, {
+        tags: normalizeTags(tag),
+        sort: parseSearchSort(sort),
+      }),
+    };
   }
 
   @Get("repositories/:owner/:slug")
@@ -83,4 +97,16 @@ export class RepositoryController {
   async publish(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
     return this.repositoryService.publishWorld(subject, worldId, publishSchema.parse(body));
   }
+}
+
+function normalizeTags(tag?: string | string[]) {
+  const tags = Array.isArray(tag) ? tag : tag ? [tag] : [];
+  return tags.flatMap((item) => item.split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseSearchSort(sort: string) {
+  if (sort === "stars" || sort === "forks" || sort === "updated") return sort;
+  return "relevance";
 }

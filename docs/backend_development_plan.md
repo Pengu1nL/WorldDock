@@ -572,15 +572,16 @@ type ApiError = {
 
 任务：
 
-- [ ] 新增 `outbox_events` 表和 outbox repository。
-- [ ] 在 repository 发布、更新、Star、Fork、审核状态变化时写入 outbox。
-- [ ] 新增 `apps/worker`，接入 BullMQ。
-- [ ] 实现 `search-indexing` queue。
-- [ ] 定义 Meilisearch `world_repositories` index。
-- [ ] 实现 repository document mapper。
-- [ ] 实现 upsert、delete、full rebuild 命令。
-- [ ] API 搜索接口读取 Meilisearch，并对权限敏感结果回查 PostgreSQL。
-- [ ] 前端 Explore 搜索接入真实搜索接口。
+- [x] 新增 `outbox_events` 表和 outbox repository。
+- [x] 在 repository 发布、更新、Star、Fork 状态变化时写入 outbox；审核状态变化由 Phase 10 审核模块接入。
+- [x] 新增 `apps/worker`，接入 BullMQ。
+- [x] 实现 `search-indexing` queue。
+- [x] 定义 Meilisearch `world_repositories` index。
+- [x] 实现 repository document mapper。
+- [x] 实现 upsert、delete、full rebuild 命令。
+- [x] API 搜索接口读取 Meilisearch，并对权限敏感结果回查 PostgreSQL；Meilisearch 不可用时回退 PostgreSQL。
+- [x] API 搜索接口支持关键词、标签、排序。
+- [x] 前端 Explore 搜索接入真实搜索接口。
 
 验收标准：
 

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApiApp } from "../src/configure-api-app";
 import { AUTH_REPOSITORY, hashToken, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import { OUTBOX_REPOSITORY, type OutboxEventRecord, type OutboxRepository } from "../src/modules/outbox/outbox.repository";
 import {
   REPOSITORY_REPOSITORY,
   type PublicRepositoryRecord,
@@ -13,6 +14,11 @@ import {
   type ReleaseSnapshotRecord,
   type RepositoryRepository,
 } from "../src/modules/repositories/repository.repository";
+import {
+  REPOSITORY_SEARCH_CLIENT,
+  type RepositorySearchOptions,
+  type RepositorySearchClient,
+} from "../src/modules/repositories/repository-search.client";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -245,12 +251,70 @@ describe("repository publish endpoints", () => {
       })
       .expect(403);
   });
+
+  it("writes outbox events for repository changes and searches public repositories", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    const outbox = createInMemoryOutboxRepository();
+    let indexedRepositoryId = "";
+    let searchedQuery = "";
+    let searchedOptions: RepositorySearchOptions | undefined;
+    const searchClient = {
+      async search(query: string, options?: RepositorySearchOptions) {
+        searchedQuery = query;
+        searchedOptions = options;
+        return indexedRepositoryId ? [{ id: indexedRepositoryId }] : [];
+      },
+    } satisfies RepositorySearchClient;
+    addSession(auth, "session_user_1", "user_1", "ren");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Searchable Archive",
+      type: "奇幻",
+      summary: "一个可以被搜索到的公开世界。",
+      tags: ["搜索"],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, repositories, outbox, searchClient);
+    const publish = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/publish`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ releaseNote: "初始发布", license: "free-fork-attribution" })
+      .expect(201);
+    indexedRepositoryId = publish.body.repository.id;
+
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/star`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/fork`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(201);
+
+    expect(outbox.events.map((event) => event.type)).toEqual([
+      "repository.published",
+      "repository.starred",
+      "repository.forked",
+    ]);
+
+    const search = await request(app.getHttpServer())
+      .get("/v1/repositories/search")
+      .query({ q: "Searchable", tag: "搜索", sort: "stars" })
+      .expect(200);
+    expect(searchedQuery).toBe("searchable");
+    expect(searchedOptions).toEqual({ tags: ["搜索"], sort: "stars" });
+    expect(search.body.repositories[0].slug).toBe("searchable-archive");
+  });
 });
 
 async function createTestApp(
   authRepository: AuthRepository,
   worldRepository: WorldRepository,
   repositoryRepository: RepositoryRepository,
+  outboxRepository: OutboxRepository = createInMemoryOutboxRepository(),
+  searchClient: RepositorySearchClient = createInMemorySearchClient(),
 ) {
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -261,6 +325,10 @@ async function createTestApp(
     .useValue(worldRepository)
     .overrideProvider(REPOSITORY_REPOSITORY)
     .useValue(repositoryRepository)
+    .overrideProvider(OUTBOX_REPOSITORY)
+    .useValue(outboxRepository)
+    .overrideProvider(REPOSITORY_SEARCH_CLIENT)
+    .useValue(searchClient)
     .compile();
 
   const testApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
@@ -268,6 +336,36 @@ async function createTestApp(
   await testApp.init();
   await testApp.getHttpAdapter().getInstance().ready();
   return testApp;
+}
+
+function createInMemorySearchClient() {
+  return {
+    async search() {
+      throw new Error("Search index unavailable in tests.");
+    },
+  } satisfies RepositorySearchClient;
+}
+
+function createInMemoryOutboxRepository() {
+  const events: OutboxEventRecord[] = [];
+  const repository = {
+    events,
+    async createEvent(input: Omit<OutboxEventRecord, "id" | "createdAt" | "processedAt">) {
+      const event = { id: `out_${events.length + 1}`, createdAt: new Date(), processedAt: null, ...input };
+      events.push(event);
+      return event;
+    },
+    async listPending() {
+      return events.filter((event) => !event.processedAt);
+    },
+    async markProcessed(id: string, processedAt: Date) {
+      const event = events.find((item) => item.id === id);
+      if (!event) return null;
+      event.processedAt = processedAt;
+      return event;
+    },
+  } satisfies OutboxRepository & { events: typeof events };
+  return repository;
 }
 
 function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string) {

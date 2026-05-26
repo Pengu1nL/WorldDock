@@ -1,13 +1,15 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { OutboxModule } from "../outbox/outbox.module";
 import { WorldsModule } from "../worlds/worlds.module";
 import { PrismaRepositoryRepository } from "./prisma-repository.repository";
 import { RepositoryController } from "./repository.controller";
 import { REPOSITORY_REPOSITORY } from "./repository.repository";
+import { MeilisearchRepositorySearchClient, REPOSITORY_SEARCH_CLIENT } from "./repository-search.client";
 import { RepositoryService } from "./repository.service";
 
 @Module({
-  imports: [AuthModule, WorldsModule],
+  imports: [AuthModule, OutboxModule, WorldsModule],
   controllers: [RepositoryController],
   providers: [
     RepositoryService,
@@ -16,7 +18,11 @@ import { RepositoryService } from "./repository.service";
       provide: REPOSITORY_REPOSITORY,
       useExisting: PrismaRepositoryRepository,
     },
+    {
+      provide: REPOSITORY_SEARCH_CLIENT,
+      useClass: MeilisearchRepositorySearchClient,
+    },
   ],
-  exports: [RepositoryService, REPOSITORY_REPOSITORY],
+  exports: [RepositoryService, REPOSITORY_REPOSITORY, REPOSITORY_SEARCH_CLIENT],
 })
 export class RepositoryModule {}

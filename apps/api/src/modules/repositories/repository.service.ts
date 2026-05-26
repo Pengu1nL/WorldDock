@@ -1,14 +1,18 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { licenseSchema, releaseSnapshotSchema, type ReleaseDiff } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
+import { OUTBOX_REPOSITORY, type OutboxRepository } from "../outbox/outbox.repository";
 import { WORLD_REPOSITORY, type WorldRecord, type WorldRepository } from "../worlds/world.repository";
 import { REPOSITORY_REPOSITORY, type PublicRepositoryRecord, type ReleaseRecord, type RepositoryRepository } from "./repository.repository";
+import { REPOSITORY_SEARCH_CLIENT, type RepositorySearchClient, type RepositorySearchOptions } from "./repository-search.client";
 
 @Injectable()
 export class RepositoryService {
   constructor(
     @Inject(REPOSITORY_REPOSITORY) private readonly repositories: RepositoryRepository,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
+    @Inject(REPOSITORY_SEARCH_CLIENT) private readonly searchClient: RepositorySearchClient,
   ) {}
 
   async listPublicRepositories() {
@@ -22,6 +26,38 @@ export class RepositoryService {
     return this.toRepositoryDetail(repository);
   }
 
+  async searchPublicRepositories(query: string, options: RepositorySearchOptions = {}) {
+    const normalized = query.trim().toLowerCase();
+    const shouldQuerySearchIndex = Boolean(
+      normalized || options.tags?.length || (options.sort && options.sort !== "relevance"),
+    );
+    const searchHits = shouldQuerySearchIndex
+      ? await this.searchClient.search(normalized, options).catch(() => null)
+      : null;
+
+    if (searchHits) {
+      const repositories = await Promise.all(
+        searchHits.map((hit) => this.repositories.findById(hit.id)),
+      );
+      return Promise.all(
+        repositories
+          .filter((repository): repository is PublicRepositoryRecord => Boolean(repository))
+          .map((repository) => this.toRepositoryDetail(repository)),
+      );
+    }
+
+    const repositories = await this.repositories.listPublic();
+    const filtered = sortRepositories((normalized
+      ? repositories.filter((repository) =>
+          [repository.name, repository.summary, repository.ownerName, repository.slug, ...repository.tags]
+            .join(" ")
+            .toLowerCase()
+            .includes(normalized))
+      : repositories)
+      .filter((repository) => hasAllTags(repository, options.tags)), options.sort);
+    return Promise.all(filtered.map((repository) => this.toRepositoryDetail(repository)));
+  }
+
   async listReleases(repositoryId: string) {
     const releases = await this.repositories.listReleases(repositoryId);
     return releases.map(toReleaseDetail);
@@ -30,12 +66,14 @@ export class RepositoryService {
   async starRepository(subject: AuthSubject, repositoryId: string) {
     const repository = await this.repositories.starRepository(repositoryId, subject.user.id);
     if (!repository) throw this.notFound("Repository not found.");
+    await this.emitRepositoryEvent("repository.starred", repository.id, { repositoryId: repository.id, userId: subject.user.id });
     return this.toRepositoryDetail(repository);
   }
 
   async unstarRepository(subject: AuthSubject, repositoryId: string) {
     const repository = await this.repositories.unstarRepository(repositoryId, subject.user.id);
     if (!repository) throw this.notFound("Repository not found.");
+    await this.emitRepositoryEvent("repository.unstarred", repository.id, { repositoryId: repository.id, userId: subject.user.id });
     return this.toRepositoryDetail(repository);
   }
 
@@ -72,6 +110,7 @@ export class RepositoryService {
       userId: subject.user.id,
       licenseSnapshot: repository.license,
     });
+    await this.emitRepositoryEvent("repository.forked", repository.id, { repositoryId: repository.id, forkId: fork.id, userId: subject.user.id });
 
     return { world, fork };
   }
@@ -119,6 +158,7 @@ export class RepositoryService {
       createdAt: release.createdAt.toISOString(),
     });
     await this.repositories.createSnapshot({ repositoryId: repository.id, releaseId: release.id, snapshot });
+    await this.emitRepositoryEvent("repository.local_pushed", repository.id, { repositoryId: repository.id, releaseId: release.id });
     return {
       repository: await this.toRepositoryDetail(repository),
       release: toReleaseDetail(release),
@@ -183,6 +223,7 @@ export class RepositoryService {
       snapshot,
     });
     await this.worlds.updateWorld(world.id, { status: "published", visibility: "public" });
+    await this.emitRepositoryEvent("repository.published", repository.id, { repositoryId: repository.id, releaseId: release.id, worldId: world.id });
 
     return {
       repository: await this.toRepositoryDetail(repository),
@@ -222,6 +263,10 @@ export class RepositoryService {
 
   private notFound(message: string) {
     return new NotFoundException({ code: "NOT_FOUND", message });
+  }
+
+  private async emitRepositoryEvent(type: string, aggregateId: string, payload: unknown) {
+    await this.outbox.createEvent({ type, aggregateId, payload });
   }
 }
 
@@ -273,4 +318,18 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "world";
+}
+
+function hasAllTags(repository: PublicRepositoryRecord, tags: string[] = []) {
+  if (tags.length === 0) return true;
+  const repositoryTags = new Set(repository.tags.map((tag) => tag.toLowerCase()));
+  return tags.every((tag) => repositoryTags.has(tag.toLowerCase()));
+}
+
+function sortRepositories(repositories: PublicRepositoryRecord[], sort: RepositorySearchOptions["sort"]) {
+  const sorted = [...repositories];
+  if (sort === "stars") return sorted.sort((left, right) => right.stars - left.stars);
+  if (sort === "forks") return sorted.sort((left, right) => right.forks - left.forks);
+  if (sort === "updated") return sorted.sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+  return sorted;
 }

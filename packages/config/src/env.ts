@@ -17,6 +17,7 @@ export const worldDockEnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
   MEILISEARCH_HOST: z.string().url(),
+  MEILISEARCH_API_KEY: z.string().min(1).optional(),
   S3_ENDPOINT: z.string().url(),
   S3_BUCKET: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(16),

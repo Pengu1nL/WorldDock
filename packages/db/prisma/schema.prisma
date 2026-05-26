@@ -379,3 +379,16 @@ model RepositoryFork {
   @@index([targetWorldId])
   @@map("forks")
 }
+
+model OutboxEvent {
+  id          String    @id @default(cuid())
+  type        String
+  aggregateId String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([type])
+  @@index([processedAt, createdAt])
+  @@map("outbox_events")
+}

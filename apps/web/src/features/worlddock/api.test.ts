@@ -12,6 +12,7 @@ import {
   listAccessTokens,
   listConflicts,
   listPublicRepositories,
+  searchPublicRepositories,
   listRepositoryReleases,
   listStorySeeds,
   listWorlds,
@@ -155,6 +156,14 @@ describe("worlddock API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/repositories", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/repositories/ren/memory-market", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/repositories/repo_1/releases", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("searches public repositories", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({ repositories: [{ id: "repo_1" }] }));
+
+    await searchPublicRepositories("memory", { sessionToken: "session_valid", fetcher, tags: ["记忆"], sort: "stars" });
+
+    expect(fetcher).toHaveBeenCalledWith("http://localhost:4000/v1/repositories/search?q=memory&tag=%E8%AE%B0%E5%BF%86&sort=stars", expect.objectContaining({ method: "GET" }));
   });
 
   it("stars, unstars, forks, and local-pushes repositories", async () => {

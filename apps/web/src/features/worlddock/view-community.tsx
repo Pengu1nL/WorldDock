@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PublicRepository } from "@worlddock/domain";
-import { forkRepository, listPublicRepositories, starRepository, unstarRepository } from "./api";
+import { forkRepository, listPublicRepositories, searchPublicRepositories, starRepository, unstarRepository } from "./api";
 import { PUBLIC_REPOSITORIES } from "./fixtures";
 import { Icon } from "./components";
 
@@ -35,6 +35,17 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
         setRepositories(PUBLIC_REPOSITORIES);
       });
   }, [sessionToken]);
+
+  useEffect(() => {
+    if (!query.trim()) return;
+    void searchPublicRepositories(query, { sessionToken: sessionToken() })
+      .then((result: any) => {
+        if (Array.isArray(result.repositories)) {
+          setRepositories(result.repositories.length > 0 ? result.repositories : PUBLIC_REPOSITORIES);
+        }
+      })
+      .catch(() => {});
+  }, [query, sessionToken]);
 
   const filtered = useMemo(() => {
     return repositories.filter((repository) => {
