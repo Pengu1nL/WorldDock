@@ -3,6 +3,7 @@ import { AuthModule } from "../auth/auth.module";
 import { BillingController } from "./billing.controller";
 import { BILLING_REPOSITORY } from "./billing.repository";
 import { BillingService } from "./billing.service";
+import { EntitlementsService } from "./entitlements.service";
 import { PrismaBillingRepository } from "./prisma-billing.repository";
 
 @Module({
@@ -10,6 +11,7 @@ import { PrismaBillingRepository } from "./prisma-billing.repository";
   controllers: [BillingController],
   providers: [
     BillingService,
+    EntitlementsService,
     PrismaBillingRepository,
     {
       provide: BILLING_REPOSITORY,

@@ -8,7 +8,7 @@ import { configureApiApp } from "../src/configure-api-app";
 import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord, type ContextRefRecord } from "../src/modules/agent/agent.repository";
 import { AGENT_PROVIDER, type AgentProvider } from "../src/modules/agent/agent.provider";
-import { BILLING_REPOSITORY, type BillingAccountRecord, type BillingRepository, type UsageLedgerEntryRecord } from "../src/modules/billing/billing.repository";
+import { BILLING_REPOSITORY, type BillingAccountRecord, type BillingPlaceholderIntentRecord, type BillingRepository, type UsageLedgerEntryRecord } from "../src/modules/billing/billing.repository";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -384,6 +384,7 @@ function createInMemoryAgentRepository() {
 function createInMemoryBillingRepository() {
   const accounts = new Map<string, BillingAccountRecord>();
   const entries = new Map<string, UsageLedgerEntryRecord>();
+  const placeholderIntents = new Map<string, BillingPlaceholderIntentRecord>();
 
   const repository = {
     accounts,
@@ -425,6 +426,19 @@ function createInMemoryBillingRepository() {
     },
     async listLedgerEntriesForRun(agentRunId: string) {
       return [...entries.values()].filter((entry) => entry.agentRunId === agentRunId);
+    },
+    async createPlaceholderIntent(input) {
+      const intent: BillingPlaceholderIntentRecord = {
+        id: `bpi_${placeholderIntents.size + 1}`,
+        createdAt: new Date(),
+        status: input.status ?? "captured",
+        ...input,
+      };
+      placeholderIntents.set(intent.id, intent);
+      return intent;
+    },
+    async listPlaceholderIntents(userId: string) {
+      return [...placeholderIntents.values()].filter((intent) => intent.userId === userId);
     },
   } satisfies BillingRepository & { accounts: typeof accounts; entries: typeof entries };
 

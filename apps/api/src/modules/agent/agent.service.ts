@@ -126,7 +126,7 @@ export class AgentService {
         tokenUsage,
         completedAt: new Date(),
       });
-      await this.billing.settleAgentRun(run.userId, run.id, tokenUsage);
+      await this.billing.settleAgentRun(run.userId, run.id, tokenUsage, resolveBillingModel(run.model));
       yield await this.append(run.id, sequence++, "run.completed", { tokenUsage });
     } catch {
       await this.agents.updateRun(run.id, {
@@ -257,4 +257,13 @@ export class AgentService {
 function parseAgentProvider(value: string | undefined): "mock" | "vercel-ai" | "pi" {
   if (value === "pi" || value === "vercel-ai") return value;
   return "mock";
+}
+
+function resolveBillingModel(model: string | null | undefined) {
+  if (!model || model === "mock") return { provider: "openai-compatible", model: "qwen3-32b" };
+  if (model.startsWith("openai/")) return { provider: "openai", model: model.replace("openai/", "") };
+  if (model.startsWith("anthropic/")) return { provider: "anthropic", model: model.replace("anthropic/", "") };
+  if (model.startsWith("gpt-")) return { provider: "openai", model };
+  if (model.startsWith("claude")) return { provider: "anthropic", model };
+  return { provider: "openai-compatible", model };
 }

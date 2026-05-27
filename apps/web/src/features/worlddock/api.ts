@@ -120,6 +120,16 @@ export type UsageLedgerEntry = {
   createdAt: string;
 };
 
+export type BillingPlaceholderIntent = {
+  id: string;
+  userId: string;
+  accountId: string;
+  plan: string;
+  source: string;
+  status: "captured";
+  createdAt: string;
+};
+
 export type BillingUsage = {
   balance: BillingBalance;
   lastAgentRun: {
@@ -129,6 +139,7 @@ export type BillingUsage = {
     createdAt: string;
   } | null;
   entries: UsageLedgerEntry[];
+  placeholderIntents?: BillingPlaceholderIntent[];
 };
 
 export type PublishWorldInput = {
@@ -221,6 +232,20 @@ export async function getBillingUsage(options: ApiClientOptions): Promise<{ usag
   return requestJson("/v1/billing/usage", {
     method: "GET",
     sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function captureBillingPlaceholderIntent(
+  input: { plan: "creator" | "studio" | "team" },
+  options: ApiClientOptions,
+): Promise<{ intent: BillingPlaceholderIntent }> {
+  return requestJson("/v1/billing/placeholder-intents", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
     signal: options.signal,

@@ -2059,7 +2059,7 @@ Expected: user can preview diff, publish, view release, roll back, Fork, compare
 - Test: `apps/api/test/billing-alpha.integration-spec.ts`
 - Test: `apps/web/tests/e2e/billing-flow.spec.ts`
 
-- [ ] **Task 1: 建立价格表**
+- [x] **Task 1: 建立价格表**
 
 Create `packages/domain/src/billing/price-book.ts`:
 
@@ -2091,7 +2091,7 @@ export function calculateModelRunCostCents(input: {
 }
 ```
 
-- [ ] **Task 2: 增加 Alpha 用量和余额模型，不接真实支付**
+- [x] **Task 2: 增加 Alpha 用量和余额模型，不接真实支付**
 
 Add models:
 
@@ -2109,7 +2109,7 @@ model BillingPlaceholderIntent {
 }
 ```
 
-- [ ] **Task 3: 建立支付 UI 占位**
+- [x] **Task 3: 建立支付 UI 占位**
 
 Billing UI must show:
 
@@ -2141,7 +2141,7 @@ Deferred to Beta:
 - Production tax and refund policy
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 

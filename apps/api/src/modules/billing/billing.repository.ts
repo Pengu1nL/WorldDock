@@ -23,6 +23,16 @@ export type UsageLedgerEntryRecord = {
   createdAt: Date;
 };
 
+export type BillingPlaceholderIntentRecord = {
+  id: string;
+  userId: string;
+  accountId: string;
+  plan: string;
+  source: string;
+  status: "captured";
+  createdAt: Date;
+};
+
 export type BillingRepository = {
   findAccountByUserId(userId: string): Promise<BillingAccountRecord | null>;
   createAccount(input: { userId: string; freeCreditGrantedAt?: Date | null }): Promise<BillingAccountRecord>;
@@ -30,4 +40,6 @@ export type BillingRepository = {
   createLedgerEntry(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">): Promise<UsageLedgerEntryRecord>;
   listLedgerEntries(userId: string): Promise<UsageLedgerEntryRecord[]>;
   listLedgerEntriesForRun(agentRunId: string): Promise<UsageLedgerEntryRecord[]>;
+  createPlaceholderIntent(input: Omit<BillingPlaceholderIntentRecord, "id" | "createdAt" | "status"> & Partial<Pick<BillingPlaceholderIntentRecord, "status">>): Promise<BillingPlaceholderIntentRecord>;
+  listPlaceholderIntents(userId: string): Promise<BillingPlaceholderIntentRecord[]>;
 };
