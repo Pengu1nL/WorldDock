@@ -1,4 +1,4 @@
-import type { PublicRepository, WorldAsset, WorldAssetKind, WorldPackage } from "@worlddock/domain";
+import type { Notification, PublicRepository, WorldAsset, WorldAssetKind, WorldPackage } from "@worlddock/domain";
 
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
 
@@ -249,6 +249,11 @@ export type ExportSummary = {
   createdAt: string;
 };
 
+export type NotificationList = {
+  notifications: Notification[];
+  unreadCount: number;
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -299,6 +304,40 @@ export async function getBillingUsage(options: ApiClientOptions): Promise<{ usag
   return requestJson("/v1/billing/usage", {
     method: "GET",
     sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listNotifications(options: ApiClientOptions): Promise<NotificationList> {
+  return requestJson("/v1/notifications", {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function markNotificationRead(notificationId: string, options: ApiClientOptions): Promise<{ notification: Notification }> {
+  return requestJson(`/v1/notifications/${notificationId}/read`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function submitSupportFeedback(
+  input: { message: string; context?: Record<string, unknown> },
+  options: ApiClientOptions,
+) {
+  return requestJson("/v1/support/feedback", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
     signal: options.signal,

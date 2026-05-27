@@ -2391,7 +2391,7 @@ Expected: user can export a world package, import it into a new private world, r
 - Modify: `packages/db/prisma/schema.prisma`
 - Test: `apps/api/test/notifications.integration-spec.ts`
 
-- [ ] **Task 1: 定义通知类型**
+- [x] **Task 1: 定义通知类型**
 
 Create `packages/domain/src/notifications/index.ts`:
 
@@ -2419,7 +2419,7 @@ export const notificationSchema = z.object({
 });
 ```
 
-- [ ] **Task 2: 建立站内通知和 Alpha 反馈入口**
+- [x] **Task 2: 建立站内通知和 Alpha 反馈入口**
 
 In-app notification and support entry must support:
 
@@ -2454,7 +2454,7 @@ Deferred to Beta:
 - Moderation action email
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
