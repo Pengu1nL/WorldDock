@@ -1,4 +1,4 @@
-import type { ReleaseDiff, ReleaseSnapshot } from "@worlddock/domain";
+import type { ReleaseChange, ReleaseDiff, ReleaseSnapshot, ReleaseStatus } from "@worlddock/domain";
 import type { ModerationStatus } from "@worlddock/domain";
 
 export const REPOSITORY_REPOSITORY = Symbol("REPOSITORY_REPOSITORY");
@@ -26,9 +26,11 @@ export type ReleaseRecord = {
   id: string;
   repositoryId: string;
   version: string;
+  status: ReleaseStatus;
   note: string;
   license: string;
   diff: ReleaseDiff;
+  changes: ReleaseChange[];
   source: "cloud-publish" | "local-push";
   createdAt: Date;
 };
@@ -59,12 +61,17 @@ export type RepositoryRepository = {
   setModerationStatus(id: string, input: { status: ModerationStatus; reason?: string | null; moderatedAt: Date }): Promise<PublicRepositoryRecord | null>;
   listPublic(): Promise<PublicRepositoryRecord[]>;
   findPublicByOwnerSlug(ownerName: string, slug: string): Promise<PublicRepositoryRecord | null>;
-  createRelease(input: Omit<ReleaseRecord, "id" | "createdAt">): Promise<ReleaseRecord>;
+  createRelease(input: Omit<ReleaseRecord, "id" | "createdAt" | "status" | "changes"> & Partial<Pick<ReleaseRecord, "status" | "changes">>): Promise<ReleaseRecord>;
+  findReleaseById(id: string): Promise<ReleaseRecord | null>;
+  updateReleaseStatus(id: string, status: ReleaseStatus): Promise<ReleaseRecord | null>;
   listReleases(repositoryId: string): Promise<ReleaseRecord[]>;
   createSnapshot(input: Omit<ReleaseSnapshotRecord, "id" | "createdAt">): Promise<ReleaseSnapshotRecord>;
   findSnapshotByReleaseId(releaseId: string): Promise<ReleaseSnapshotRecord | null>;
   starRepository(repositoryId: string, userId: string): Promise<PublicRepositoryRecord | null>;
   unstarRepository(repositoryId: string, userId: string): Promise<PublicRepositoryRecord | null>;
   createFork(input: Omit<ForkRecord, "id" | "createdAt">): Promise<ForkRecord>;
+  findForkById(id: string): Promise<ForkRecord | null>;
+  updateForkSourceRelease(id: string, sourceReleaseId: string): Promise<ForkRecord | null>;
+  deleteFork(id: string): Promise<ForkRecord | null>;
   listForksForRepository(repositoryId: string): Promise<ForkRecord[]>;
 };

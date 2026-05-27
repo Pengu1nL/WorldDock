@@ -1978,7 +1978,7 @@ Expected: `AI_PROVIDER=pi` runs through Pi Session Runner, pi can only call regi
 - Test: `apps/api/test/releases.integration-spec.ts`
 - Test: `apps/web/tests/e2e/release-flow.spec.ts`
 
-- [ ] **Task 1: 定义 release 状态机**
+- [x] **Task 1: 定义 release 状态机**
 
 Create `packages/domain/src/releases/index.ts`:
 
@@ -2008,7 +2008,7 @@ export const worldReleaseSchema = z.object({
 });
 ```
 
-- [ ] **Task 2: 发布前检查**
+- [x] **Task 2: 发布前检查**
 
 Release wizard must block publish when:
 
@@ -2020,7 +2020,7 @@ moderation pre-scan fails
 billing entitlement does not include public publishing
 ```
 
-- [ ] **Task 3: Fork 同步**
+- [x] **Task 3: Fork 同步**
 
 Add APIs:
 
@@ -2030,7 +2030,7 @@ POST /v1/forks/:forkId/sync
 POST /v1/forks/:forkId/detach
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 

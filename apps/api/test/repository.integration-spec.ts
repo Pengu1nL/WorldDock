@@ -103,6 +103,7 @@ describe("repository publish endpoints", () => {
       tags: ["账本"],
       mode: "cloud",
     });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "账本誓约", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
     app = await createTestApp(auth, worlds, repositories);
 
     await request(app.getHttpServer())
@@ -154,6 +155,7 @@ describe("repository publish endpoints", () => {
       tags: [],
       mode: "cloud",
     });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "收藏规则", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
     app = await createTestApp(auth, worlds, repositories);
     const publish = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/publish`)
@@ -279,6 +281,7 @@ describe("repository publish endpoints", () => {
       tags: ["搜索"],
       mode: "cloud",
     });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "可搜索设定", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
     app = await createTestApp(auth, worlds, repositories, outbox, searchClient);
     const publish = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/publish`)
@@ -328,6 +331,7 @@ describe("repository publish endpoints", () => {
       tags: ["审核"],
       mode: "cloud",
     });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "待审核设定", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
     app = await createTestApp(auth, worlds, repositories, outbox, createInMemorySearchClient(), moderation);
     const publish = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/publish`)
@@ -405,6 +409,7 @@ describe("repository publish endpoints", () => {
       tags: ["storage"],
       mode: "cloud",
     });
+    await worlds.createArchiveEntry({ worldId: world.id, title: "附件设定", category: "世界规则", summary: "摘要", body: "正文", relations: [] });
     app = await createTestApp(
       auth,
       worlds,
@@ -765,9 +770,25 @@ function createInMemoryRepositoryRepository() {
       return [...repositories.values()].find((item) => item.ownerName === ownerName && item.slug === slug && item.moderationStatus !== "removed") ?? null;
     },
     async createRelease(input) {
-      const release = { id: `rel_${releases.size + 1}`, createdAt: new Date(), ...input };
+      const release = {
+        id: `rel_${releases.size + 1}`,
+        createdAt: new Date(),
+        status: input.status ?? "published",
+        changes: input.changes ?? [],
+        ...input,
+      };
       releases.set(release.id, release);
       return release;
+    },
+    async findReleaseById(id) {
+      return releases.get(id) ?? null;
+    },
+    async updateReleaseStatus(id, status) {
+      const release = releases.get(id);
+      if (!release) return null;
+      const next = { ...release, status };
+      releases.set(id, next);
+      return next;
     },
     async listReleases(repositoryId) {
       return [...releases.values()].filter((release) => release.repositoryId === repositoryId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -802,6 +823,23 @@ function createInMemoryRepositoryRepository() {
       forks.push(fork);
       const repository = repositories.get(input.repositoryId);
       if (repository) repositories.set(input.repositoryId, { ...repository, forks: repository.forks + 1, updatedAt: new Date() });
+      return fork;
+    },
+    async findForkById(id) {
+      return forks.find((fork) => fork.id === id) ?? null;
+    },
+    async updateForkSourceRelease(id, sourceReleaseId) {
+      const fork = forks.find((item) => item.id === id);
+      if (!fork) return null;
+      fork.sourceReleaseId = sourceReleaseId;
+      return fork;
+    },
+    async deleteFork(id) {
+      const index = forks.findIndex((fork) => fork.id === id);
+      if (index === -1) return null;
+      const [fork] = forks.splice(index, 1);
+      const repository = repositories.get(fork.repositoryId);
+      if (repository) repositories.set(fork.repositoryId, { ...repository, forks: Math.max(0, repository.forks - 1), updatedAt: new Date() });
       return fork;
     },
     async listForksForRepository(repositoryId) {

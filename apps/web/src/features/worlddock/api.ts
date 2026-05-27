@@ -148,6 +148,24 @@ export type LocalPushInput = PublishWorldInput & {
   };
 };
 
+export type ReleaseChange = {
+  assetId: string;
+  kind: "added" | "changed" | "removed";
+  title: string;
+  beforeHash?: string;
+  afterHash?: string;
+};
+
+export type ReleasePreflight = {
+  ok: boolean;
+  checks: Array<{
+    code: "assets" | "license" | "release_note" | "moderation" | "entitlement";
+    ok: boolean;
+    message: string;
+  }>;
+  changes: ReleaseChange[];
+};
+
 export type ReportRepositoryInput = {
   reason: "spam" | "sensitive_content" | "abuse" | "copyright" | "other";
   detail?: string;
@@ -404,6 +422,21 @@ export async function publishWorld(worldId: string, input: PublishWorldInput, op
   });
 }
 
+export async function previewWorldRelease(
+  worldId: string,
+  input: Partial<PublishWorldInput>,
+  options: ApiClientOptions,
+): Promise<{ preflight: ReleasePreflight }> {
+  return requestJson(`/v1/worlds/${worldId}/releases/preview`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function listPublicRepositories(options: ApiClientOptions) {
   return requestJson("/v1/repositories", {
     method: "GET",
@@ -453,6 +486,16 @@ export async function listRepositoryReleases(repositoryId: string, options: ApiC
   });
 }
 
+export async function rollbackRelease(releaseId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/releases/${releaseId}/rollback`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function starRepository(repositoryId: string, options: ApiClientOptions) {
   return requestJson(`/v1/repositories/${repositoryId}/star`, {
     method: "POST",
@@ -475,6 +518,36 @@ export async function unstarRepository(repositoryId: string, options: ApiClientO
 
 export async function forkRepository(repositoryId: string, options: ApiClientOptions) {
   return requestJson(`/v1/repositories/${repositoryId}/fork`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getForkUpstreamDiff(forkId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/forks/${forkId}/upstream-diff`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function syncFork(forkId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/forks/${forkId}/sync`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function detachFork(forkId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/forks/${forkId}/detach`, {
     method: "POST",
     sessionToken: options.sessionToken,
     fetcher: options.fetcher,

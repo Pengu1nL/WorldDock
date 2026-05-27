@@ -375,9 +375,11 @@ model RepositoryRelease {
   id           String          @id @default(cuid())
   repositoryId String
   version      String
+  status       String          @default("published")
   note         String
   license      String
   diff         Json
+  changes      Json            @default("[]")
   source       String
   createdAt    DateTime        @default(now())
   repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
@@ -387,6 +389,7 @@ model RepositoryRelease {
 
   @@unique([repositoryId, version])
   @@index([repositoryId])
+  @@index([status])
   @@map("releases")
 }
 
