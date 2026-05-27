@@ -2172,7 +2172,7 @@ Expected: Agent Run uses real price book, low balance blocks runs, billing page 
 - Test: `apps/api/test/community.integration-spec.ts`
 - Test: `apps/web/tests/e2e/community-product-flow.spec.ts`
 
-- [ ] **Task 1: 分页和过滤 API**
+- [x] **Task 1: 分页和过滤 API**
 
 Community APIs must provide:
 
@@ -2186,7 +2186,7 @@ POST /v1/community/repositories/:repositoryId/collections
 DELETE /v1/community/repositories/:repositoryId/collections/:collectionId
 ```
 
-- [ ] **Task 2: 替换 repository detail 未接入标签页**
+- [x] **Task 2: 替换 repository detail 未接入标签页**
 
 Repository detail must render:
 
@@ -2199,7 +2199,7 @@ Releases: full release history
 Forks: fork graph and linked worlds
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

@@ -264,6 +264,7 @@ function createInMemoryRepositoryRepository() {
   const releases = new Map<string, ReleaseRecord>();
   const snapshots = new Map<string, ReleaseSnapshotRecord>();
   const forks: ForkRecord[] = [];
+  const collections = new Map<string, any>();
   const repository: RepositoryRepository = {
     async findById(id) { return repositories.get(id) ?? null; },
     async findByWorldId(worldId) { return [...repositories.values()].find((item) => item.worldId === worldId) ?? null; },
@@ -305,6 +306,24 @@ function createInMemoryRepositoryRepository() {
       return fork;
     },
     async listForksForRepository(repositoryId) { return forks.filter((fork) => fork.repositoryId === repositoryId); },
+    async saveToCollection(input) {
+      const name = input.name ?? "saved";
+      const existing = [...collections.values()].find((item) =>
+        item.repositoryId === input.repositoryId && item.userId === input.userId && item.name === name);
+      if (existing) return existing;
+      const collection = { id: `collection_${collections.size + 1}`, createdAt: new Date(), name, ...input };
+      collections.set(collection.id, collection);
+      return collection;
+    },
+    async removeFromCollection(input) {
+      const collection = collections.get(input.collectionId);
+      if (!collection || collection.repositoryId !== input.repositoryId || collection.userId !== input.userId) return null;
+      collections.delete(collection.id);
+      return collection;
+    },
+    async listCollectionsForUser(userId) {
+      return [...collections.values()].filter((collection) => collection.userId === userId);
+    },
   };
   return repository;
 }

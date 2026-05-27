@@ -53,6 +53,14 @@ export type ForkRecord = {
   createdAt: Date;
 };
 
+export type RepositoryCollectionRecord = {
+  id: string;
+  repositoryId: string;
+  userId: string;
+  name: string;
+  createdAt: Date;
+};
+
 export type RepositoryRepository = {
   findById(id: string): Promise<PublicRepositoryRecord | null>;
   findByWorldId(worldId: string): Promise<PublicRepositoryRecord | null>;
@@ -74,4 +82,7 @@ export type RepositoryRepository = {
   updateForkSourceRelease(id: string, sourceReleaseId: string): Promise<ForkRecord | null>;
   deleteFork(id: string): Promise<ForkRecord | null>;
   listForksForRepository(repositoryId: string): Promise<ForkRecord[]>;
+  saveToCollection(input: { repositoryId: string; userId: string; name?: string }): Promise<RepositoryCollectionRecord>;
+  removeFromCollection(input: { collectionId: string; repositoryId: string; userId: string }): Promise<RepositoryCollectionRecord | null>;
+  listCollectionsForUser(userId: string): Promise<RepositoryCollectionRecord[]>;
 };

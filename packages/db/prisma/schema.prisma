@@ -25,6 +25,7 @@ model User {
   repositories  PublicRepository[]
   stars         RepositoryStar[]
   forks         RepositoryFork[]
+  collections   RepositoryCollection[]
   reports       Report[]
   moderationActions ModerationAction[]
   storageObjects StorageObject[]
@@ -377,6 +378,7 @@ model PublicRepository {
   snapshots ReleaseSnapshot[]
   starRecords RepositoryStar[]
   forkRecords RepositoryFork[]
+  collections RepositoryCollection[]
   reports   Report[]
   moderationActions ModerationAction[]
   storageObjects StorageObject[]
@@ -433,6 +435,21 @@ model RepositoryStar {
   @@unique([repositoryId, userId])
   @@index([userId])
   @@map("stars")
+}
+
+model RepositoryCollection {
+  id           String           @id @default(cuid())
+  repositoryId String
+  userId       String
+  name         String           @default("saved")
+  createdAt    DateTime         @default(now())
+  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, userId, name])
+  @@index([userId, createdAt])
+  @@index([repositoryId])
+  @@map("repository_collections")
 }
 
 model RepositoryFork {

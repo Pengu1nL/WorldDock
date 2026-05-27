@@ -1,7 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
 import { moderationStatusSchema, releaseChangeSchema, releaseDiffSchema, releaseSnapshotSchema, releaseStatusSchema } from "@worlddock/domain";
-import type { ForkRecord, PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryRepository } from "./repository.repository";
+import type { ForkRecord, PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryCollectionRecord, RepositoryRepository } from "./repository.repository";
 
 @Injectable()
 export class PrismaRepositoryRepository implements RepositoryRepository, OnModuleDestroy {
@@ -154,6 +154,46 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
     return forks.map(mapFork);
   }
 
+  async saveToCollection(input: Parameters<RepositoryRepository["saveToCollection"]>[0]) {
+    const collection = await this.prisma.repositoryCollection.upsert({
+      where: {
+        repositoryId_userId_name: {
+          repositoryId: input.repositoryId,
+          userId: input.userId,
+          name: input.name ?? "saved",
+        },
+      },
+      create: {
+        repositoryId: input.repositoryId,
+        userId: input.userId,
+        name: input.name ?? "saved",
+      },
+      update: {},
+    });
+    return mapCollection(collection);
+  }
+
+  async removeFromCollection(input: Parameters<RepositoryRepository["removeFromCollection"]>[0]) {
+    const collection = await this.prisma.repositoryCollection.findFirst({
+      where: {
+        id: input.collectionId,
+        repositoryId: input.repositoryId,
+        userId: input.userId,
+      },
+    });
+    if (!collection) return null;
+    await this.prisma.repositoryCollection.delete({ where: { id: collection.id } });
+    return mapCollection(collection);
+  }
+
+  async listCollectionsForUser(userId: string) {
+    const collections = await this.prisma.repositoryCollection.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+    return collections.map(mapCollection);
+  }
+
   async onModuleDestroy() {
     await this.prisma.$disconnect();
   }
@@ -218,5 +258,9 @@ function parseReleaseSource(value: string): ReleaseRecord["source"] {
 }
 
 function mapFork(record: ForkRecord): ForkRecord {
+  return record;
+}
+
+function mapCollection(record: RepositoryCollectionRecord): RepositoryCollectionRecord {
   return record;
 }

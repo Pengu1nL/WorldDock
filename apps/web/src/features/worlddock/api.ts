@@ -1,4 +1,4 @@
-import type { WorldAsset, WorldAssetKind } from "@worlddock/domain";
+import type { PublicRepository, WorldAsset, WorldAssetKind } from "@worlddock/domain";
 
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
 
@@ -180,6 +180,66 @@ export type ReleasePreflight = {
 export type ReportRepositoryInput = {
   reason: "spam" | "sensitive_content" | "abuse" | "copyright" | "other";
   detail?: string;
+};
+
+export type CommunityRepositoryAsset = {
+  id: string;
+  assetId: string;
+  kind: "archive" | "seed" | "conflict";
+  title: string;
+  category: string;
+  summary: string;
+  body: string;
+  related: string[];
+};
+
+export type CommunityRepository = PublicRepository & {
+  latestRelease?: {
+    id: string;
+    repositoryId: string;
+    version: string;
+    note: string;
+    status: string;
+    license: string;
+    createdAt: string;
+  } | null;
+  releaseHistory?: Array<{
+    id: string;
+    repositoryId: string;
+    version: string;
+    note: string;
+    status: string;
+    license: string;
+    createdAt: string;
+  }>;
+  assetCounts?: { archive: number; seeds: number; conflicts: number };
+  forkGraph?: {
+    repositoryId: string;
+    forks: Array<{
+      id: string;
+      sourceReleaseId: string;
+      targetWorldId: string;
+      userId: string;
+      createdAt: string;
+    }>;
+  };
+};
+
+export type CommunityCreator = {
+  handle: string;
+  displayName: string;
+  bio: string;
+  stats: { repositories: number; stars: number; forks: number };
+  tags: string[];
+  latestUpdated: string | null;
+};
+
+export type RepositoryCollection = {
+  id: string;
+  repositoryId: string;
+  userId: string;
+  name: string;
+  createdAt: string;
 };
 
 export async function createAccessToken(
@@ -476,6 +536,114 @@ export type RepositorySearchOptions = {
   tags?: string[];
   sort?: "relevance" | "stars" | "forks" | "updated";
 };
+
+export type CommunityRepositorySearchOptions = RepositorySearchOptions & {
+  query?: string;
+  cursor?: string;
+};
+
+export async function listCommunityRepositories(
+  options: ApiClientOptions & CommunityRepositorySearchOptions,
+): Promise<{ repositories: CommunityRepository[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.query) params.set("q", options.query);
+  if (options.cursor) params.set("cursor", options.cursor);
+  for (const tag of options.tags ?? []) params.append("tag", tag);
+  if (options.sort) params.set("sort", options.sort);
+  const query = params.toString();
+  return requestJson(`/v1/community/repositories${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getCommunityRepository(
+  owner: string,
+  slug: string,
+  options: ApiClientOptions,
+): Promise<{ repository: CommunityRepository }> {
+  return requestJson(`/v1/community/repositories/${owner}/${slug}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listCommunityRepositoryAssets(
+  repositoryId: string,
+  options: ApiClientOptions & { kind?: "archive" | "seed" | "conflict"; cursor?: string },
+): Promise<{ repositoryId: string; releaseId: string | null; assets: CommunityRepositoryAsset[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.kind) params.set("kind", options.kind);
+  if (options.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  return requestJson(`/v1/community/repositories/${repositoryId}/assets${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getCommunityCreator(handle: string, options: ApiClientOptions): Promise<{ creator: CommunityCreator }> {
+  return requestJson(`/v1/community/creators/${handle}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listCommunityCreatorRepositories(
+  handle: string,
+  options: ApiClientOptions & { cursor?: string; sort?: RepositorySearchOptions["sort"] },
+): Promise<{ repositories: CommunityRepository[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.sort) params.set("sort", options.sort);
+  const query = params.toString();
+  return requestJson(`/v1/community/creators/${handle}/repositories${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function addRepositoryToCollection(
+  repositoryId: string,
+  options: ApiClientOptions,
+): Promise<{ collection: RepositoryCollection }> {
+  return requestJson(`/v1/community/repositories/${repositoryId}/collections`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function removeRepositoryFromCollection(
+  repositoryId: string,
+  collectionId: string,
+  options: ApiClientOptions,
+): Promise<{ collection: RepositoryCollection; removed: true }> {
+  return requestJson(`/v1/community/repositories/${repositoryId}/collections/${collectionId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
 
 export async function searchPublicRepositories(query: string, options: ApiClientOptions & RepositorySearchOptions) {
   const params = new URLSearchParams({ q: query });
