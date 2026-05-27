@@ -3,6 +3,7 @@ import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { RequestIdMiddleware } from "./common/request-id.middleware";
 import { AccountModule } from "./modules/account/account.module";
 import { AgentModule } from "./modules/agent/agent.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { CommunityModule } from "./modules/community/community.module";
@@ -17,7 +18,7 @@ import { WorldAssetsModule } from "./modules/world-assets/world-assets.module";
 import { WorldsModule } from "./modules/worlds/worlds.module";
 
 @Module({
-  imports: [AccountModule, AgentModule, AuthModule, BillingModule, CommunityModule, ExportsModule, ModerationModule, NotificationsModule, ReleasesModule, RepositoryModule, StorageModule, SystemModule, WorldAssetsModule, WorldsModule],
+  imports: [AccountModule, AgentModule, AnalyticsModule, AuthModule, BillingModule, CommunityModule, ExportsModule, ModerationModule, NotificationsModule, ReleasesModule, RepositoryModule, StorageModule, SystemModule, WorldAssetsModule, WorldsModule],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

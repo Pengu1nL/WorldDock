@@ -2483,7 +2483,7 @@ Expected: notification records are created idempotently, notification center sho
 - Create: `docs/product/data-and-ip-policy.md`
 - Test: `apps/web/tests/e2e/marketing-and-activation.spec.ts`
 
-- [ ] **Task 1: 定义产品事件**
+- [x] **Task 1: 定义产品事件**
 
 Create `apps/web/src/features/analytics/product-events.ts`:
 
@@ -2503,7 +2503,7 @@ export const PRODUCT_EVENTS = {
 export type ProductEventName = typeof PRODUCT_EVENTS[keyof typeof PRODUCT_EVENTS];
 ```
 
-- [ ] **Task 2: 建立 Alpha 官网和定价占位，不做模板库**
+- [x] **Task 2: 建立 Alpha 官网和定价占位，不做模板库**
 
 Marketing pages must support:
 
@@ -2531,7 +2531,7 @@ Deferred to Beta:
 - Community-submitted templates
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

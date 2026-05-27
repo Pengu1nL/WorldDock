@@ -77,7 +77,7 @@ test("authenticated creator creates a cloud world and saves an asset through API
     await route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ asset }) });
   });
 
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: /新建世界/ }).click();
   await page.getByLabel(/初始灵感/).fill("一个世界里，记忆可以被买卖。");
   await page.getByRole("button", { name: /开始推演/ }).click();

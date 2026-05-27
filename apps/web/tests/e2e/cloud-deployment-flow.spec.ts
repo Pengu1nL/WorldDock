@@ -13,7 +13,7 @@ test("authenticated cloud world list does not fall back to fixture worlds", asyn
     });
   });
 
-  await page.goto("/");
+  await page.goto("/app");
 
   await expect(page.getByRole("heading", { name: "我的世界" })).toBeVisible();
   await expect(page.getByText("云端世界暂不可用，请稍后重试。")).toBeVisible();
