@@ -1,3 +1,111 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 @import "../styles/base.css";
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.auth-panel {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--r-8);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.18);
+}
+
+.auth-panel h1 {
+  margin: 0 0 4px;
+  font-size: var(--t-28);
+  color: var(--fg);
+}
+
+.auth-kicker {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  color: var(--slate);
+}
+
+.auth-panel label {
+  display: grid;
+  gap: 6px;
+  color: var(--fg-1);
+}
+
+.auth-panel label span {
+  font-size: var(--t-13);
+}
+
+.auth-panel input {
+  height: 38px;
+  width: 100%;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-4);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 0 10px;
+}
+
+.auth-submit {
+  width: 100%;
+  height: 38px;
+}
+
+.auth-link {
+  justify-self: center;
+  color: var(--fg-2);
+  font-size: var(--t-13);
+}
+
+.auth-link:hover {
+  color: var(--fg);
+}
+
+.auth-error {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--brick-dim);
+  border-radius: var(--r-4);
+  background: var(--brick-bg);
+  color: var(--brick);
+}
+
+.onboarding-panel {
+  width: min(560px, 100%);
+}
+
+.onboarding-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.option-button {
+  min-height: 44px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-4);
+  background: var(--surface-2);
+  color: var(--fg-1);
+  text-align: left;
+  padding: 0 12px;
+}
+
+.option-button:hover,
+.option-button.selected {
+  border-color: var(--sage-dim);
+  color: var(--fg);
+  background: var(--sage-bg);
+}
+
+.auth-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

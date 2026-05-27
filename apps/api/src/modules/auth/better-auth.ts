@@ -13,5 +13,7 @@ export const worldDockAuth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: false,
+    autoSignIn: true,
   },
 });

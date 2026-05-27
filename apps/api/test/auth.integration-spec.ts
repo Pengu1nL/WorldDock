@@ -119,6 +119,45 @@ describe("auth endpoints", () => {
       .set("authorization", `Bearer ${createResponse.body.token}`)
       .expect(401);
   });
+
+  it("registers and logs in with email/password sessions", async () => {
+    const repository = createInMemoryAuthRepository();
+    app = await createTestApp(repository);
+
+    const registered = await request(app.getHttpServer())
+      .post("/v1/auth/register")
+      .send({
+        email: "writer@example.com",
+        password: "correct horse battery",
+        name: "Writer",
+      })
+      .expect(201);
+
+    expect(registered.body.session.token).toMatch(/^session_/);
+    expect(registered.body.user).toMatchObject({
+      email: "writer@example.com",
+      name: "Writer",
+    });
+
+    const me = await request(app.getHttpServer())
+      .get("/v1/me")
+      .set("authorization", `Bearer ${registered.body.session.token}`)
+      .expect(200);
+
+    expect(me.body.user.email).toBe("writer@example.com");
+
+    const loggedIn = await request(app.getHttpServer())
+      .post("/v1/auth/login")
+      .send({ email: "writer@example.com", password: "correct horse battery" })
+      .expect(200);
+
+    expect(loggedIn.body.session.token).toMatch(/^session_/);
+
+    await request(app.getHttpServer())
+      .post("/v1/auth/login")
+      .send({ email: "writer@example.com", password: "wrong password" })
+      .expect(401);
+  });
 });
 
 async function createTestApp(repository: AuthRepository) {
@@ -140,23 +179,42 @@ function createInMemoryAuthRepository() {
   const users = new Map<string, StoredUser>();
   const sessions = new Map<string, StoredSession>();
   const accessTokens = new Map<string, StoredAccessToken>();
+  const passwordAccounts = new Map<string, { userId: string; passwordHash: string }>();
 
   const repository: AuthRepository & {
     users: typeof users;
     sessions: typeof sessions;
     accessTokens: typeof accessTokens;
+    passwordAccounts: typeof passwordAccounts;
   } = {
     users,
     sessions,
     accessTokens,
+    passwordAccounts,
     async findUserById(id) {
       return users.get(id) ?? null;
+    },
+    async findUserByEmail(email) {
+      return [...users.values()].find((user) => user.email === email) ?? null;
     },
     async findSessionByToken(token) {
       return [...sessions.values()].find((session) => session.token === token) ?? null;
     },
     async deleteSession(token) {
       sessions.delete(token);
+    },
+    async createSession(input) {
+      sessions.set(input.token, input);
+      return input;
+    },
+    async findPasswordAccountByEmail(email) {
+      return passwordAccounts.get(email) ?? null;
+    },
+    async createPasswordUser(input) {
+      users.set(input.user.id, input.user);
+      passwordAccounts.set(input.user.email, { userId: input.user.id, passwordHash: input.passwordHash });
+      sessions.set(input.session.token, input.session);
+      return input.user;
     },
     async listAccessTokens(userId) {
       return [...accessTokens.values()].filter((token) => token.userId === userId);

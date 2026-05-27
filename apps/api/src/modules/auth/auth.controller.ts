@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject } from "./auth.decorators";
 import { WorldDockAuthGuard } from "./auth.guard";
@@ -10,9 +10,45 @@ const createAccessTokenSchema = z.object({
   expiresAt: z.string().datetime().optional(),
 });
 
+const emailPasswordSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+const registerSchema = emailPasswordSchema.extend({
+  name: z.string().min(1).max(80).optional(),
+});
+
 @Controller()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post("auth/register")
+  async register(@Body() body: unknown) {
+    const result = await this.authService.registerEmailPassword(registerSchema.parse(body));
+    return {
+      user: result.user,
+      session: {
+        token: result.session.token,
+        expiresAt: result.session.expiresAt.toISOString(),
+      },
+      token: result.session.token,
+    };
+  }
+
+  @Post("auth/login")
+  @HttpCode(200)
+  async login(@Body() body: unknown) {
+    const result = await this.authService.loginEmailPassword(emailPasswordSchema.parse(body));
+    return {
+      user: result.user,
+      session: {
+        token: result.session.token,
+        expiresAt: result.session.expiresAt.toISOString(),
+      },
+      token: result.session.token,
+    };
+  }
 
   @Get("me")
   @UseGuards(WorldDockAuthGuard)

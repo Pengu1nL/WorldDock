@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
+import { hashPassword as betterAuthHashPassword, verifyPassword as betterAuthVerifyPassword } from "better-auth/crypto";
 
 export const ACCESS_TOKEN_SCOPES = ["world:read", "world:write", "repository:push"] as const;
 export type AccessTokenScope = typeof ACCESS_TOKEN_SCOPES[number];
@@ -34,15 +35,29 @@ export type StoredAccessToken = {
 
 export type PublicAccessToken = Omit<StoredAccessToken, "tokenHash" | "userId">;
 
+export type StoredPasswordAccount = {
+  userId: string;
+  passwordHash: string;
+};
+
 export type AuthRepository = {
   findUserById(id: string): Promise<StoredUser | null>;
+  findUserByEmail?(email: string): Promise<StoredUser | null>;
   findSessionByToken(token: string): Promise<StoredSession | null>;
   deleteSession(token: string): Promise<void>;
+  createSession?(input: StoredSession): Promise<StoredSession>;
   listAccessTokens(userId: string): Promise<StoredAccessToken[]>;
   createAccessToken(input: StoredAccessToken): Promise<StoredAccessToken>;
   findAccessTokenByHash(tokenHash: string): Promise<StoredAccessToken | null>;
   markAccessTokenUsed(id: string, usedAt: Date): Promise<void>;
   revokeAccessToken(userId: string, tokenId: string, revokedAt: Date): Promise<StoredAccessToken | null>;
+  findPasswordAccountByEmail?(email: string): Promise<StoredPasswordAccount | null>;
+  createPasswordUser?(input: {
+    user: StoredUser;
+    emailVerified: boolean;
+    passwordHash: string;
+    session: StoredSession;
+  }): Promise<StoredUser>;
 };
 
 export type SessionSubject = {
@@ -66,9 +81,73 @@ export type IssueAccessTokenInput = {
   expiresAt?: Date | null;
 };
 
+export type RegisterEmailPasswordInput = {
+  email: string;
+  password: string;
+  name?: string;
+};
+
+export type LoginEmailPasswordInput = {
+  email: string;
+  password: string;
+};
+
 @Injectable()
 export class AuthService {
   constructor(@Inject(AUTH_REPOSITORY) private readonly repository: AuthRepository) {}
+
+  async registerEmailPassword(input: RegisterEmailPasswordInput) {
+    const credentials = this.requireCredentialsRepository();
+    const email = normalizeEmail(input.email);
+    const password = normalizePassword(input.password);
+    const existing = await credentials.findUserByEmail(email);
+    if (existing) {
+      throw new ConflictException({
+        code: "EMAIL_TAKEN",
+        message: "Email is already registered.",
+      });
+    }
+
+    const now = new Date();
+    const session = createSessionRecord(`user_${randomUUID().replaceAll("-", "")}`);
+    const user = await credentials.createPasswordUser({
+      user: {
+        id: session.userId,
+        email,
+        name: input.name?.trim() || email.split("@")[0],
+        role: "user",
+      },
+      emailVerified: false,
+      passwordHash: await hashPassword(password),
+      session: {
+        ...session,
+        expiresAt: new Date(now.getTime() + sessionMaxAgeMs),
+      },
+    });
+
+    return {
+      user,
+      session: { token: session.token, expiresAt: session.expiresAt },
+    };
+  }
+
+  async loginEmailPassword(input: LoginEmailPasswordInput) {
+    const credentials = this.requireCredentialsRepository();
+    const email = normalizeEmail(input.email);
+    const account = await credentials.findPasswordAccountByEmail(email);
+    if (!account || !await verifyPassword(input.password, account.passwordHash)) {
+      throw this.authRequired();
+    }
+
+    const user = await this.repository.findUserById(account.userId);
+    if (!user) throw this.authRequired();
+    const session = createSessionRecord(user.id);
+    const created = await credentials.createSession(session);
+    return {
+      user,
+      session: { token: created.token, expiresAt: created.expiresAt },
+    };
+  }
 
   async authenticateBearer(token: string): Promise<AuthSubject> {
     if (token.startsWith("wdl_")) {
@@ -202,8 +281,65 @@ export class AuthService {
       message: "Authentication is required.",
     });
   }
+
+  private requireCredentialsRepository() {
+    if (
+      !this.repository.findUserByEmail ||
+      !this.repository.findPasswordAccountByEmail ||
+      !this.repository.createPasswordUser ||
+      !this.repository.createSession
+    ) {
+      throw new Error("Email/password auth repository is not configured.");
+    }
+
+    return {
+      findUserByEmail: this.repository.findUserByEmail.bind(this.repository),
+      findPasswordAccountByEmail: this.repository.findPasswordAccountByEmail.bind(this.repository),
+      createPasswordUser: this.repository.createPasswordUser.bind(this.repository),
+      createSession: this.repository.createSession.bind(this.repository),
+    };
+  }
 }
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
+}
+
+const sessionMaxAgeMs = 30 * 24 * 60 * 60 * 1000;
+
+function createSessionRecord(userId: string): StoredSession {
+  return {
+    token: `session_${randomUUID().replaceAll("-", "")}`,
+    userId,
+    expiresAt: new Date(Date.now() + sessionMaxAgeMs),
+  };
+}
+
+function normalizeEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalized)) {
+    throw new BadRequestException({
+      code: "INVALID_EMAIL",
+      message: "Email is invalid.",
+    });
+  }
+  return normalized;
+}
+
+function normalizePassword(password: string) {
+  if (password.length < 8) {
+    throw new BadRequestException({
+      code: "WEAK_PASSWORD",
+      message: "Password must be at least 8 characters.",
+    });
+  }
+  return password;
+}
+
+function hashPassword(password: string) {
+  return betterAuthHashPassword(password);
+}
+
+function verifyPassword(password: string, encoded: string) {
+  return betterAuthVerifyPassword({ password, hash: encoded });
 }

@@ -391,7 +391,7 @@ Expected: all commands pass.
 - Test: `apps/web/tests/e2e/auth-onboarding.spec.ts`
 - Test: `apps/api/test/account.integration-spec.ts`
 
-- [ ] **Task 1: 定义账户产品能力**
+- [x] **Task 1: 定义账户产品能力**
 
 Add account data fields in `packages/db/prisma/schema.prisma`:
 
@@ -412,7 +412,7 @@ model UserProfile {
 }
 ```
 
-- [ ] **Task 2: 暴露账户 API**
+- [x] **Task 2: 暴露账户 API**
 
 Create endpoints in `apps/api/src/modules/account/account.controller.ts`:
 
@@ -456,7 +456,7 @@ export class AccountController {
 }
 ```
 
-- [ ] **Task 3: 建立 Alpha 登录注册 UI，不做邮箱验证**
+- [x] **Task 3: 建立 Alpha 登录注册 UI，不做邮箱验证**
 
 Create `apps/web/src/app/(auth)/login/page.tsx` and matching register route. Alpha uses email/password as the login identifier but does not send email verification or password reset email. Each route must include:
 
@@ -505,7 +505,7 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Task 4: 建立首次体验，不做模板库**
+- [x] **Task 4: 建立首次体验，不做模板库**
 
 Create `apps/web/src/features/onboarding/onboarding-flow.tsx` with a three-step flow:
 
@@ -517,7 +517,7 @@ export const ONBOARDING_STEPS = [
 ] as const;
 ```
 
-- [ ] **Task 5: Run verification**
+- [x] **Task 5: Run verification**
 
 Run:
 
