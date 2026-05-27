@@ -2,6 +2,8 @@
 
 日期：2026-05-26
 
+补充验收：2026-05-27
+
 ## 阶段提交
 
 - Phase 1：`741e210` Monorepo 与共享领域包
@@ -39,25 +41,35 @@ pnpm --filter @worlddock/web test:e2e
 
 阶段内还分别通过了各 Phase 计划文档记录的 API、Worker、Web、Prisma validate、E2E 等针对性命令。
 
-## 未执行项
-
-以下依赖真实本地服务，当前机器 Docker daemon 不可连接，因此未执行：
+2026-05-27 在本机 Docker daemon 可用后补充通过真实依赖验收：
 
 ```bash
+docker info --format '{{.ServerVersion}}'
 docker compose up -d postgres redis meilisearch storage
+docker compose ps
 pnpm --filter @worlddock/db prisma:migrate:deploy
 pnpm --filter @worlddock/db seed
 pnpm --filter @worlddock/api test:readiness:local
+curl -sf http://localhost:9000/minio/health/ready
 ```
 
-当前 Docker 检查结果：
+额外 smoke 验证：
 
-```txt
-failed to connect to the docker API at the user Docker socket
+- MinIO：通过 AWS SDK 对本地 MinIO 完成临时 bucket 的 create、put、get、delete。
+- Meilisearch：通过本地 Meilisearch 完成临时 index 的 create、documents add、search、delete。
+
+## 补充修复
+
+真实数据库验收首次执行时发现 `prisma:migrate:deploy` 因缺少 `prisma/migrations` 只报告无待执行迁移，随后 `pnpm --filter @worlddock/db seed` 在 PostgreSQL 上报 `public.users` 不存在。已补充初始迁移：
+
+```bash
+packages/db/prisma/migrations/20260527024858_init/migration.sql
+packages/db/prisma/migrations/migration_lock.toml
 ```
 
-## 风险与补救
+补充迁移后，`prisma:migrate:deploy` 成功应用 `20260527024858_init`，seed 和 readiness 均通过。
 
-- 真实 PostgreSQL/Redis/Meilisearch/MinIO 端到端联调仍需在 Docker daemon 可用后执行。
+## 仍需生产环境验证
+
 - Sentry/OTel 上报依赖真实 `SENTRY_DSN` 和 OTLP endpoint，当前测试覆盖初始化和代码边界。
-- Meilisearch 与 S3 的真实 daemon 写入/读取未在本机联调；对应 HTTP/presigner/权限/metadata 行为已用单元或集成测试覆盖。
+- 生产数据库、Redis、Meilisearch、对象存储的云端权限、网络策略、备份和告警仍需按发布 checklist 在 staging/production 环境执行。

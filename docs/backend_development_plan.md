@@ -807,7 +807,7 @@ pnpm test:e2e
 - staging 全链路验收通过；
 - 具备上线 checklist。
 
-总体验收记录：见 `docs/backend_final_validation_report.md`。代码级质量门、API 集成测试和 Web E2E 已通过；真实 Docker 依赖验收因当前 Docker daemon 不可连接，已在总体验收报告中记录风险与补救。
+总体验收记录：见 `docs/backend_final_validation_report.md`。代码级质量门、API 集成测试、Web E2E 和本机真实 Docker 依赖验收已通过；补充验收时发现并修复了缺失初始 Prisma migration 的问题。
 
 ## 12. 风险与控制
 
