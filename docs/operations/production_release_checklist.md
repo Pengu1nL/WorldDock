@@ -10,8 +10,10 @@
 - [ ] 数据库备份完成且 checksum 已记录
 - [ ] migration 已在 staging 运行
 - [ ] staging 冒烟：创作、Agent、发布、搜索、Fork、举报、对象存储 signed URL
-- [ ] `APP_ENV=production`、`AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY` 已配置
+- [ ] `WORLD_DOCK_EDITION=cloud`、`APP_ENV=production`、`AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY` 已配置
+- [ ] `NEXT_PUBLIC_WORLD_DOCK_FIXTURES` 未在生产环境启用
 - [ ] `SENTRY_DSN`、`TRUSTED_ORIGINS`、`API_RATE_LIMIT_MAX`、`API_BODY_LIMIT_BYTES`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL` 已配置
+- [ ] `docs/product/cloud-release-scope.md`、`docs/product/cloud-api-contract.md`、`docs/product/local-deployment-later.md` 已按本次发布复核
 - [ ] 生产 secrets 未出现在日志、提交历史或工单中
 - [ ] Worker 队列和失败告警可见
 - [ ] `docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md` 已按本次发布复核

@@ -1,5 +1,22 @@
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
 
+export const WORLD_DOCK_SESSION_TOKEN_KEY = "worlddock.sessionToken";
+
+type FixtureEnvironment = {
+  NODE_ENV?: string;
+  NEXT_PUBLIC_WORLD_DOCK_FIXTURES?: string;
+};
+
+type SessionTokenStorage = Pick<Storage, "getItem">;
+
+export function canUseFixtures(env: FixtureEnvironment = process.env) {
+  return env.NODE_ENV !== "production" && env.NEXT_PUBLIC_WORLD_DOCK_FIXTURES === "1";
+}
+
+export function readStoredSessionToken(storage: SessionTokenStorage | null = getBrowserSessionStorage()) {
+  return storage?.getItem(WORLD_DOCK_SESSION_TOKEN_KEY) ?? "";
+}
+
 export type AccessTokenSummary = {
   id: string;
   name: string;
@@ -499,6 +516,11 @@ function findSseBoundary(text: string) {
 
 function getBoundaryLength(text: string, boundary: number) {
   return text.startsWith("\r\n\r\n", boundary) ? 4 : 2;
+}
+
+function getBrowserSessionStorage(): SessionTokenStorage | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage;
 }
 
 async function requestJson<T>(

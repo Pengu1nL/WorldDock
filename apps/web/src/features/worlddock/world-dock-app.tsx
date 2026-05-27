@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
   cancelAgentRun,
+  canUseFixtures,
   createAgentRun,
   discardAgentSuggestion,
   getBillingBalance,
@@ -14,6 +15,7 @@ import {
   listStorySeeds,
   listWorlds,
   publishWorld,
+  readStoredSessionToken,
   saveAgentSuggestion,
   streamAgentEvents,
   WorldDockApiError,
@@ -62,6 +64,7 @@ export function WorldDockApp() {
 
 function WorldDockRuntime() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const fixturesAllowed = useMemo(() => canUseFixtures(), []);
 
   // Apply density / font tweaks
   useEffect(() => { document.documentElement.dataset.density = t.density; }, [t.density]);
@@ -93,6 +96,7 @@ function WorldDockRuntime() {
   const [communityConnected, setCommunityConnected] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
+  const cloudOnly = Boolean(sessionToken) && !fixturesAllowed;
 
   const streamingTimer = useRef<any>(null);
   const agentAbortRef = useRef<AbortController | null>(null);
@@ -101,8 +105,13 @@ function WorldDockRuntime() {
   const worldStatesRef = useRef<any>({});
 
   useEffect(() => {
-    setSessionToken(window.localStorage.getItem("worlddock.sessionToken") ?? "");
-  }, []);
+    const storedSessionToken = readStoredSessionToken();
+    setSessionToken(storedSessionToken);
+    if (storedSessionToken && !fixturesAllowed) {
+      setWorlds([]);
+      setRecentlyCreatedId(null);
+    }
+  }, [fixturesAllowed]);
 
   const worldsQuery = useQuery({
     queryKey: ["worlds", sessionToken],
@@ -114,6 +123,23 @@ function WorldDockRuntime() {
   useEffect(() => {
     if (worldsQuery.data?.worlds) setWorlds(worldsQuery.data.worlds);
   }, [worldsQuery.data]);
+
+  useEffect(() => {
+    if (!cloudOnly) return;
+    if (worldsQuery.isPending || worldsQuery.isError) setWorlds([]);
+  }, [cloudOnly, worldsQuery.isError, worldsQuery.isPending]);
+
+  useEffect(() => {
+    if (cloudOnly && t.mode !== "cloud") setTweak("mode", "cloud");
+  }, [cloudOnly, setTweak, t.mode]);
+
+  const cloudWorldsState = cloudOnly
+    ? worldsQuery.isPending
+      ? "loading"
+      : worldsQuery.isError
+        ? "error"
+        : "ready"
+    : "fixture";
 
   const archiveQuery = useQuery({
     queryKey: ["archive", sessionToken, currentWorld?.id],
@@ -564,7 +590,7 @@ function WorldDockRuntime() {
         mode={t.mode}
         balance={balance}
         tokens={runTokens}
-        onMode={(m: any) => setTweak("mode", m)}
+        onMode={(m: any) => setTweak("mode", cloudOnly ? "cloud" : m)}
         onOpenPublish={() => {
           if (currentWorld) setView("publish");
           else pushToast({ text: "请先打开一个世界", kind: "warn" });
@@ -598,6 +624,8 @@ function WorldDockRuntime() {
                 onDelete={deleteWorld}
                 onDuplicate={duplicateWorld}
                 hideDraftFromList={isStillFresh ? draftWorld.id : null}
+                cloudState={cloudWorldsState}
+                cloudOnly={cloudOnly}
               />
             );
           })()}

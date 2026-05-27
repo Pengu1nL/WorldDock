@@ -540,12 +540,13 @@ Expected: new user can register, log in, complete onboarding, and enter the app 
 - Modify: `packages/config/src/env.ts`
 - Modify: `apps/web/src/features/worlddock/api.ts`
 - Modify: `apps/web/src/features/worlddock/world-dock-app.tsx`
+- Modify: `apps/web/src/features/worlddock/view-worlds.tsx`
 - Modify: `docs/operations/production_release_checklist.md`
 - Test: `packages/config/test/env.test.ts`
 - Test: `apps/web/src/features/worlddock/api.test.ts`
 - Test: `apps/web/tests/e2e/cloud-deployment-flow.spec.ts`
 
-- [ ] **Task 1: 冻结云端部署版范围**
+- [x] **Task 1: 冻结云端部署版范围**
 
 Create `docs/product/cloud-release-scope.md`:
 
@@ -600,7 +601,7 @@ That later plan should cover:
 - Local/Cloud privacy boundary and no-secret upload guarantees
 ```
 
-- [ ] **Task 2: 增加 Cloud edition 环境门禁**
+- [x] **Task 2: 增加 Cloud edition 环境门禁**
 
 Modify `packages/config/src/env.ts`:
 
@@ -622,7 +623,7 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
 }
 ```
 
-- [ ] **Task 3: 建立 Cloud API contract，前端不再依赖 Local 兜底**
+- [x] **Task 3: 建立 Cloud API contract，前端不再依赖 Local 兜底**
 
 Create `docs/product/cloud-api-contract.md`:
 
@@ -667,7 +668,7 @@ export function canUseFixtures() {
 }
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 

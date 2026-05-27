@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWorldDockEnv, runtimeEnvironmentSchema } from "../src";
+import { parseWorldDockEnv, runtimeEnvironmentSchema, worldDockEditionSchema } from "../src";
 
 function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
@@ -25,10 +25,16 @@ describe("@worlddock/config env", () => {
     expect(runtimeEnvironmentSchema.parse("production")).toBe("production");
   });
 
+  it("accepts supported WorldDock editions", () => {
+    expect(worldDockEditionSchema.parse("cloud")).toBe("cloud");
+    expect(worldDockEditionSchema.parse("local")).toBe("local");
+  });
+
   it("parses the minimal backend environment shared by API and worker", () => {
     expect(
       parseWorldDockEnv(baseEnv()).API_PORT,
     ).toBe(4000);
+    expect(parseWorldDockEnv(baseEnv()).WORLD_DOCK_EDITION).toBe("cloud");
   });
 
   it("rejects malformed dependency URLs", () => {
@@ -48,6 +54,30 @@ describe("@worlddock/config env", () => {
         SENTRY_DSN: "https://public@example.com/1",
       })),
     ).toThrow("AI_PROVIDER=mock is not allowed in production.");
+  });
+
+  it("rejects local edition in production", () => {
+    expect(() =>
+      parseWorldDockEnv(baseEnv({
+        NODE_ENV: "production",
+        APP_ENV: "production",
+        WORLD_DOCK_EDITION: "local",
+        AI_PROVIDER: "pi",
+        PI_MODEL_PROVIDER: "openai",
+        PI_MODEL_ID: "gpt-5-mini",
+        PI_PROVIDER_API_KEY: "test_key",
+        SENTRY_DSN: "https://public@example.com/1",
+      })),
+    ).toThrow("Production deployment must use WORLD_DOCK_EDITION=cloud.");
+  });
+
+  it("allows local edition outside production for the later local plan", () => {
+    expect(
+      parseWorldDockEnv(baseEnv({
+        APP_ENV: "staging",
+        WORLD_DOCK_EDITION: "local",
+      })).WORLD_DOCK_EDITION,
+    ).toBe("local");
   });
 
   it("requires pi model settings in production", () => {

@@ -121,7 +121,7 @@ const EmptyWorldCard = ({ inspirations, onPick }: any) => (
 );
 
 // ────────── Worlds list view ──────────
-export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDraft, onDelete, onDuplicate, hideDraftFromList }: any) => {
+export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDraft, onDelete, onDuplicate, hideDraftFromList, cloudState = "fixture", cloudOnly = false }: any) => {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
 
@@ -141,6 +141,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
     "如果一座城市本身是有意识的。",
     "审判必须由被告自己说出。",
   ];
+  const showCloudState = cloudState === "loading" || cloudState === "error" || (cloudState === "ready" && worlds.length === 0);
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
@@ -173,7 +174,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
           { id: "all", label: "全部", n: worlds.length },
           { id: "published", label: "已公开", n: worlds.filter((w: any) => w.status === "published").length },
           { id: "draft", label: "草稿 / 未公开", n: worlds.filter((w: any) => w.status !== "published").length },
-          { id: "local", label: "Local", n: worlds.filter((w: any) => w.mode === "local").length },
+          ...(!cloudOnly ? [{ id: "local", label: "Local", n: worlds.filter((w: any) => w.mode === "local").length }] : []),
         ].map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
             className={"sb-btn " + (filter === f.id ? "primary" : "")}
@@ -192,6 +193,21 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
         gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
         gap: 14,
       }}>
+        {cloudState === "loading" && (
+          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+            正在同步云端世界...
+          </div>
+        )}
+        {cloudState === "error" && (
+          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+            云端世界暂不可用，请稍后重试。
+          </div>
+        )}
+        {cloudState === "ready" && worlds.length === 0 && (
+          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+            还没有云端世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个</a>
+          </div>
+        )}
         {savedDraft && (
           <button className="card hover" onClick={onContinueDraft}
             style={{
@@ -222,7 +238,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
           </button>
         )}
         {filtered.map((w: any) => <WorldCard key={w.id} world={w} onOpen={onOpen} onDelete={onDelete} onDuplicate={onDuplicate}/>)}
-        {!savedDraft && filtered.length === 0 && (
+        {!savedDraft && filtered.length === 0 && !showCloudState && (
           <div style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
             没有匹配的世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个 →</a>
           </div>

@@ -9,7 +9,10 @@ export const runtimeEnvironmentSchema = z.enum([
 
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
+export const worldDockEditionSchema = z.enum(["cloud", "local"]).default("cloud");
+
 export const worldDockEnvSchema = z.object({
+  WORLD_DOCK_EDITION: worldDockEditionSchema,
   NODE_ENV: nodeEnvironmentSchema.default("development"),
   APP_ENV: runtimeEnvironmentSchema.default("development"),
   API_HOST: z.string().min(1).default("0.0.0.0"),
@@ -49,6 +52,9 @@ export type WorldDockEnv = z.infer<typeof worldDockEnvSchema>;
 
 export function parseWorldDockEnv(env: Record<string, string | undefined>): WorldDockEnv {
   const parsed = worldDockEnvSchema.parse(env);
+  if (parsed.APP_ENV === "production" && parsed.WORLD_DOCK_EDITION !== "cloud") {
+    throw new Error("Production deployment must use WORLD_DOCK_EDITION=cloud.");
+  }
   if (parsed.APP_ENV === "production" && parsed.AI_PROVIDER === "mock") {
     throw new Error("AI_PROVIDER=mock is not allowed in production.");
   }
