@@ -139,6 +139,7 @@ model World {
   forkRecords       RepositoryFork[]
   coverObject       StorageObject?     @relation("WorldCoverObject", fields: [coverObjectId], references: [id], onDelete: SetNull)
   storageObjects    StorageObject[]
+  assetRelations    WorldAssetRelation[]
 
   @@index([ownerId])
   @@index([coverObjectId])
@@ -153,6 +154,7 @@ model ArchiveEntry {
   summary   String
   body      String
   relations String[] @default([])
+  position  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -170,6 +172,7 @@ model StorySeed {
   conflict     String
   protagonists String?
   questions    String[] @default([])
+  position     Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -186,6 +189,7 @@ model Conflict {
   body         String
   related      String[] @default([])
   derivedSeeds String[] @default([])
+  position     Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -207,6 +211,20 @@ model ConsistencyIssue {
 
   @@index([worldId])
   @@map("consistency_issues")
+}
+
+model WorldAssetRelation {
+  id            String   @id @default(cuid())
+  worldId       String
+  sourceAssetId String
+  targetAssetId String
+  createdAt     DateTime @default(now())
+  world         World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, sourceAssetId, targetAssetId])
+  @@index([worldId, sourceAssetId])
+  @@index([worldId, targetAssetId])
+  @@map("world_asset_relations")
 }
 
 model AgentRun {

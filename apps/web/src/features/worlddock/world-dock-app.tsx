@@ -8,7 +8,11 @@ import {
   cancelAgentRun,
   canUseFixtures,
   createAgentRun,
+  createWorld as createCloudWorld,
+  createWorldAsset,
+  deleteWorld as deleteCloudWorld,
   discardAgentSuggestion,
+  duplicateWorld as duplicateCloudWorld,
   getBillingBalance,
   listArchiveEntries,
   listConflicts,
@@ -429,7 +433,15 @@ function WorldDockRuntime() {
     openWorld(recentlyCreatedId);
   };
 
-  const deleteWorld = (id: string) => {
+  const deleteWorld = async (id: string) => {
+    if (sessionToken && isCloudPersistedWorldId(id)) {
+      try {
+        await deleteCloudWorld(id, { sessionToken });
+      } catch {
+        pushToast({ kind: "warn", text: "云端删除失败 · 请稍后重试" });
+        return;
+      }
+    }
     setWorlds((prev: any[]) => prev.filter((w: any) => w.id !== id));
     delete worldStatesRef.current[id];
     if (recentlyCreatedId === id) setRecentlyCreatedId(null);
@@ -437,9 +449,20 @@ function WorldDockRuntime() {
     pushToast({ kind: "warn", text: "已删除世界" });
   };
 
-  const duplicateWorld = (id: string) => {
+  const duplicateWorld = async (id: string) => {
     const w = worlds.find((world: any) => world.id === id);
     if (!w) return;
+    if (sessionToken && isCloudPersistedWorldId(id)) {
+      try {
+        const created: any = await duplicateCloudWorld(id, { sessionToken });
+        setWorlds((prev: any[]) => [created.world, ...prev]);
+        pushToast({ kind: "save", text: `已复制 · ${created.world.name}` });
+        return;
+      } catch {
+        pushToast({ kind: "warn", text: "云端复制失败 · 请稍后重试" });
+        return;
+      }
+    }
     const copy = { ...w, id: "copy_" + Date.now(), name: w.name + " · 副本", status: "draft", updated: "刚刚", isNew: true };
     setWorlds((prev: any[]) => [copy, ...prev]);
     // Copy workbench state too
@@ -449,9 +472,9 @@ function WorldDockRuntime() {
     pushToast({ kind: "save", text: `已复制 · ${copy.name}` });
   };
 
-  const createWorld = ({ name, type, inspiration, seedKey }: any) => {
+  const createWorld = async ({ name, type, inspiration, seedKey }: any) => {
     const sd = (MOCK.SEEDS as any)[seedKey] || MOCK.SEEDS.memory;
-    const newWorld = {
+    let newWorld = {
       id: "new_" + Date.now(),
       name: name || sd.suggestedName,
       type: type || sd.suggestedType,
@@ -465,6 +488,22 @@ function WorldDockRuntime() {
       mode: t.mode,
       isNew: true,
     };
+    if (sessionToken) {
+      try {
+        const created: any = await createCloudWorld({
+          name: newWorld.name,
+          type: newWorld.type,
+          summary: newWorld.summary,
+          tags: newWorld.tags,
+          mode: "cloud",
+        }, { sessionToken });
+        newWorld = { ...created.world, isNew: true };
+        pushToast({ kind: "save", text: "云端世界已创建" });
+      } catch {
+        pushToast({ kind: "warn", text: "云端世界创建失败 · 请稍后重试" });
+        return;
+      }
+    }
     setWorlds((prev: any[]) => [newWorld, ...prev]);
     setCurrentWorld(newWorld);
     setRecentlyCreatedId(newWorld.id);
@@ -489,6 +528,13 @@ function WorldDockRuntime() {
         await saveAgentSuggestion(item.agentSuggestionId, { sessionToken });
       } catch {
         pushToast({ kind: "warn", text: "云端保存失败 · 请检查网络后重试" });
+        return;
+      }
+    } else if (sessionToken && currentWorld?.id && isCloudPersistedWorldId(currentWorld.id)) {
+      try {
+        await createWorldAsset(currentWorld.id, toWorldAssetInput(item), { sessionToken });
+      } catch {
+        pushToast({ kind: "warn", text: "云端资产保存失败 · 请检查网络后重试" });
         return;
       }
     }
@@ -925,6 +971,52 @@ const WorkbenchEmpty = ({ world }: any) => (
 // ────────── Helper: follow-up agent responses ──────────
 function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
+}
+
+function isCloudPersistedWorldId(id: string) {
+  return !id.startsWith("new_") && !id.startsWith("copy_") && !id.startsWith("fork_");
+}
+
+function toWorldAssetInput(item: any) {
+  if (item.kind === "seed") {
+    return {
+      kind: "seed" as const,
+      title: item.title,
+      category: item.category,
+      summary: item.hook ?? item.summary,
+      body: item.conflict ?? item.body ?? item.summary,
+      payload: {
+        hook: item.hook ?? item.summary,
+        trigger: item.trigger,
+        conflict: item.conflict ?? item.body,
+        protagonists: item.protagonists,
+        questions: item.questions ?? [],
+      },
+    };
+  }
+  if (item.kind === "conflict") {
+    return {
+      kind: "conflict" as const,
+      title: item.title,
+      category: item.category,
+      summary: item.summary,
+      body: item.body ?? item.summary,
+      payload: {
+        related: item.related ?? [],
+        derivedSeeds: item.derivedSeeds ?? [],
+      },
+    };
+  }
+  return {
+    kind: "setting" as const,
+    title: item.title,
+    category: item.category,
+    summary: item.summary,
+    body: item.body ?? item.summary,
+    payload: {
+      relations: item.relations ?? [],
+    },
+  };
 }
 
 function getBackendAgentMode(mode: string): "expand" | "challenge" | "fork" | "polish" {

@@ -686,9 +686,14 @@ Expected: production env requires `WORLD_DOCK_EDITION=cloud`, authenticated clou
 ### Phase 4: 云端世界 CRUD 和资产编辑器
 
 **Files:**
+- Create: `packages/domain/src/assets/index.ts`
+- Modify: `packages/domain/src/index.ts`
+- Modify: `packages/db/prisma/schema.prisma`
+- Create: `packages/db/prisma/migrations/20260527200500_world_asset_order_relations/migration.sql`
 - Create: `apps/api/src/modules/world-assets/world-assets.controller.ts`
 - Create: `apps/api/src/modules/world-assets/world-assets.service.ts`
 - Create: `apps/api/src/modules/world-assets/world-assets.module.ts`
+- Modify: `apps/web/src/features/worlddock/api.ts`
 - Create: `apps/web/src/features/worlds/worlds-api.ts`
 - Create: `apps/web/src/features/world-assets/asset-editor.tsx`
 - Create: `apps/web/src/features/world-assets/asset-search.tsx`
@@ -698,7 +703,7 @@ Expected: production env requires `WORLD_DOCK_EDITION=cloud`, authenticated clou
 - Test: `apps/api/test/world-assets.integration-spec.ts`
 - Test: `apps/web/tests/e2e/cloud-world-crud.spec.ts`
 
-- [ ] **Task 1: 补齐资产 API 行为**
+- [x] **Task 1: 补齐资产 API 行为**
 
 World asset endpoints must support:
 
@@ -713,7 +718,7 @@ POST   /v1/worlds/:worldId/assets/:assetId/relations
 DELETE /v1/worlds/:worldId/assets/:assetId/relations/:targetAssetId
 ```
 
-- [ ] **Task 2: 统一资产 domain schema**
+- [x] **Task 2: 统一资产 domain schema**
 
 Create `packages/domain/src/assets/index.ts`:
 
@@ -739,7 +744,7 @@ export const worldAssetSchema = z.object({
 export type WorldAsset = z.infer<typeof worldAssetSchema>;
 ```
 
-- [ ] **Task 3: 前端主链路移除本地 CRUD**
+- [x] **Task 3: 前端主链路移除本地 CRUD**
 
 Modify `apps/web/src/features/worlddock/world-dock-app.tsx` so these actions call cloud APIs:
 
@@ -751,7 +756,7 @@ handleSave -> POST /v1/worlds/:worldId/assets or save agent suggestion
 handleDiscard -> discard agent suggestion and update cloud state
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 

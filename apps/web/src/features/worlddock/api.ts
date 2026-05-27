@@ -1,3 +1,5 @@
+import type { WorldAsset, WorldAssetKind } from "@worlddock/domain";
+
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
 
 export const WORLD_DOCK_SESSION_TOKEN_KEY = "worlddock.sessionToken";
@@ -53,6 +55,16 @@ export type CreateWorldInput = {
   summary: string;
   tags: string[];
   mode: "cloud" | "local";
+};
+
+export type CreateWorldAssetInput = {
+  kind: WorldAssetKind;
+  title: string;
+  category?: string;
+  summary: string;
+  body?: string;
+  payload?: Record<string, unknown>;
+  position?: number;
 };
 
 export type CreateArchiveEntryInput = {
@@ -213,6 +225,110 @@ export async function createWorld(input: CreateWorldInput, options: ApiClientOpt
     body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
+  });
+}
+
+export async function deleteWorld(worldId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function duplicateWorld(worldId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/duplicate`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function listWorldAssets(
+  worldId: string,
+  options: ApiClientOptions & { kind?: WorldAssetKind; q?: string; cursor?: string },
+): Promise<{ assets: WorldAsset[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.kind) params.set("kind", options.kind);
+  if (options.q) params.set("q", options.q);
+  if (options.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  return requestJson(`/v1/worlds/${worldId}/assets${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function createWorldAsset(
+  worldId: string,
+  input: CreateWorldAssetInput,
+  options: ApiClientOptions,
+): Promise<{ asset: WorldAsset }> {
+  return requestJson(`/v1/worlds/${worldId}/assets`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function updateWorldAsset(
+  worldId: string,
+  assetId: string,
+  input: Partial<Omit<CreateWorldAssetInput, "kind">>,
+  options: ApiClientOptions,
+): Promise<{ asset: WorldAsset }> {
+  return requestJson(`/v1/worlds/${worldId}/assets/${assetId}`, {
+    method: "PATCH",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function deleteWorldAsset(worldId: string, assetId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/assets/${assetId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function reorderWorldAssets(worldId: string, assetIds: string[], options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/assets/reorder`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: { assetIds },
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function relateWorldAssets(
+  worldId: string,
+  sourceAssetId: string,
+  targetAssetId: string,
+  options: ApiClientOptions,
+) {
+  return requestJson(`/v1/worlds/${worldId}/assets/${sourceAssetId}/relations`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: { targetAssetId },
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
   });
 }
 
@@ -526,7 +642,7 @@ function getBrowserSessionStorage(): SessionTokenStorage | null {
 async function requestJson<T>(
   path: string,
   options: {
-    method: "GET" | "POST" | "DELETE";
+    method: "GET" | "POST" | "PATCH" | "DELETE";
     sessionToken: string;
     body?: unknown;
     fetcher?: typeof fetch;

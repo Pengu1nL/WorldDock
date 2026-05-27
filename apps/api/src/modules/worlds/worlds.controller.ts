@@ -79,6 +79,23 @@ export class WorldsController {
     return { world: await this.toWorld(record) };
   }
 
+  @Post(":worldId/duplicate")
+  @RequireScopes("world:write")
+  async duplicate(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
+    const original = await this.requireOwnedWorld(subject, worldId);
+    const record = await this.worlds.createWorld({
+      ownerId: subject.user.id,
+      name: `${original.name} · 副本`,
+      type: original.type,
+      summary: original.summary,
+      tags: original.tags,
+      mode: original.mode,
+      maturity: original.maturity,
+    });
+
+    return { world: await this.toWorld(record) };
+  }
+
   @Get(":worldId")
   @RequireScopes("world:read")
   async detail(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
