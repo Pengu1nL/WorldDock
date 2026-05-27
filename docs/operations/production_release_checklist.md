@@ -1,24 +1,24 @@
 # 生产发布 Checklist
 
-- [ ] `pnpm lint`
+- [x] `pnpm lint`
   - Owner: release driver
-  - Evidence: CI run URL or local command output timestamp
+  - Evidence: local command passed at 2026-05-27 23:54 CST
   - Command: `pnpm lint`
-- [ ] `pnpm test`
+- [x] `pnpm test`
   - Owner: release driver
-  - Evidence: CI run URL or local command output timestamp
+  - Evidence: local command passed at 2026-05-27 23:54 CST
   - Command: `pnpm test`
-- [ ] `pnpm build`
+- [x] `pnpm build`
   - Owner: release driver
-  - Evidence: CI run URL or local command output timestamp
+  - Evidence: local command passed at 2026-05-27 23:55 CST
   - Command: `pnpm build`
-- [ ] API integration tests
+- [x] API integration tests
   - Owner: API owner
-  - Evidence: CI run URL or local command output timestamp
+  - Evidence: local command passed at 2026-05-27 23:26 CST
   - Command: `pnpm --filter @worlddock/api test:integration`
-- [ ] Web E2E tests
+- [x] Web E2E tests
   - Owner: web owner
-  - Evidence: CI run URL or local command output timestamp
+  - Evidence: local command passed at 2026-05-27 23:53 CST, 17/17 passed
   - Command: `pnpm --filter @worlddock/web test:e2e`
 - [ ] GitHub Actions `ci` 工作流在目标提交上通过
   - Owner: release driver

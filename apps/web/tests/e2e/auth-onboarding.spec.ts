@@ -40,7 +40,7 @@ test("new user can register, complete onboarding, and enter the app", async ({ p
   await page.getByRole("button", { name: "从空白世界开始" }).click();
   await page.getByRole("button", { name: "进入 WorldDock" }).click();
 
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole("heading", { name: "我的世界" })).toBeVisible();
 });
 

@@ -36,7 +36,7 @@ export function OnboardingFlow() {
     setError("");
     try {
       await completeOnboarding(token);
-      window.location.href = "/";
+      window.location.href = "/app";
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "首次体验保存失败。");
       setSubmitting(false);
