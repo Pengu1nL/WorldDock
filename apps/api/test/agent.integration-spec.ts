@@ -67,6 +67,22 @@ describe("agent run endpoints", () => {
 
     const suggestionId = (await agent.listSuggestions(createRun.body.run.id))[0].id;
     await request(app.getHttpServer())
+      .patch(`/v1/agent-suggestions/${suggestionId}`)
+      .set("authorization", "Bearer session_user_1")
+      .send({
+        suggestion: {
+          id: "s1",
+          kind: "setting",
+          category: "世界规则",
+          title: "《记忆交易法》修订版",
+          summary: "修订后的法律地位。",
+          body: "仅认证机构可以主持交易，并需要保留撤销机制。",
+        },
+      })
+      .expect(200);
+    expect((await agent.findSuggestionById(suggestionId))?.status).toBe("edited");
+
+    await request(app.getHttpServer())
       .post(`/v1/agent-suggestions/${suggestionId}/save`)
       .set("authorization", "Bearer session_user_1")
       .expect(201);
@@ -329,6 +345,8 @@ function createInMemoryAgentRepository() {
         prompt: input.prompt,
         status: "running",
         model: input.model,
+        provider: input.provider ?? "mock",
+        piSessionId: input.piSessionId ?? null,
         tokenUsage: null,
         createdAt: now,
         updatedAt: now,

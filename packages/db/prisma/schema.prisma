@@ -235,6 +235,8 @@ model AgentRun {
   mode           String
   prompt         String
   model          String?
+  provider       String            @default("mock")
+  piSessionId    String?
   tokenUsage     Json?
   errorCode      String?
   errorMessage   String?
@@ -251,6 +253,7 @@ model AgentRun {
 
   @@index([worldId])
   @@index([userId])
+  @@index([piSessionId])
   @@map("agent_runs")
 }
 
@@ -292,10 +295,13 @@ model ContextRef {
   title     String
   excerpt   String
   targetId  String?
+  level     String   @default("card")
+  source    String   @default("initial")
   createdAt DateTime @default(now())
   run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
+  @@index([runId, level])
   @@map("context_refs")
 }
 

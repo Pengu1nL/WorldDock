@@ -3,6 +3,10 @@ import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, t
 import type { AuthSubject } from "../auth/auth.service";
 import { BillingService } from "../billing/billing.service";
 import { WORLD_REPOSITORY, type WorldRepository, type WorldRecord } from "../worlds/world.repository";
+import { selectInitialWorldContext } from "./context-builder";
+import { describeWorldTools } from "./pi/world-tool-registry";
+import { loadWorldDockPiSkills } from "./pi/skill-loader";
+import { buildDisclosureBriefs, buildDisclosureCards, buildDisclosureManifest } from "./pi/world-tools";
 import { AGENT_PROVIDER, type AgentProvider } from "./agent.provider";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord } from "./agent.repository";
 
@@ -24,6 +28,7 @@ export class AgentService {
       mode: input.mode,
       prompt: input.prompt,
       model: process.env.AI_MODEL ?? "mock",
+      provider: parseAgentProvider(process.env.AI_PROVIDER),
     });
     await this.append(run.id, 1, "run.started", { runId: run.id, mode: input.mode });
     await this.billing.reserveAgentRun(subject.user.id, run.id);
@@ -49,12 +54,26 @@ export class AgentService {
 
     let sequence = existingEvents.reduce((max, event) => Math.max(max, event.sequence), 0) + 1;
     let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const context = selectInitialWorldContext({
+      prompt: run.prompt,
+      manifest: await buildDisclosureManifest(this.worlds, world),
+      cards: await buildDisclosureCards(this.worlds, world.id),
+      briefs: await buildDisclosureBriefs(this.worlds, world.id),
+      maxCards: 8,
+      maxBriefs: 3,
+    });
 
     try {
       for await (const chunk of this.provider.stream({
         prompt: run.prompt,
         mode: run.mode,
-        world: { name: world.name, summary: world.summary },
+        runId: run.id,
+        userId: run.userId,
+        model: run.model,
+        world: { id: world.id, name: world.name, summary: world.summary },
+        context,
+        tools: [...describeWorldTools()],
+        skills: loadWorldDockPiSkills(process.env),
       })) {
         const latestRun = await this.agents.findRunById(run.id);
         if (latestRun?.status === "cancelled") return;
@@ -62,8 +81,29 @@ export class AgentService {
         if (chunk.type === "context") {
           const created = await this.agents.createContextRef({ runId: run.id, ...chunk.contextRef });
           yield await this.append(run.id, sequence++, "context.used", {
-            contextRef: { id: created.id, kind: created.kind, title: created.title, excerpt: created.excerpt, targetId: created.targetId ?? undefined },
+            contextRef: {
+              id: created.id,
+              kind: created.kind,
+              title: created.title,
+              excerpt: created.excerpt,
+              targetId: created.targetId ?? undefined,
+              level: created.level ?? "card",
+              source: created.source ?? "initial",
+            },
           });
+        }
+
+        if (chunk.type === "pi-session-started") {
+          await this.agents.updateRun(run.id, { piSessionId: chunk.piSessionId, provider: "pi" });
+          yield await this.append(run.id, sequence++, "pi.session.started", { piSessionId: chunk.piSessionId });
+        }
+
+        if (chunk.type === "tool-requested") {
+          yield await this.append(run.id, sequence++, "tool.requested", { toolCall: chunk.toolCall });
+        }
+
+        if (chunk.type === "tool-completed") {
+          yield await this.append(run.id, sequence++, "tool.completed", { toolCallId: chunk.toolCallId, result: chunk.result });
         }
 
         if (chunk.type === "delta") {
@@ -121,6 +161,15 @@ export class AgentService {
 
     const savedAssetId = await this.saveSuggestionAsset(suggestion.worldId, suggestion.suggestion);
     return this.agents.updateSuggestion(suggestion.id, { status: "saved", savedAssetId });
+  }
+
+  async editSuggestion(subject: AuthSubject, suggestionId: string, input: { suggestion: unknown }) {
+    const suggestion = await this.requireOwnedSuggestion(subject, suggestionId);
+    if (suggestion.status !== "pending" && suggestion.status !== "edited") return suggestion;
+    return this.agents.updateSuggestion(suggestion.id, {
+      status: "edited",
+      suggestion: suggestionSchema.parse(input.suggestion),
+    });
   }
 
   async discardSuggestion(subject: AuthSubject, suggestionId: string) {
@@ -203,4 +252,9 @@ export class AgentService {
   private notFound(message: string) {
     return new NotFoundException({ code: "NOT_FOUND", message });
   }
+}
+
+function parseAgentProvider(value: string | undefined): "mock" | "vercel-ai" | "pi" {
+  if (value === "pi" || value === "vercel-ai") return value;
+  return "mock";
 }

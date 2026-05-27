@@ -1,26 +1,43 @@
+import type { PiToolCall } from "@worlddock/domain/agent/pi";
 import type { TokenUsage, WorldSuggestion } from "@worlddock/domain";
+import type { WorldContextRef } from "@worlddock/domain/agent/context";
+import { MockPiRuntimeClient } from "./pi/pi-runtime.client";
+import { piEventToAgentChunk } from "./pi/pi-event-adapter";
+import { PiSessionRunner } from "./pi/pi-session-runner";
+import { SafetyGate } from "./pi/safety-gate";
+import { describeWorldTools, WorldToolRegistry } from "./pi/world-tool-registry";
 
 export const AGENT_PROVIDER = Symbol("AGENT_PROVIDER");
 
 export type AgentProviderInput = {
+  runId?: string;
+  userId?: string;
   prompt: string;
   world: {
+    id?: string;
     name: string;
     summary: string;
   };
+  context?: WorldContextRef[];
+  tools?: ReturnType<typeof describeWorldTools>;
+  skills?: Array<{ name: string; path: string; description: string }>;
+  model?: string | null;
   mode: "expand" | "challenge" | "fork" | "polish";
 };
 
 export type AgentProviderOutput = {
   deltas: string[];
-  contextRefs: Array<{ kind: "world" | "archive" | "seed" | "conflict" | "repository"; title: string; excerpt: string; targetId?: string | null }>;
+  contextRefs: Array<{ kind: "world" | "archive" | "seed" | "conflict" | "repository"; title: string; excerpt: string; targetId?: string | null; level?: NonNullable<WorldContextRef["level"]>; source?: NonNullable<WorldContextRef["source"]> }>;
   suggestions: WorldSuggestion[];
   tokenUsage: TokenUsage;
 };
 
 export type AgentProviderChunk =
+  | { type: "pi-session-started"; piSessionId: string }
   | { type: "context"; contextRef: AgentProviderOutput["contextRefs"][number] }
   | { type: "delta"; text: string }
+  | { type: "tool-requested"; toolCall: PiToolCall }
+  | { type: "tool-completed"; toolCallId: string; result: Record<string, unknown> }
   | { type: "suggestion"; suggestion: WorldSuggestion }
   | { type: "usage"; tokenUsage: TokenUsage };
 
@@ -99,4 +116,41 @@ export class VercelAiSdkAgentProvider implements AgentProvider {
       tokenUsage: { inputTokens: 0, outputTokens: text.length, totalTokens: text.length },
     };
   }
+}
+
+export class PiAgentProvider implements AgentProvider {
+  constructor(private readonly runner = createDefaultPiSessionRunner()) {}
+
+  async *stream(input: AgentProviderInput): AsyncIterable<AgentProviderChunk> {
+    const context: WorldContextRef[] = input.context ?? [{
+      level: "manifest",
+      kind: "world",
+      title: input.world.name,
+      excerpt: input.world.summary,
+      targetId: input.world.id,
+      source: "initial",
+    }];
+    for await (const event of this.runner.run({
+      runId: input.runId ?? "run_pending",
+      worldId: input.world.id ?? "world_pending",
+      userId: input.userId ?? "user_pending",
+      mode: input.mode,
+      prompt: input.prompt,
+      model: input.model ?? process.env.PI_MODEL_ID ?? process.env.AI_MODEL ?? "pi-mock",
+      context,
+      tools: input.tools ? [...input.tools] : [...describeWorldTools()],
+      skills: input.skills ?? [],
+    })) {
+      const chunk = piEventToAgentChunk(event);
+      if (chunk) yield chunk;
+    }
+  }
+}
+
+function createDefaultPiSessionRunner() {
+  const registry = new WorldToolRegistry();
+  for (const tool of describeWorldTools()) {
+    registry.register(tool.name, async () => ({}));
+  }
+  return new PiSessionRunner(new MockPiRuntimeClient(), registry, new SafetyGate());
 }

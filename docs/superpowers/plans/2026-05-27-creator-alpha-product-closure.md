@@ -802,7 +802,7 @@ Expected: create, edit, delete, duplicate, search, reorder, and relate assets pe
 - Test: `apps/api/test/agent-context.integration-spec.ts`
 - Test: `apps/web/tests/e2e/pi-agent.spec.ts`
 
-- [ ] **Task 1: 锁定 pi upstream 版本和真实 API**
+- [x] **Task 1: 锁定 pi upstream 版本和真实 API**
 
 Before writing the Phase 5 detailed execution document, inspect the real upstream repository and record evidence. Do not invent package names, endpoints, event types, or method signatures.
 
@@ -905,7 +905,7 @@ Implementation decision:
 WorldDock will integrate pi as a TypeScript package adapter, not as a guessed HTTP `/v1/sessions/stream` service. If the upstream API differs from this plan, update the Phase 5 detailed execution document before writing code.
 ```
 
-- [ ] **Task 2: 固化 pi Agent 架构边界**
+- [x] **Task 2: 固化 pi Agent 架构边界**
 
 Create `docs/product/pi-agent-architecture.md`:
 
@@ -945,7 +945,7 @@ Dangerous operations stay outside pi and require explicit user confirmation thro
 Billing rule: only pi/model execution consumes creation credits. Manual editing, browsing, Star, Fork, import/export, Push, and release viewing do not consume credits unless the user explicitly asks pi to generate or review content.
 ```
 
-- [ ] **Task 3: 定义 pi 事件和工具契约**
+- [x] **Task 3: 定义 pi 事件和工具契约**
 
 Create `packages/domain/src/agent/pi.ts`:
 
@@ -1050,7 +1050,7 @@ baseAgentEventSchema.extend({
 }),
 ```
 
-- [ ] **Task 4: 定义 World Asset Progressive Disclosure Protocol**
+- [x] **Task 4: 定义 World Asset Progressive Disclosure Protocol**
 
 Create `docs/product/world-asset-progressive-disclosure.md`:
 
@@ -1166,7 +1166,7 @@ export type WorldManifest = z.infer<typeof worldManifestSchema>;
 export type WorldContextRef = z.infer<typeof worldContextRefSchema>;
 ```
 
-- [ ] **Task 5: 建立 World Context Builder**
+- [x] **Task 5: 建立 World Context Builder**
 
 Create `apps/api/src/modules/agent/context-builder.ts`:
 
@@ -1239,7 +1239,7 @@ export function selectInitialWorldContext(input: {
 }
 ```
 
-- [ ] **Task 6: 建立 Pi Runtime Client 和 Session Runner**
+- [x] **Task 6: 建立 Pi Runtime Client 和 Session Runner**
 
 Create `apps/api/src/modules/agent/pi/pi-runtime.client.ts`:
 
@@ -1466,7 +1466,7 @@ export class PiSessionRunner {
 }
 ```
 
-- [ ] **Task 7: 建立 World Tool Registry 和 Safety Gate**
+- [x] **Task 7: 建立 World Tool Registry 和 Safety Gate**
 
 Create `apps/api/src/modules/agent/pi/safety-gate.ts`:
 
@@ -1730,7 +1730,7 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
 }
 ```
 
-- [ ] **Task 8: 建立 Skill Loader 和 Event Adapter**
+- [x] **Task 8: 建立 Skill Loader 和 Event Adapter**
 
 Create `apps/api/src/modules/agent/pi/skill-loader.ts`:
 
@@ -1792,7 +1792,7 @@ export function adaptPiEvent(event: PiRuntimeEvent): AgentProviderChunk[] {
 }
 ```
 
-- [ ] **Task 9: 将 AgentProvider 切换为 PiAgentProvider**
+- [x] **Task 9: 将 AgentProvider 切换为 PiAgentProvider**
 
 Modify `apps/api/src/modules/agent/agent.provider.ts` so pi becomes the production provider:
 
@@ -1870,7 +1870,7 @@ Modify `apps/api/src/modules/agent/agent.module.ts`:
 }
 ```
 
-- [ ] **Task 10: 将 AgentService 改为 pi session 编排器**
+- [x] **Task 10: 将 AgentService 改为 pi session 编排器**
 
 Modify `apps/api/src/modules/agent/agent.repository.ts` and `apps/api/src/modules/agent/prisma-agent.repository.ts` so:
 - `AgentRunRecord` includes `piSessionId?: string | null` and `provider: "mock" | "pi"`.
@@ -1935,7 +1935,7 @@ for await (const chunk of this.provider.stream({
 
 WorldDock API remains the only writer for product data. pi output can create pending suggestions and tool events, but saving suggestions still goes through `POST /v1/agent-suggestions/:suggestionId/save`.
 
-- [ ] **Task 11: 建议生命周期产品化**
+- [x] **Task 11: 建议生命周期产品化**
 
 Agent suggestions must support:
 
@@ -1948,7 +1948,7 @@ failed run -> refunded
 cancelled run -> refunded
 ```
 
-- [ ] **Task 12: Run verification**
+- [x] **Task 12: Run verification**
 
 Run:
 

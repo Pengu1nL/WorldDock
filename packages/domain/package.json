@@ -6,6 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./agent": "./src/agent/index.ts",
+    "./agent/context": "./src/agent/context.ts",
+    "./agent/pi": "./src/agent/pi.ts",
     "./api": "./src/api/index.ts",
     "./billing": "./src/billing/index.ts",
     "./repository": "./src/repository/index.ts",

@@ -74,6 +74,8 @@ function mapRun(record: {
   mode: string;
   prompt: string;
   model: string | null;
+  provider: string;
+  piSessionId: string | null;
   tokenUsage: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -87,6 +89,8 @@ function mapRun(record: {
     ...record,
     status: parseRunStatus(record.status),
     mode: parseRunMode(record.mode),
+    provider: parseRunProvider(record.provider),
+    piSessionId: record.piSessionId,
     tokenUsage: record.tokenUsage ? tokenUsageSchema.parse(record.tokenUsage) : null,
   };
 }
@@ -136,6 +140,8 @@ function mapContextRef(record: {
   title: string;
   excerpt: string;
   targetId: string | null;
+  level?: string;
+  source?: string;
 }): ContextRefRecord {
   return {
     id: record.id,
@@ -144,6 +150,8 @@ function mapContextRef(record: {
     title: record.title,
     excerpt: record.excerpt,
     targetId: record.targetId,
+    level: parseContextLevel(record.level ?? "card"),
+    source: parseContextSource(record.source ?? "initial"),
   };
 }
 
@@ -161,8 +169,15 @@ function parseRunMode(value: string): AgentRunRecord["mode"] {
   throw new Error(`Unknown agent run mode: ${value}`);
 }
 
+function parseRunProvider(value: string): AgentRunRecord["provider"] {
+  if (value === "mock" || value === "vercel-ai" || value === "pi") {
+    return value;
+  }
+  throw new Error(`Unknown agent run provider: ${value}`);
+}
+
 function parseSuggestionStatus(value: string): AgentSuggestionRecord["status"] {
-  if (value === "pending" || value === "saved" || value === "discarded") {
+  if (value === "pending" || value === "edited" || value === "saved" || value === "discarded" || value === "superseded") {
     return value;
   }
   throw new Error(`Unknown agent suggestion status: ${value}`);
@@ -173,4 +188,18 @@ function parseContextKind(value: string): ContextRefRecord["kind"] {
     return value;
   }
   throw new Error(`Unknown context ref kind: ${value}`);
+}
+
+function parseContextLevel(value: string): NonNullable<ContextRefRecord["level"]> {
+  if (value === "manifest" || value === "card" || value === "brief" || value === "detail" || value === "source_fragment" || value === "release_delta") {
+    return value;
+  }
+  throw new Error(`Unknown context ref level: ${value}`);
+}
+
+function parseContextSource(value: string): NonNullable<ContextRefRecord["source"]> {
+  if (value === "initial" || value === "tool") {
+    return value;
+  }
+  throw new Error(`Unknown context ref source: ${value}`);
 }
