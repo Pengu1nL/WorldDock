@@ -179,7 +179,7 @@ export type ReleasePreflight = {
 
 export type ReportRepositoryInput = {
   reason: "spam" | "sensitive_content" | "abuse" | "copyright" | "other";
-  detail?: string;
+  detail: string;
 };
 
 export type CommunityRepositoryAsset = {
@@ -751,6 +751,17 @@ export async function detachFork(forkId: string, options: ApiClientOptions) {
 
 export async function reportRepository(repositoryId: string, input: ReportRepositoryInput, options: ApiClientOptions) {
   return requestJson(`/v1/repositories/${repositoryId}/reports`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function reportCreatorProfile(handle: string, input: ReportRepositoryInput, options: ApiClientOptions) {
+  return requestJson(`/v1/community/creators/${handle}/reports`, {
     method: "POST",
     sessionToken: options.sessionToken,
     body: input,

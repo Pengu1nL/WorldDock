@@ -155,17 +155,10 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
           onFork(activeRepository);
           onToast({ kind: "save", text: "Fork 成功 · 已生成私有世界" });
         }}
-        onReport={async () => {
+        onReport={async (input) => {
           const session = sessionToken();
           if (session) {
-            try {
-              await reportRepository(activeRepository.id, {
-                reason: "other",
-                detail: "用户从社区详情页提交举报。",
-              }, { sessionToken: session });
-            } catch {
-              onToast({ kind: "info", text: "云端举报暂不可用，已保留本地反馈" });
-            }
+            await reportRepository(activeRepository.id, input, { sessionToken: session });
           }
           onToast({ kind: "warn", text: "举报已提交 · Alpha 团队会人工处理" });
         }}

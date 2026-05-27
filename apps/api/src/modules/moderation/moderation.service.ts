@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { CreateReportInput, ModerateReportInput, ModerationAction, ModerationStatus, ReportStatus } from "@worlddock/domain";
+import type { CreateReportInput, ModerateReportInput, ModerationAction, ModerationStatus, ReportStatus, ReportTargetType } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
 import { OUTBOX_REPOSITORY, type OutboxRepository } from "../outbox/outbox.repository";
 import { REPOSITORY_REPOSITORY, type PublicRepositoryRecord, type RepositoryRepository } from "../repositories/repository.repository";
@@ -17,26 +17,69 @@ export class ModerationService {
 
   async reportRepository(subject: AuthSubject, repositoryId: string, input: CreateReportInput) {
     const repository = await this.requireVisibleRepository(repositoryId);
-    const report = await this.moderation.createReport({
+    const report = await this.createIdempotentReport(subject, {
       repositoryId: repository.id,
-      reporterId: subject.user.id,
+      targetType: "repository",
+      targetId: repository.id,
       reason: input.reason,
-      detail: input.detail ?? null,
+      detail: input.detail,
     });
-    const openReportCount = await this.moderation.countOpenReports(repository.id);
-    if (openReportCount >= duplicateReportThreshold) {
+    const openReportCount = await this.moderation.countOpenReportsForTarget("repository", repository.id);
+    if (!report.duplicate && openReportCount >= duplicateReportThreshold) {
       await this.outbox.createEvent({
         type: "repository.moderation_scan_requested",
         aggregateId: repository.id,
         payload: {
           repositoryId: repository.id,
-          reportId: report.id,
+          reportId: report.record.id,
           source: "duplicate-report-threshold",
           openReportCount,
         },
       });
     }
-    return this.toReportResponse(report);
+    return this.toReportResponse(report.record);
+  }
+
+  async reportCreator(subject: AuthSubject, handle: string, input: CreateReportInput) {
+    const targetId = normalizeCreatorHandle(handle);
+    const repository = await this.findVisibleCreatorRepository(targetId);
+    if (!repository) throw this.notFound("Creator not found.");
+    const report = await this.createIdempotentReport(subject, {
+      repositoryId: null,
+      targetType: "creator",
+      targetId,
+      reason: input.reason,
+      detail: input.detail,
+    });
+    return this.toReportResponse(report.record);
+  }
+
+  private async createIdempotentReport(subject: AuthSubject, input: {
+    repositoryId: string | null;
+    targetType: ReportTargetType;
+    targetId: string;
+    reason: CreateReportInput["reason"];
+    detail: string;
+  }) {
+    const { dayStart, dayEnd } = reportDayWindow(new Date());
+    const existing = await this.moderation.findReportByReporterTargetOnDay({
+      reporterId: subject.user.id,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      dayStart,
+      dayEnd,
+    });
+    if (existing) return { record: existing, duplicate: true };
+
+    const record = await this.moderation.createReport({
+      repositoryId: input.repositoryId,
+      reporterId: subject.user.id,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      reason: input.reason,
+      detail: input.detail,
+    });
+    return { record, duplicate: false };
   }
 
   async listReports(subject: AuthSubject, status?: ReportStatus) {
@@ -49,6 +92,7 @@ export class ModerationService {
     this.assertAdmin(subject);
     const report = await this.moderation.findReportById(reportId);
     if (!report) throw this.notFound("Report not found.");
+    if (!report.repositoryId) throw this.notFound("Repository not found.");
     const repository = await this.repositories.findById(report.repositoryId);
     if (!repository) throw this.notFound("Repository not found.");
 
@@ -122,10 +166,12 @@ export class ModerationService {
   }
 
   private async toReportResponse(report: Awaited<ReturnType<ModerationRepository["findReportById"]>> extends infer Report ? NonNullable<Report> : never) {
-    const repository = await this.repositories.findById(report.repositoryId);
+    const repository = report.repositoryId ? await this.repositories.findById(report.repositoryId) : null;
     return {
       id: report.id,
       repositoryId: report.repositoryId,
+      targetType: report.targetType,
+      targetId: report.targetId,
       repository: repository ? {
         id: repository.id,
         owner: repository.ownerName,
@@ -150,6 +196,12 @@ export class ModerationService {
     return repository;
   }
 
+  private async findVisibleCreatorRepository(handle: string) {
+    const repositories = await this.repositories.listPublic();
+    return repositories.find((repository) =>
+      repository.ownerName.toLowerCase() === handle && repository.moderationStatus !== "removed") ?? null;
+  }
+
   private assertAdmin(subject: AuthSubject) {
     if (subject.user.role !== "admin") {
       throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "Admin access is required." });
@@ -159,6 +211,18 @@ export class ModerationService {
   private notFound(message: string) {
     return new NotFoundException({ code: "NOT_FOUND", message });
   }
+}
+
+function normalizeCreatorHandle(handle: string) {
+  return handle.trim().toLowerCase();
+}
+
+function reportDayWindow(now: Date) {
+  const dayStart = new Date(now);
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+  return { dayStart, dayEnd };
 }
 
 function toNextStatus(current: ModerationStatus, action: ModerateReportInput["action"] | "scan_flagged") {

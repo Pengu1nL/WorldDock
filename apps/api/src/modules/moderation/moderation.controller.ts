@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
-import { createReportSchema, moderateReportSchema, reportStatusSchema } from "@worlddock/domain";
+import { BadRequestException, Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { createReportSchema, type CreateReportInput } from "@worlddock/domain";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
 import type { AuthSubject } from "../auth/auth.service";
@@ -17,27 +17,29 @@ export class ModerationController {
     @Param("repositoryId") repositoryId: string,
     @Body() body: unknown,
   ) {
-    return { report: await this.moderationService.reportRepository(subject, repositoryId, createReportSchema.parse(body)) };
+    return { report: await this.moderationService.reportRepository(subject, repositoryId, parseCreateReport(body)) };
   }
 
-  @Get("admin/reports")
+  @Post("community/creators/:handle/reports")
   @UseGuards(WorldDockAuthGuard)
-  async listReports(@CurrentSubject() subject: AuthSubject, @Query("status") status?: string) {
-    return {
-      reports: await this.moderationService.listReports(
-        subject,
-        status ? reportStatusSchema.parse(status) : undefined,
-      ),
-    };
-  }
-
-  @Post("admin/reports/:reportId/actions")
-  @UseGuards(WorldDockAuthGuard)
-  async moderate(
+  @RequireScopes("world:write")
+  async reportCreator(
     @CurrentSubject() subject: AuthSubject,
-    @Param("reportId") reportId: string,
+    @Param("handle") handle: string,
     @Body() body: unknown,
   ) {
-    return this.moderationService.moderateReport(subject, reportId, moderateReportSchema.parse(body));
+    return { report: await this.moderationService.reportCreator(subject, handle, parseCreateReport(body)) };
   }
+}
+
+function parseCreateReport(body: unknown): CreateReportInput {
+  const parsed = createReportSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new BadRequestException({
+      code: "BAD_REQUEST",
+      message: "Report detail is too short.",
+      details: parsed.error.flatten(),
+    });
+  }
+  return parsed.data;
 }

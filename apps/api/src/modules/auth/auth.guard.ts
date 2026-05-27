@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { assertSubjectRateLimit } from "../../common/security";
 import { AuthService, type AuthSubject } from "./auth.service";
 import { REQUIRED_SCOPES_METADATA } from "./auth.decorators";
 
@@ -24,6 +25,7 @@ export class WorldDockAuthGuard implements CanActivate {
 
     this.authService.assertScopes(subject, requiredScopes);
     request.authSubject = subject;
+    await assertSubjectRateLimit(subject, request);
     return true;
   }
 

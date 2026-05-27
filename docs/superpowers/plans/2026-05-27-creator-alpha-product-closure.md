@@ -2225,7 +2225,7 @@ Expected: Explore works without fixtures, search is paginated, repository detail
 - Test: `apps/api/test/alpha-moderation.integration-spec.ts`
 - Test: `apps/web/tests/e2e/report-flow.spec.ts`
 
-- [ ] **Task 1: 建立 Alpha 举报入口，不做管理后台**
+- [x] **Task 1: 建立 Alpha 举报入口，不做管理后台**
 
 Report flow must support:
 
@@ -2272,7 +2272,7 @@ Deferred to Beta:
 - Admin role management
 ```
 
-- [ ] **Task 2: 分布式限流**
+- [x] **Task 2: 分布式限流**
 
 Replace in-memory buckets in `apps/api/src/common/security.ts` with Redis-backed keys:
 
@@ -2292,7 +2292,7 @@ user id + route family
 access token id + route family
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

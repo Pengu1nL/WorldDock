@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CommunityRepository, CommunityRepositoryAsset, RepositoryCollection } from "../worlddock/api";
+import type { CommunityRepository, CommunityRepositoryAsset, ReportRepositoryInput, RepositoryCollection } from "../worlddock/api";
 import { getCommunityRepository, listCommunityRepositoryAssets } from "../worlddock/api";
 import { Icon } from "../worlddock/components";
+import { ReportDialog } from "./report-dialog";
 
 type RepositoryDetailPageProps = {
   repository: CommunityRepository;
@@ -11,7 +12,7 @@ type RepositoryDetailPageProps = {
   onBack: () => void;
   onStar: () => void;
   onFork: () => void;
-  onReport: () => void;
+  onReport: (input: ReportRepositoryInput) => Promise<void> | void;
   onOpenCreator: (handle: string) => void;
   onToggleCollection: (repository: CommunityRepository) => void;
 };
@@ -102,7 +103,11 @@ export function RepositoryDetailPage({
         ))}
         <div className="flex" />
         <button className="sb-btn" onClick={() => onOpenCreator(repository.owner)}><Icon name="community" size={11} /><span>创作者</span></button>
-        <button className="sb-btn" onClick={onReport}><Icon name="flag" size={11} /><span>举报</span></button>
+        <ReportDialog
+          targetLabel={`${repository.owner}/${repository.slug}`}
+          onSubmit={onReport}
+          trigger={<button className="sb-btn" type="button"><Icon name="flag" size={11} /><span>举报</span></button>}
+        />
       </div>
 
       <div

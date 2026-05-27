@@ -17,7 +17,10 @@ test("visitor can browse, star, fork, view releases, and report a repository", a
   await expect(page.locator("main").getByText("v1.2.0", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: /举报/ }).click();
-  await expect(page.getByText(/举报已提交/)).toBeVisible();
+  await page.getByLabel("举报说明").fill("这个仓库需要人工复核。");
+  await page.getByRole("button", { name: "提交举报" }).click();
+  await expect(page.getByText("Alpha 团队会人工处理")).toBeVisible();
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Fork", exact: true }).click();
   await expect(page.getByText(/Fork 成功/)).toBeVisible();

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import type { CommunityCreator, CommunityRepository } from "../worlddock/api";
-import { getCommunityCreator, listCommunityCreatorRepositories } from "../worlddock/api";
+import { getCommunityCreator, listCommunityCreatorRepositories, reportCreatorProfile } from "../worlddock/api";
 import { Icon } from "../worlddock/components";
+import { ReportDialog } from "./report-dialog";
 
 type CreatorProfilePageProps = {
   handle: string;
@@ -31,7 +32,16 @@ export function CreatorProfilePage({ handle, sessionToken, onBack, onOpenReposit
           <h1>{creator?.displayName ?? handle}</h1>
           <div className="sub">{creator?.bio ?? "公开创作者主页"}</div>
         </div>
-        <button className="btn ghost" onClick={onBack}>返回 Explore</button>
+        <div className="row gap-2">
+          <ReportDialog
+            targetLabel={`@${handle}`}
+            onSubmit={async (input) => {
+              await reportCreatorProfile(handle, input, { sessionToken });
+            }}
+            trigger={<button className="btn" type="button"><Icon name="flag" size={12} /><span>举报</span></button>}
+          />
+          <button className="btn ghost" onClick={onBack}>返回 Explore</button>
+        </div>
       </div>
 
       <div style={{ padding: "20px 32px 40px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(220px, 280px)", gap: 18 }} className="community-detail-grid">

@@ -486,19 +486,23 @@ model OutboxEvent {
 
 model Report {
   id           String           @id @default(cuid())
-  repositoryId String
+  repositoryId String?
   reporterId   String
+  targetType   String           @default("repository")
+  targetId     String
   reason       String
   detail       String?
   status       String           @default("open")
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
-  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository   PublicRepository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   reporter     User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
   actions      ModerationAction[]
 
   @@index([repositoryId, status])
   @@index([reporterId])
+  @@index([targetType, targetId, status])
+  @@index([reporterId, targetType, targetId, createdAt])
   @@index([status, createdAt])
   @@map("reports")
 }

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
 import { configureApiApp } from "../src/configure-api-app";
 import { AUTH_REPOSITORY, hashToken, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import { ModerationService } from "../src/modules/moderation/moderation.service";
 import { MODERATION_REPOSITORY, type ModerationActionRecord, type ModerationRepository, type ReportRecord } from "../src/modules/moderation/moderation.repository";
 import { OUTBOX_REPOSITORY, type OutboxEventRecord, type OutboxRepository } from "../src/modules/outbox/outbox.repository";
 import {
@@ -315,13 +316,15 @@ describe("repository publish endpoints", () => {
     expect(search.body.repositories[0].slug).toBe("searchable-archive");
   });
 
-  it("lets users report repositories and lets admins remove them", async () => {
+  it("lets users report repositories and keeps manual moderation off admin HTTP routes", async () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const repositories = createInMemoryRepositoryRepository();
     const outbox = createInMemoryOutboxRepository();
     const moderation = createInMemoryModerationRepository();
     addSession(auth, "session_user_1", "user_1", "ren");
+    addSession(auth, "session_user_2", "user_2", "lin");
+    addSession(auth, "session_user_3", "user_3", "kai");
     addSession(auth, "session_admin", "admin_1", "admin", "admin");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -346,36 +349,42 @@ describe("repository publish endpoints", () => {
       .set("authorization", "Bearer session_user_1")
       .send({ reason: "other", detail: "请管理员复核。" })
       .expect(201);
-    expect(report.body.report).toMatchObject({ repositoryId: publish.body.repository.id, status: "open" });
-    await request(app.getHttpServer())
+    expect(report.body.report).toMatchObject({ repositoryId: publish.body.repository.id, targetType: "repository", status: "open" });
+    const duplicate = await request(app.getHttpServer())
       .post(`/v1/repositories/${publish.body.repository.id}/reports`)
       .set("authorization", "Bearer session_user_1")
+      .send({ reason: "spam", detail: "同一天重复举报测试。" })
+      .expect(201);
+    expect(duplicate.body.report.id).toBe(report.body.report.id);
+    await request(app.getHttpServer())
+      .post(`/v1/repositories/${publish.body.repository.id}/reports`)
+      .set("authorization", "Bearer session_user_2")
       .send({ reason: "spam", detail: "重复举报阈值测试 1。" })
       .expect(201);
     await request(app.getHttpServer())
       .post(`/v1/repositories/${publish.body.repository.id}/reports`)
-      .set("authorization", "Bearer session_user_1")
+      .set("authorization", "Bearer session_user_3")
       .send({ reason: "abuse", detail: "重复举报阈值测试 2。" })
       .expect(201);
     expect(outbox.events.filter((event) => event.type === "repository.moderation_scan_requested")).toHaveLength(2);
 
     await request(app.getHttpServer())
       .get("/v1/admin/reports")
-      .set("authorization", "Bearer session_user_1")
-      .expect(403);
-
-    const list = await request(app.getHttpServer())
-      .get("/v1/admin/reports")
       .set("authorization", "Bearer session_admin")
-      .expect(200);
-    expect(list.body.reports[0]).toMatchObject({ id: report.body.report.id, repositoryId: publish.body.repository.id });
+      .expect(404);
 
-    const action = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post(`/v1/admin/reports/${report.body.report.id}/actions`)
       .set("authorization", "Bearer session_admin")
       .send({ action: "remove", reason: "违反社区规范。" })
-      .expect(201);
-    expect(action.body.action).toMatchObject({
+      .expect(404);
+
+    const action = await app.get(ModerationService).moderateReport({
+      kind: "session",
+      user: { id: "admin_1", email: "admin_1@example.com", name: "admin", role: "admin" },
+      sessionToken: "operator",
+    }, report.body.report.id, { action: "remove", reason: "违反社区规范。" });
+    expect(action.action).toMatchObject({
       moderatorId: "admin_1",
       previousStatus: "visible",
       nextStatus: "removed",
@@ -881,6 +890,14 @@ function createInMemoryModerationRepository() {
       reports.push(report);
       return report;
     },
+    async findReportByReporterTargetOnDay(input: { reporterId: string; targetType: ReportRecord["targetType"]; targetId: string; dayStart: Date; dayEnd: Date }) {
+      return reports.find((report) =>
+        report.reporterId === input.reporterId &&
+        report.targetType === input.targetType &&
+        report.targetId === input.targetId &&
+        report.createdAt >= input.dayStart &&
+        report.createdAt < input.dayEnd) ?? null;
+    },
     async listReports(status?: ReportRecord["status"]) {
       return reports.filter((report) => !status || report.status === status);
     },
@@ -896,6 +913,9 @@ function createInMemoryModerationRepository() {
     },
     async countOpenReports(repositoryId: string) {
       return reports.filter((report) => report.repositoryId === repositoryId && report.status === "open").length;
+    },
+    async countOpenReportsForTarget(targetType: ReportRecord["targetType"], targetId: string) {
+      return reports.filter((report) => report.targetType === targetType && report.targetId === targetId && report.status === "open").length;
     },
     async createAction(input: Omit<ModerationActionRecord, "id" | "createdAt">) {
       const action = { id: `mod_${actions.length + 1}`, createdAt: new Date(), ...input };
