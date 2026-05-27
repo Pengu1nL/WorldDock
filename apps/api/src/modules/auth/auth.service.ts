@@ -1,8 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 import { hashPassword as betterAuthHashPassword, verifyPassword as betterAuthVerifyPassword } from "better-auth/crypto";
+import { alphaPersonalAccessTokenScopes } from "@worlddock/domain/developer-access";
 
-export const ACCESS_TOKEN_SCOPES = ["world:read", "world:write", "repository:push"] as const;
+export const ACCESS_TOKEN_SCOPES = [...alphaPersonalAccessTokenScopes, "repository:push"] as const;
 export type AccessTokenScope = typeof ACCESS_TOKEN_SCOPES[number];
 
 export const AUTH_REPOSITORY = Symbol("AUTH_REPOSITORY");

@@ -19,25 +19,25 @@ export class BillingController {
   ) {}
 
   @Get("balance")
-  @RequireScopes("world:read")
+  @RequireScopes("billing:read")
   async balance(@CurrentSubject() subject: AuthSubject) {
     return { balance: await this.billing.getBalance(subject.user.id) };
   }
 
   @Get("usage")
-  @RequireScopes("world:read")
+  @RequireScopes("billing:read")
   async usage(@CurrentSubject() subject: AuthSubject) {
     return { usage: await this.billing.getUsage(subject.user.id) };
   }
 
   @Get("entitlements")
-  @RequireScopes("world:read")
+  @RequireScopes("billing:read")
   async entitlementsStatus() {
     return { entitlements: this.entitlements.getAlphaEntitlements() };
   }
 
   @Post("placeholder-intents")
-  @RequireScopes("world:read")
+  @RequireScopes("billing:read")
   async placeholderIntent(@CurrentSubject() subject: AuthSubject, @Body() body: unknown) {
     const input = placeholderIntentSchema.parse(body);
     return { intent: await this.billing.capturePlaceholderIntent(subject.user.id, input.plan) };

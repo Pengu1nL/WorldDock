@@ -2616,7 +2616,7 @@ Expected: API exposes queue health, failed queues raise Sentry events, release c
 - Test: `apps/api/test/public-api.integration-spec.ts`
 - Test: `packages/worlddock-cli/test/cli.test.ts`
 
-- [ ] **Task 1: 定义个人访问令牌 scope**
+- [x] **Task 1: 定义个人访问令牌 scope**
 
 Personal access token scopes:
 
@@ -2627,7 +2627,7 @@ repository:read
 billing:read
 ```
 
-- [ ] **Task 2: CLI 最小能力**
+- [x] **Task 2: CLI 最小能力**
 
 CLI commands:
 
@@ -2639,7 +2639,7 @@ worlddock worlds import ./memory-market.worlddock.json
 worlddock repositories pull ren/memory-market
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

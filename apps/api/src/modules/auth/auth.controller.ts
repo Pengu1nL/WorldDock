@@ -2,11 +2,11 @@ import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post
 import { z } from "zod";
 import { CurrentSubject } from "./auth.decorators";
 import { WorldDockAuthGuard } from "./auth.guard";
-import { AuthService, type AuthSubject } from "./auth.service";
+import { ACCESS_TOKEN_SCOPES, AuthService, type AuthSubject } from "./auth.service";
 
 const createAccessTokenSchema = z.object({
   name: z.string().min(1).max(80),
-  scopes: z.array(z.enum(["world:read", "world:write", "repository:push"])).min(1),
+  scopes: z.array(z.enum(ACCESS_TOKEN_SCOPES)).min(1),
   expiresAt: z.string().datetime().optional(),
 });
 

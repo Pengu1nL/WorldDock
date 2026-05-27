@@ -2,6 +2,7 @@ export * from "./assets";
 export * from "./agent";
 export * from "./api";
 export * from "./billing";
+export * from "./developer-access";
 export * from "./moderation";
 export * from "./notifications";
 export * from "./repository";

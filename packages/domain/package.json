@@ -10,6 +10,7 @@
     "./agent/pi": "./src/agent/pi.ts",
     "./api": "./src/api/index.ts",
     "./billing": "./src/billing/index.ts",
+    "./developer-access": "./src/developer-access/index.ts",
     "./repository": "./src/repository/index.ts",
     "./releases": "./src/releases/index.ts",
     "./world": "./src/world/index.ts"
