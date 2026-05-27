@@ -35,7 +35,14 @@ function findCachedChromiumHeadlessShell() {
 export default defineConfig({
   testDir: "./tests/e2e",
   workers: 1,
+  webServer: {
+    command: "PORT=3100 pnpm start",
+    url: "http://127.0.0.1:3100",
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
   use: {
+    baseURL: "http://127.0.0.1:3100",
     trace: "on-first-retry",
   },
   projects: [
