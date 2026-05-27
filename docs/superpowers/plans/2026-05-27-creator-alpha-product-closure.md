@@ -2556,7 +2556,7 @@ Expected: landing page explains the Alpha, pricing page uses non-payment Alpha c
 - Test: `apps/api/test/worker-health.integration-spec.ts`
 - Test: `apps/worker/test/queue-dashboard.test.ts`
 
-- [ ] **Task 1: Worker 队列健康快照**
+- [x] **Task 1: Worker 队列健康快照**
 
 Create `apps/worker/src/queue-dashboard.ts`:
 
@@ -2579,7 +2579,7 @@ export function classifyQueueHealth(queue: QueueHealth) {
 }
 ```
 
-- [ ] **Task 2: 发布 checklist 可执行化**
+- [x] **Task 2: 发布 checklist 可执行化**
 
 Modify `docs/operations/production_release_checklist.md` so each item has owner, evidence, and command:
 
@@ -2590,7 +2590,7 @@ Modify `docs/operations/production_release_checklist.md` so each item has owner,
   - Command: `pnpm lint`
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

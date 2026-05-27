@@ -1,20 +1,78 @@
 # 生产发布 Checklist
 
 - [ ] `pnpm lint`
+  - Owner: release driver
+  - Evidence: CI run URL or local command output timestamp
+  - Command: `pnpm lint`
 - [ ] `pnpm test`
+  - Owner: release driver
+  - Evidence: CI run URL or local command output timestamp
+  - Command: `pnpm test`
 - [ ] `pnpm build`
-- [ ] `pnpm --filter @worlddock/api test:integration`
-- [ ] `pnpm --filter @worlddock/web test:e2e`
+  - Owner: release driver
+  - Evidence: CI run URL or local command output timestamp
+  - Command: `pnpm build`
+- [ ] API integration tests
+  - Owner: API owner
+  - Evidence: CI run URL or local command output timestamp
+  - Command: `pnpm --filter @worlddock/api test:integration`
+- [ ] Web E2E tests
+  - Owner: web owner
+  - Evidence: CI run URL or local command output timestamp
+  - Command: `pnpm --filter @worlddock/web test:e2e`
 - [ ] GitHub Actions `ci` 工作流在目标提交上通过
+  - Owner: release driver
+  - Evidence: GitHub Actions run URL
+  - Command: `gh run list --workflow ci --limit 5`
 - [ ] API、Web、Worker 镜像已构建并记录 tag
+  - Owner: infrastructure owner
+  - Evidence: image registry URL and immutable image tags
+  - Command: `docker image inspect <image-tag>`
 - [ ] 数据库备份完成且 checksum 已记录
+  - Owner: database owner
+  - Evidence: backup object URL and checksum
+  - Command: `shasum -a 256 <backup-file>`
 - [ ] migration 已在 staging 运行
-- [ ] staging 冒烟：创作、Agent、发布、搜索、Fork、举报、对象存储 signed URL
+  - Owner: database owner
+  - Evidence: staging migration log URL
+  - Command: `pnpm --filter @worlddock/db prisma:migrate:deploy`
+- [ ] staging 冒烟：创作、Agent、发布、搜索、Fork、举报、对象存储 signed URL、导入导出、通知
+  - Owner: release driver
+  - Evidence: staging smoke ticket with screenshots or command output timestamp
+  - Command: `pnpm --filter @worlddock/web test:e2e`
+- [ ] Worker 队列健康快照为 healthy
+  - Owner: worker owner
+  - Evidence: `/v1/system/worker-health` response with request id and timestamp
+  - Command: `curl -fsS "$API_BASE_URL/v1/system/worker-health"`
 - [ ] `WORLD_DOCK_EDITION=cloud`、`APP_ENV=production`、`AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY` 已配置
+  - Owner: infrastructure owner
+  - Evidence: redacted environment inventory
+  - Command: `printenv | rg 'WORLD_DOCK_EDITION|APP_ENV|AI_PROVIDER|PI_MODEL_PROVIDER|PI_MODEL_ID|PI_PROVIDER_API_KEY'`
 - [ ] `NEXT_PUBLIC_WORLD_DOCK_FIXTURES` 未在生产环境启用
+  - Owner: web owner
+  - Evidence: production env inventory
+  - Command: `test -z "$NEXT_PUBLIC_WORLD_DOCK_FIXTURES"`
 - [ ] `SENTRY_DSN`、`TRUSTED_ORIGINS`、`API_RATE_LIMIT_MAX`、`API_BODY_LIMIT_BYTES`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL` 已配置
+  - Owner: infrastructure owner
+  - Evidence: redacted environment inventory
+  - Command: `printenv | rg 'SENTRY_DSN|TRUSTED_ORIGINS|API_RATE_LIMIT_MAX|API_BODY_LIMIT_BYTES|BETTER_AUTH_SECRET|BETTER_AUTH_URL'`
 - [ ] `docs/product/cloud-release-scope.md`、`docs/product/cloud-api-contract.md`、`docs/product/local-deployment-later.md` 已按本次发布复核
+  - Owner: product owner
+  - Evidence: release ticket comment with reviewed document links
+  - Command: `git diff --name-only origin/main...HEAD -- docs/product`
 - [ ] 生产 secrets 未出现在日志、提交历史或工单中
+  - Owner: security owner
+  - Evidence: secret scan URL or local scan timestamp
+  - Command: `git log --format=%H | head -20`
 - [ ] Worker 队列和失败告警可见
-- [ ] `docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md` 已按本次发布复核
+  - Owner: worker owner
+  - Evidence: Sentry project link and queue snapshot response
+  - Command: `curl -fsS "$API_BASE_URL/v1/system/worker-health"`
+- [ ] `docs/operations/incident_runbook.md`、`docs/operations/queue_runbook.md`、`docs/operations/worker_alerts.md` 已按本次发布复核
+  - Owner: operations owner
+  - Evidence: release ticket comment with reviewed runbook links
+  - Command: `git diff --name-only origin/main...HEAD -- docs/operations`
 - [ ] 发布后 30 分钟观察窗口有人值守
+  - Owner: release driver
+  - Evidence: on-call handoff note with owner and time window
+  - Command: `date -u`
