@@ -6,6 +6,7 @@ import { AgentModule } from "./modules/agent/agent.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { CommunityModule } from "./modules/community/community.module";
+import { ExportsModule } from "./modules/exports/exports.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
 import { ReleasesModule } from "./modules/releases/releases.module";
 import { RepositoryModule } from "./modules/repositories/repository.module";
@@ -15,7 +16,7 @@ import { WorldAssetsModule } from "./modules/world-assets/world-assets.module";
 import { WorldsModule } from "./modules/worlds/worlds.module";
 
 @Module({
-  imports: [AccountModule, AgentModule, AuthModule, BillingModule, CommunityModule, ModerationModule, ReleasesModule, RepositoryModule, StorageModule, SystemModule, WorldAssetsModule, WorldsModule],
+  imports: [AccountModule, AgentModule, AuthModule, BillingModule, CommunityModule, ExportsModule, ModerationModule, ReleasesModule, RepositoryModule, StorageModule, SystemModule, WorldAssetsModule, WorldsModule],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

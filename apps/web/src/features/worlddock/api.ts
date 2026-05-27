@@ -1,4 +1,4 @@
-import type { PublicRepository, WorldAsset, WorldAssetKind } from "@worlddock/domain";
+import type { PublicRepository, WorldAsset, WorldAssetKind, WorldPackage } from "@worlddock/domain";
 
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
 
@@ -242,6 +242,13 @@ export type RepositoryCollection = {
   createdAt: string;
 };
 
+export type ExportSummary = {
+  id: string;
+  kind: "world" | "account";
+  status: "ready";
+  createdAt: string;
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -337,6 +344,67 @@ export async function deleteWorld(worldId: string, options: ApiClientOptions) {
     sessionToken: options.sessionToken,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
+  });
+}
+
+export async function exportWorldPackage(worldId: string, options: ApiClientOptions): Promise<{ export: ExportSummary }> {
+  return requestJson(`/v1/worlds/${worldId}/export`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getWorldExport(exportId: string, options: ApiClientOptions): Promise<{ export: ExportSummary; package: WorldPackage }> {
+  return requestJson(`/v1/exports/${exportId}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function importWorldPackage(input: WorldPackage, options: ApiClientOptions) {
+  return requestJson("/v1/worlds/import", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: { package: input },
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function requestAccountDataExport(options: ApiClientOptions): Promise<{ export: ExportSummary }> {
+  return requestJson("/v1/account/data-export", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getAccountDataExport(exportId: string, options: ApiClientOptions): Promise<{ export: ExportSummary; data: unknown }> {
+  return requestJson(`/v1/account/data-export/${exportId}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function deleteAccount(options: ApiClientOptions) {
+  return requestJson("/v1/account", {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
   });
 }
 

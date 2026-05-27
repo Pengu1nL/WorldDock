@@ -2320,7 +2320,7 @@ Expected: users can submit reports, duplicate reports are idempotent, no admin U
 - Test: `apps/api/test/exports.integration-spec.ts`
 - Test: `apps/web/tests/e2e/import-export.spec.ts`
 
-- [ ] **Task 1: 设计世界包格式**
+- [x] **Task 1: 设计世界包格式**
 
 Create `packages/domain/src/worlds/world-package.ts`:
 
@@ -2352,7 +2352,7 @@ export const worldPackageSchema = z.object({
 });
 ```
 
-- [ ] **Task 2: 增加导入导出 API**
+- [x] **Task 2: 增加导入导出 API**
 
 APIs:
 
@@ -2364,7 +2364,7 @@ POST /v1/account/data-export
 GET  /v1/account/data-export/:exportId
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

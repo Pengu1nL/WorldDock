@@ -7,3 +7,4 @@ export * from "./repository";
 export * from "./releases";
 export * from "./storage";
 export * from "./world";
+export * from "./worlds/world-package";

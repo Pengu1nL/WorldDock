@@ -14,6 +14,7 @@ const allowedMimeTypes = new Set([
   "image/webp",
   "application/json",
   "application/zip",
+  "application/vnd.worlddock.world-package+json",
   "text/plain",
 ]);
 

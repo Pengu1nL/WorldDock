@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
+import { DataRightsPage } from "../account/data-rights-page";
 import { BillingPage } from "../billing/billing-page";
+import { ImportExportPanel } from "../worlds/import-export-panel";
 import {
   captureBillingPlaceholderIntent,
   createAccessToken,
@@ -16,6 +18,7 @@ type SettingsViewProps = {
   mode: WorldMode;
   balance: number;
   communityConnected: boolean;
+  currentWorld?: { id: string; name: string } | null;
   onBack: () => void;
   onToast: (toast: { kind: "save" | "warn" | "info"; text: string }) => void;
   onCommunityConnected: (connected: boolean) => void;
@@ -25,6 +28,7 @@ export function SettingsView({
   mode,
   balance,
   communityConnected,
+  currentWorld,
   onBack,
   onToast,
   onCommunityConnected,
@@ -260,10 +264,15 @@ export function SettingsView({
           </section>
         )}
         {tab === "data" && (
-          <section className="card" style={{ padding: 18 }}>
+          <section style={{ display: "grid", gap: 18 }}>
+            <div className="card" style={{ padding: 18 }}>
             <h2 className="title-font" style={{ marginTop: 0 }}>导入导出</h2>
-            <button className="btn"><Icon name="download" size={12} /><span>导出世界包</span></button>
-            <button className="btn" style={{ marginLeft: 8 }}><Icon name="upload" size={12} /><span>导入世界包</span></button>
+              <ImportExportPanel world={currentWorld} sessionToken={sessionToken()} onToast={onToast} />
+            </div>
+            <div className="card" style={{ padding: 18 }}>
+              <h2 className="title-font" style={{ marginTop: 0 }}>数据权利</h2>
+              <DataRightsPage sessionToken={sessionToken()} onToast={onToast} />
+            </div>
           </section>
         )}
       </div>

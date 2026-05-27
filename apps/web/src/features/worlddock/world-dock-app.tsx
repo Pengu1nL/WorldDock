@@ -790,6 +790,7 @@ function WorldDockRuntime() {
               mode={t.mode}
               balance={balance}
               communityConnected={communityConnected}
+              currentWorld={currentWorld}
               onBack={() => setView("worlds")}
               onToast={pushToast}
               onCommunityConnected={setCommunityConnected}
