@@ -587,7 +587,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
@@ -615,7 +615,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
@@ -643,7 +643,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
@@ -663,7 +663,7 @@ CMD ["pnpm", "--filter", "@worlddock/worker", "exec", "tsx", "src/main.ts"]
 Run:
 
 ```bash
-node -e 'const fs = require("node:fs"); const expectations = new Map([["apps/api/Dockerfile", ["@worlddock/api", "corepack prepare pnpm@10.33.0 --activate", "tsx", "CMD"]], ["apps/web/Dockerfile", ["@worlddock/web", "corepack prepare pnpm@10.33.0 --activate", "CMD [\"pnpm\", \"--filter\", \"@worlddock/web\", \"start\"]"]], ["apps/worker/Dockerfile", ["@worlddock/worker", "corepack prepare pnpm@10.33.0 --activate", "tsx", "CMD"]]]); for (const [file, tokens] of expectations) { const text = fs.readFileSync(file, "utf8"); for (const token of ["node:24-alpine", "pnpm install --frozen-lockfile", "pnpm build", ...tokens]) { if (!text.includes(token)) throw new Error(`${file} missing ${token}`); } } if (!fs.existsSync(".dockerignore")) throw new Error("missing .dockerignore"); const ignore = fs.readFileSync(".dockerignore", "utf8"); for (const token of ["node_modules", "**/node_modules", "**/.next", "**/dist", "!.env.example"]) { if (!ignore.includes(token)) throw new Error(`.dockerignore missing ${token}`); }'
+node -e 'const fs = require("node:fs"); const expectations = new Map([["apps/api/Dockerfile", ["@worlddock/api", "corepack prepare pnpm@10.33.0 --activate", "tsconfig.base.json", "tsx", "CMD"]], ["apps/web/Dockerfile", ["@worlddock/web", "corepack prepare pnpm@10.33.0 --activate", "tsconfig.base.json", "CMD [\"pnpm\", \"--filter\", \"@worlddock/web\", \"start\"]"]], ["apps/worker/Dockerfile", ["@worlddock/worker", "corepack prepare pnpm@10.33.0 --activate", "tsconfig.base.json", "tsx", "CMD"]]]); for (const [file, tokens] of expectations) { const text = fs.readFileSync(file, "utf8"); for (const token of ["node:24-alpine", "pnpm install --frozen-lockfile", "pnpm build", ...tokens]) { if (!text.includes(token)) throw new Error(`${file} missing ${token}`); } } if (!fs.existsSync(".dockerignore")) throw new Error("missing .dockerignore"); const ignore = fs.readFileSync(".dockerignore", "utf8"); for (const token of ["node_modules", "**/node_modules", "**/.next", "**/dist", "!.env.example"]) { if (!ignore.includes(token)) throw new Error(`.dockerignore missing ${token}`); }'
 ```
 
 Expected: PASS with no output.

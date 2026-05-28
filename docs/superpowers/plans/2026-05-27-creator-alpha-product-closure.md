@@ -211,7 +211,7 @@ Post-Cloud 本地部署版独立计划
 - Modify: `docs/operations/production_release_checklist.md`
 - Test: `apps/api/test/system.integration-spec.ts`
 
-- [ ] **Task 1: 增加 CI 工作流**
+- [x] **Task 1: 增加 CI 工作流**
 
 Create `.github/workflows/ci.yml`:
 
@@ -247,7 +247,7 @@ jobs:
       - run: pnpm --filter @worlddock/web test:e2e
 ```
 
-- [ ] **Task 2: 移除生产静态导出假设**
+- [x] **Task 2: 移除生产静态导出假设**
 
 Modify `apps/web/next.config.ts` so production can use authenticated routes and server features:
 
@@ -261,7 +261,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Task 3: 强化环境校验**
+- [x] **Task 3: 强化环境校验**
 
 Modify `packages/config/src/env.ts` so production rejects mock model and weak auth secrets:
 
@@ -323,7 +323,7 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
 }
 ```
 
-- [ ] **Task 4: 增加 Docker 镜像入口**
+- [x] **Task 4: 增加 Docker 镜像入口**
 
 Create `apps/api/Dockerfile`, `apps/web/Dockerfile`, and `apps/worker/Dockerfile` with the same build pattern:
 
@@ -359,7 +359,7 @@ For `apps/worker/Dockerfile`, change the final `CMD` to:
 CMD ["pnpm", "--filter", "@worlddock/worker", "start"]
 ```
 
-- [ ] **Task 5: Run verification**
+- [x] **Task 5: Run verification**
 
 Run:
 
