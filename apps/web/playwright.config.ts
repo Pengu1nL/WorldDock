@@ -4,6 +4,8 @@ import { defineConfig, devices } from "playwright/test";
 
 const chromiumExecutablePath =
   process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || findCachedChromiumHeadlessShell();
+const webPort = process.env.PLAYWRIGHT_WEB_PORT ?? "3107";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${webPort}`;
 const chromiumLaunchOptions = chromiumExecutablePath
   ? {
       launchOptions: {
@@ -35,7 +37,14 @@ function findCachedChromiumHeadlessShell() {
 export default defineConfig({
   testDir: "./tests/e2e",
   workers: 1,
+  webServer: {
+    command: `pnpm exec next start --hostname 127.0.0.1 --port ${webPort}`,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
   use: {
+    baseURL,
     trace: "on-first-retry",
   },
   projects: [

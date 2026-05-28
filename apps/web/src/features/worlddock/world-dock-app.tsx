@@ -524,7 +524,7 @@ function WorldDockRuntime() {
               })()}
               onSend={(text: string) => {
                 setMessages((prev: any[]) => [...prev, { id: "u_" + Date.now(), role: "user", text }]);
-                setTimeout(() => startAgentRun(text, false), 200);
+                setTimeout(() => startAgentRun(text), 200);
               }}
               onStop={stopAgent}
               onSave={handleSave}

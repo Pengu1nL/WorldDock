@@ -5,9 +5,7 @@ test("creator can create a world, switch agent mode, and save suggestions", asyn
   await gotoApp(page);
   await page.getByRole("button", { name: /新建世界/ }).click();
   await page.getByLabel(/初始灵感/).fill("一个世界里，记忆可以被买卖。");
-  await page.getByRole("button", { name: /开始推演/ }).click();
-  await expect(page.getByText("雏形已生成")).toBeVisible();
-  await page.getByRole("button", { name: /确认并进入工作台/ }).click();
+  await page.getByRole("button", { name: /创建并进入工作台/ }).click();
 
   await expect(page.getByText("可保存设定")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: /扩展/ })).toBeVisible();
@@ -17,7 +15,7 @@ test("creator can create a world, switch agent mode, and save suggestions", asyn
   await page.getByRole("button", { name: /发送/ }).click();
   await expect(page.getByText(/Agent · 挑刺/)).toBeVisible();
 
-  await page.getByRole("button", { name: "保存 《记忆交易法》" }).click();
+  await page.getByRole("button", { name: "保存 《记忆交易法》" }).first().click();
   await expect(page.getByText(/已保存到档案/)).toBeVisible();
   await page.getByRole("button", { name: /档案/ }).click();
   await expect(page.locator("main").getByText("《记忆交易法》", { exact: true })).toBeVisible();

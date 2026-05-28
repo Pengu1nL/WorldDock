@@ -9,9 +9,9 @@ test("user can inspect billing, model, and community connection states", async (
   await expect(page.getByText("当前余额")).toBeVisible();
 
   await page.getByRole("button", { name: "模型" }).click();
-  await expect(page.getByLabel("MODEL_BASE_URL")).toBeVisible();
-  await page.getByRole("button", { name: /测试连接/ }).click();
-  await expect(page.getByText("模型连接正常", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("OPENAI_BASE_URL")).toBeVisible();
+  await page.getByRole("button", { name: /验证方式/ }).click();
+  await expect(page.getByText("请通过一次真实 Agent Run 验证模型连接", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "社区连接" }).click();
   await page.getByLabel("Access Token").fill("wd_mock_token");
