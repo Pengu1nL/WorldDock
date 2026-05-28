@@ -18,6 +18,7 @@ import {
   listStorySeeds,
   listWorlds,
   publishWorld,
+  readStoredSessionToken,
   saveAgentSuggestion,
   streamAgentEvents,
   WorldDockApiError,
@@ -100,7 +101,7 @@ function WorldDockRuntime() {
   const worldStatesRef = useRef<any>({});
 
   useEffect(() => {
-    setSessionToken(window.localStorage.getItem("worlddock.sessionToken") ?? "");
+    setSessionToken(readStoredSessionToken());
   }, []);
 
   const worldsQuery = useQuery({

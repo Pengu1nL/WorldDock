@@ -9,26 +9,29 @@ type FixtureEnvironment = {
   NEXT_PUBLIC_WORLD_DOCK_FIXTURES?: string;
 };
 
+type SessionTokenReader = Pick<Storage, "getItem">;
+type SessionTokenWriter = Pick<Storage, "setItem">;
+type SessionTokenRemover = Pick<Storage, "removeItem">;
 type SessionTokenStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 export function canUseFixtures(env: FixtureEnvironment = process.env) {
   return env.NODE_ENV !== "production" && env.NEXT_PUBLIC_WORLD_DOCK_FIXTURES === "1";
 }
 
-export function readStoredSessionToken(storage: SessionTokenStorage | null = getBrowserSessionStorage()) {
+export function readStoredSessionToken(storage: SessionTokenReader | null = getBrowserSessionStorage()) {
   return storage?.getItem(WORLD_DOCK_SESSION_TOKEN_KEY) ?? "";
 }
 
 export function writeStoredSessionToken(
   token: string,
-  storage: SessionTokenStorage | null = getBrowserSessionStorage(),
+  storage: SessionTokenWriter | null = getBrowserSessionStorage(),
 ) {
   const normalized = token.trim();
   if (!normalized) return;
   storage?.setItem(WORLD_DOCK_SESSION_TOKEN_KEY, normalized);
 }
 
-export function clearStoredSessionToken(storage: SessionTokenStorage | null = getBrowserSessionStorage()) {
+export function clearStoredSessionToken(storage: SessionTokenRemover | null = getBrowserSessionStorage()) {
   storage?.removeItem(WORLD_DOCK_SESSION_TOKEN_KEY);
 }
 

@@ -4,6 +4,7 @@ import {
   addRepositoryToCollection,
   forkRepository,
   listCommunityRepositories,
+  readStoredSessionToken,
   removeRepositoryFromCollection,
   reportRepository,
   starRepository,
@@ -42,9 +43,7 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
   const [loading, setLoading] = useState(false);
   const [collections, setCollections] = useState<SavedCollection[]>([]);
 
-  const sessionToken = useCallback(() => typeof window === "undefined"
-    ? ""
-    : window.localStorage.getItem("worlddock.sessionToken") ?? "", []);
+  const sessionToken = useCallback(() => readStoredSessionToken(), []);
 
   const currentCollection = useMemo(() => {
     if (!activeRepository) return undefined;

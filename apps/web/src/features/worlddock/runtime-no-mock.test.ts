@@ -33,13 +33,17 @@ describe("WorldDock production runtime", () => {
   });
 
   it("keeps direct browser session token storage access inside the shared API helper", () => {
+    const sessionTokenKey = "worlddock.sessionToken";
+
     for (const file of sessionBoundaryFiles) {
       const source = readFileSync(file, "utf8");
 
-      expect(source).not.toContain('localStorage.getItem("worlddock.sessionToken")');
-      expect(source).not.toContain('localStorage.setItem("worlddock.sessionToken"');
-      expect(source).not.toContain("localStorage.getItem('worlddock.sessionToken')");
-      expect(source).not.toContain("localStorage.setItem('worlddock.sessionToken'");
+      expect(source).not.toContain(`localStorage.getItem("${sessionTokenKey}")`);
+      expect(source).not.toContain(`localStorage.setItem("${sessionTokenKey}"`);
+      expect(source).not.toContain(`localStorage.removeItem("${sessionTokenKey}")`);
+      expect(source).not.toContain(`localStorage.getItem('${sessionTokenKey}')`);
+      expect(source).not.toContain(`localStorage.setItem('${sessionTokenKey}'`);
+      expect(source).not.toContain(`localStorage.removeItem('${sessionTokenKey}')`);
     }
   });
 });

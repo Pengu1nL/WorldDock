@@ -8,6 +8,7 @@ import {
   createAccessToken,
   getBillingUsage,
   listAccessTokens,
+  readStoredSessionToken,
   revokeAccessToken,
   type AccessTokenSummary,
   type BillingUsage,
@@ -42,10 +43,7 @@ export function SettingsView({
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
 
-  const sessionToken = () => {
-    if (typeof window === "undefined") return "";
-    return window.localStorage.getItem("worlddock.sessionToken") ?? "";
-  };
+  const sessionToken = useCallback(() => readStoredSessionToken(), []);
 
   const refreshBilling = useCallback(async () => {
     const session = sessionToken();
@@ -60,7 +58,7 @@ export function SettingsView({
     } finally {
       setBillingBusy(false);
     }
-  }, [onToast]);
+  }, [onToast, sessionToken]);
 
   const joinBillingWaitlist = async (plan: "creator" | "studio" | "team") => {
     const session = sessionToken();

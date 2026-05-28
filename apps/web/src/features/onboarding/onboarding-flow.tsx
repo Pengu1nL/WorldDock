@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { completeOnboarding } from "../account/account-api";
+import { readStoredSessionToken } from "../worlddock/api";
 
 export const ONBOARDING_STEPS = [
   { id: "goal", title: "选择创作目标", options: ["小说世界观", "游戏设定", "TRPG 战役", "影视宇宙"] },
@@ -26,7 +27,7 @@ export function OnboardingFlow() {
       return;
     }
 
-    const token = window.localStorage.getItem("worlddock.sessionToken");
+    const token = readStoredSessionToken();
     if (!token) {
       window.location.href = "/login";
       return;

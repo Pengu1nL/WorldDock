@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { writeStoredSessionToken } from "../../../features/worlddock/api";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -26,7 +27,7 @@ export default function LoginPage() {
     }
     const token = payload.token ?? payload.session?.token;
     if (typeof token === "string") {
-      window.localStorage.setItem("worlddock.sessionToken", token);
+      writeStoredSessionToken(token);
     }
     window.location.href = "/onboarding";
   }
