@@ -6,9 +6,9 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 2 验证，Phase 2 已可标记完成。除 Phase 2 外，本记录其余 Phase 的未完成判断保持不变。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 2 与 Phase 3 验证，Phase 2、Phase 3 已可标记完成。除 Phase 2、Phase 3 外，本记录其余 Phase 的未完成判断保持不变。
 
-当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。但除已验证完成的 Phase 2 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
+当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。Phase 3 已进一步冻结 Cloud-only 范围、生产环境门禁和前端认证来源。但除已验证完成的 Phase 2、Phase 3 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
 
 ## 判定标准
 
@@ -60,19 +60,28 @@
 
 ## Phase 3: 云端部署版范围冻结和 Cloud-only 主路径
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `docs/product/cloud-release-scope.md`。
-- 缺少 `docs/product/local-deployment-later.md`。
-- 缺少 `docs/product/cloud-api-contract.md`。
-- `packages/config/src/env.ts` 缺少 `WORLD_DOCK_EDITION` schema 和 production cloud edition 门禁。
-- 前端仍手动读取 `worlddock.sessionToken`，未达到“不再依赖 Local 兜底/手动 token”的要求。
-- 缺少 `apps/web/tests/e2e/cloud-deployment-flow.spec.ts`。
+完成依据：
 
-已有但不足：
+- `docs/product/cloud-release-scope.md` 已冻结 Cloud Alpha 范围，并明确真实支付、邮件投递、邮箱验证、管理后台、模板库和 Local 部署不进入 Alpha 阻塞路径。
+- `docs/product/local-deployment-later.md` 已将 Local 部署版拆到 Cloud Alpha 之后的独立计划。
+- `docs/product/cloud-api-contract.md` 已定义 Cloud API 主路径、fixture 边界和认证状态约束。
+- `packages/config/src/env.ts` 已包含 `WORLD_DOCK_EDITION` schema，production 只允许 `WORLD_DOCK_EDITION=cloud`。
+- `apps/web/src/features/worlddock/api.ts` 已集中 `worlddock.sessionToken` 读写 helper，产品运行时不再直接读写该浏览器存储键。
+- `apps/web/src/features/worlddock/world-dock-app.tsx` 与 `apps/web/src/features/worlddock/view-worlds.tsx` 已在登录后使用云端世界列表的 loading/error/empty/ready 状态，不回退到 fixture 世界或 Local tab。
+- `apps/web/tests/e2e/cloud-deployment-flow.spec.ts` 已覆盖 authenticated cloud error 和 empty list 场景。
 
-- `apps/web/src/features/worlddock/runtime-no-mock.test.ts` 检查部分运行时文件不导入 mock fixture。
-- API client 已集中在 `apps/web/src/features/worlddock/api.ts`，但认证状态来源仍未产品化。
+验收证据：
+
+- `pnpm --filter @worlddock/config test -- env.test.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts`：通过。
+
+剩余说明：
+
+- Phase 3 不删除后续生态仍需的 Local Push 后端能力，也不实现 Local 部署版。
+- E2E 测试中仍可直接写入 `worlddock.sessionToken` 来设置测试登录态；产品运行时代码必须通过共享 helper。
 
 ## Phase 4: 云端世界 CRUD 和资产编辑器
 
@@ -265,11 +274,11 @@
 ## 建议执行顺序
 
 1. 先完成 Phase 1，移除静态导出假设，补 CI、Docker、生产 env gate 和运维 runbook。
-2. 接着完成 Phase 2，打通登录、注册、session、账户 profile 和 onboarding。
-3. 再完成 Phase 3，把 Cloud-only 范围、环境门禁和前端认证来源固定下来。
-4. 在 Phase 4 中统一 world assets，消除前端本地 CRUD。
-5. 然后推进 Phase 5 和 Phase 7，因为 Agent、账本、计费和发布验收互相依赖。
+2. Phase 2 和 Phase 3 已完成，后续保持其验收测试作为回归门禁。
+3. 在 Phase 4 中统一 world assets，消除前端本地 CRUD。
+4. 然后推进 Phase 5 和 Phase 7，因为 Agent、账本、计费和发布验收互相依赖。
+5. 再按社区、治理、导入导出、通知、官网、运维和 CLI 的依赖顺序推进后续 Phase。
 
-## 本次未执行
+## 本次执行说明
 
-本次只做静态调查和文档整理，未运行全量 `pnpm lint`、`pnpm test`、`pnpm build` 或 E2E。原因是没有发现任何整项 Task 已达到可勾选状态，运行全量验收不能改变 checkbox 判定。
+本记录最初来自静态调查和文档整理；Phase 3 收口时已补充执行定向验证，并在 `docs/superpowers/plans/2026-05-27-phase-3-cloud-only-main-path.md` 中记录完整验证命令。其余未完成 Phase 仍保持静态调查结论，尚未运行对应全量验收。

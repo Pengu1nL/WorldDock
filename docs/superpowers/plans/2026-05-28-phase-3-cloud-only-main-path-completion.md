@@ -65,7 +65,7 @@
 - 修改：`apps/web/src/features/worlddock/api.test.ts`
 - 修改：`apps/web/src/features/worlddock/runtime-no-mock.test.ts`
 
-- [ ] **步骤 1：写入失败用 helper 测试**
+- [x] **步骤 1：写入失败用 helper 测试**
 
 在 `apps/web/src/features/worlddock/api.test.ts` 中扩展 import：
 
@@ -125,7 +125,7 @@ import {
   });
 ```
 
-- [ ] **步骤 2：写入失败用运行时边界测试**
+- [x] **步骤 2：写入失败用运行时边界测试**
 
 在 `apps/web/src/features/worlddock/runtime-no-mock.test.ts` 中，用显式路径组替换当前 `runtimeFiles`：
 
@@ -169,7 +169,7 @@ const sessionBoundaryFiles = [
   });
 ```
 
-- [ ] **步骤 3：运行定向测试并确认失败**
+- [x] **步骤 3：运行定向测试并确认失败**
 
 运行：
 
@@ -179,7 +179,7 @@ pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts
 
 预期：FAIL。原因是 `clearStoredSessionToken` 和 `writeStoredSessionToken` 尚未导出，且运行时文件仍包含直接 session token 存储访问。
 
-- [ ] **步骤 4：实现存储 helper**
+- [x] **步骤 4：实现存储 helper**
 
 在 `apps/web/src/features/worlddock/api.ts` 中，把文件顶部附近的 storage type 和 helper block 改为：
 
@@ -217,7 +217,7 @@ function getBrowserSessionStorage(): SessionTokenStorage | null {
 }
 ```
 
-- [ ] **步骤 5：运行 helper 测试**
+- [x] **步骤 5：运行 helper 测试**
 
 运行：
 
@@ -237,7 +237,7 @@ pnpm --filter @worlddock/web test -- api.test.ts
 - 修改：`apps/web/src/features/worlddock/view-community.tsx`
 - 修改：`apps/web/src/features/worlddock/view-settings.tsx`
 
-- [ ] **步骤 1：更新登录页写入**
+- [x] **步骤 1：更新登录页写入**
 
 在 `apps/web/src/app/(auth)/login/page.tsx` 中加入：
 
@@ -261,7 +261,7 @@ import { writeStoredSessionToken } from "@/features/worlddock/api";
     }
 ```
 
-- [ ] **步骤 2：更新注册页写入**
+- [x] **步骤 2：更新注册页写入**
 
 在 `apps/web/src/app/(auth)/register/page.tsx` 中加入：
 
@@ -285,7 +285,7 @@ import { writeStoredSessionToken } from "@/features/worlddock/api";
     }
 ```
 
-- [ ] **步骤 3：更新 onboarding 读取**
+- [x] **步骤 3：更新 onboarding 读取**
 
 在 `apps/web/src/features/onboarding/onboarding-flow.tsx` 中加入：
 
@@ -305,7 +305,7 @@ import { readStoredSessionToken } from "../worlddock/api";
     const token = readStoredSessionToken();
 ```
 
-- [ ] **步骤 4：更新 app shell 读取**
+- [x] **步骤 4：更新 app shell 读取**
 
 在 `apps/web/src/features/worlddock/world-dock-app.tsx` 中，把 `readStoredSessionToken` 加到现有 `./api` import：
 
@@ -331,7 +331,7 @@ import { readStoredSessionToken } from "../worlddock/api";
   }, []);
 ```
 
-- [ ] **步骤 5：更新社区视图读取**
+- [x] **步骤 5：更新社区视图读取**
 
 在 `apps/web/src/features/worlddock/view-community.tsx` 中，把 `readStoredSessionToken` 加到现有 `./api` import：
 
@@ -355,7 +355,7 @@ import { readStoredSessionToken } from "../worlddock/api";
   const sessionToken = useCallback(() => readStoredSessionToken(), []);
 ```
 
-- [ ] **步骤 6：更新设置视图读取**
+- [x] **步骤 6：更新设置视图读取**
 
 在 `apps/web/src/features/worlddock/view-settings.tsx` 中，把 `readStoredSessionToken` 加到现有 `./api` import：
 
@@ -386,7 +386,7 @@ import { readStoredSessionToken } from "../worlddock/api";
   }, [onToast, sessionToken]);
 ```
 
-- [ ] **步骤 7：运行运行时边界测试**
+- [x] **步骤 7：运行运行时边界测试**
 
 运行：
 
@@ -396,7 +396,7 @@ pnpm --filter @worlddock/web test -- runtime-no-mock.test.ts
 
 预期：PASS。E2E setup code 仍允许直接读写 session token，但产品运行时文件必须通过 `api.ts`。
 
-- [ ] **步骤 8：提交 session helper 边界**
+- [x] **步骤 8：提交 session helper 边界**
 
 运行：
 
@@ -428,7 +428,7 @@ git log -1 --format=fuller
 - 仅当新增 E2E 失败时修改：`apps/web/src/features/worlddock/view-worlds.tsx`
 - 仅当新增 E2E 失败时修改：`apps/web/src/features/worlddock/world-dock-app.tsx`
 
-- [ ] **步骤 1：增加认证后空列表 E2E 覆盖**
+- [x] **步骤 1：增加认证后空列表 E2E 覆盖**
 
 把这个测试追加到 `apps/web/tests/e2e/cloud-deployment-flow.spec.ts`：
 
@@ -455,7 +455,7 @@ test("authenticated empty cloud world list hides Local paths and fixture worlds"
 });
 ```
 
-- [ ] **步骤 2：运行 cloud deployment E2E**
+- [x] **步骤 2：运行 cloud deployment E2E**
 
 运行：
 
@@ -465,7 +465,7 @@ pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts
 
 预期：任务 1 和任务 2 完成后 PASS。若因 Local tab 仍可见而失败，继续步骤 3；若已通过，跳过步骤 3，并保留该测试作为回归覆盖。
 
-- [ ] **步骤 3：必要时修复 Cloud-only 列表渲染**
+- [x] **步骤 3：必要时修复 Cloud-only 列表渲染**
 
 如果 E2E 报告 Local tab 可见，确认 `apps/web/src/features/worlddock/world-dock-app.tsx` 从认证状态传入 `cloudOnly`：
 
@@ -488,7 +488,7 @@ pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts
 
 预期：PASS。
 
-- [ ] **步骤 4：提交 E2E 覆盖**
+- [x] **步骤 4：提交 E2E 覆盖**
 
 运行：
 
@@ -506,7 +506,7 @@ git log -1 --format=fuller
 - 修改：`docs/superpowers/plans/2026-05-27-phase-3-cloud-only-main-path.md`
 - 修改：`docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **步骤 1：更新旧 Phase 3 执行记录**
+- [x] **步骤 1：更新旧 Phase 3 执行记录**
 
 把这个小节追加到 `docs/superpowers/plans/2026-05-27-phase-3-cloud-only-main-path.md`：
 
@@ -533,7 +533,7 @@ pnpm build
 ```
 ````
 
-- [ ] **步骤 2：替换 incomplete-task 记录里的 Phase 3 小节**
+- [x] **步骤 2：替换 incomplete-task 记录里的 Phase 3 小节**
 
 在 `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` 中，用以下内容替换当前 Phase 3 小节：
 
@@ -564,7 +564,7 @@ pnpm build
 - E2E 测试中仍可直接写入 `worlddock.sessionToken` 来设置测试登录态；产品运行时代码必须通过共享 helper。
 ```
 
-- [ ] **步骤 3：运行文档和源码扫描**
+- [x] **步骤 3：运行文档和源码扫描**
 
 运行：
 
@@ -575,7 +575,7 @@ rg -n 'localStorage\\.getItem\\("worlddock\\.sessionToken"\\)|localStorage\\.set
 
 预期：两个命令都没有匹配结果。
 
-- [ ] **步骤 4：运行 Phase 3 验证套件**
+- [x] **步骤 4：运行 Phase 3 验证套件**
 
 运行：
 
@@ -587,7 +587,7 @@ pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts
 
 预期：PASS。
 
-- [ ] **步骤 5：运行 workspace 验证**
+- [x] **步骤 5：运行 workspace 验证**
 
 运行：
 
@@ -599,7 +599,7 @@ pnpm build
 
 预期：PASS。
 
-- [ ] **步骤 6：提交文档收口**
+- [x] **步骤 6：提交文档收口**
 
 运行：
 
@@ -616,15 +616,15 @@ git log -1 --format=fuller
 
 ## 最终验证清单
 
-- [ ] `pnpm --filter @worlddock/config test -- env.test.ts` 通过。
-- [ ] `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts` 通过。
-- [ ] `pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts` 通过。
-- [ ] `pnpm lint` 通过。
-- [ ] `pnpm test` 通过。
-- [ ] `pnpm build` 通过。
-- [ ] `rg -n 'localStorage\\.getItem\\("worlddock\\.sessionToken"\\)|localStorage\\.setItem\\("worlddock\\.sessionToken"' apps/web/src` 没有匹配结果。
-- [ ] `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` 中的 Phase 3 写明 `完成状态：已完成。`
-- [ ] 最新提交通过 `git log -1 --format=fuller` 身份复核。
+- [x] `pnpm --filter @worlddock/config test -- env.test.ts` 通过。
+- [x] `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts` 通过。
+- [x] `pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts` 通过。
+- [x] `pnpm lint` 通过。
+- [x] `pnpm test` 通过。
+- [x] `pnpm build` 通过。
+- [x] `rg -n 'localStorage\\.getItem\\("worlddock\\.sessionToken"\\)|localStorage\\.setItem\\("worlddock\\.sessionToken"' apps/web/src` 没有匹配结果。
+- [x] `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` 中的 Phase 3 写明 `完成状态：已完成。`
+- [x] 最新提交通过 `git log -1 --format=fuller` 身份复核。
 
 ## 自检
 

@@ -66,3 +66,24 @@
 - [x] Step 6: Run `pnpm build`.
 - [x] Step 7: Update this detailed plan and the source phase checkboxes.
 - [x] Step 8: Check git identity, commit with anonymized author/committer, and verify `git log --format=fuller`.
+
+## 2026-05-28 收口记录
+
+收口计划：`docs/superpowers/plans/2026-05-28-phase-3-cloud-only-main-path-completion.md`
+
+补充收口：
+
+- 产品运行时文件现在只通过 `apps/web/src/features/worlddock/api.ts` 的共享 helper 读写 `worlddock.sessionToken`。
+- 已认证 Cloud 世界列表覆盖 loading、error、empty 和 ready 状态，不回退到 fixture。
+- `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` 已更新，Phase 3 标记为完成。
+
+验证：
+
+```bash
+pnpm --filter @worlddock/config test -- env.test.ts
+pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts
+pnpm --filter @worlddock/web test:e2e -- cloud-deployment-flow.spec.ts
+pnpm lint
+pnpm test
+pnpm build
+```
