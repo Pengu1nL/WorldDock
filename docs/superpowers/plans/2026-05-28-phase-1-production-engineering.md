@@ -47,6 +47,7 @@
 - Create: `apps/api/Dockerfile`
 - Create: `apps/web/Dockerfile`
 - Create: `apps/worker/Dockerfile`
+- Create: `.dockerignore`
 - Create: `docs/operations/incident_runbook.md`
 - Create: `docs/operations/queue_runbook.md`
 - Create: `apps/web/src/config/next-config.test.ts`
@@ -582,7 +583,7 @@ FROM node:24-alpine AS base
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN apk add --no-cache openssl && corepack enable
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -598,7 +599,7 @@ FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app ./
 EXPOSE 4000
-CMD ["pnpm", "--filter", "@worlddock/api", "start"]
+CMD ["pnpm", "--filter", "@worlddock/api", "exec", "tsx", "src/main.ts"]
 ```
 
 - [ ] **Step 3: Create Web Dockerfile**
@@ -610,7 +611,7 @@ FROM node:24-alpine AS base
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN apk add --no-cache openssl && corepack enable
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -626,7 +627,7 @@ FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app ./
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@worlddock/web", "start"]
+CMD ["pnpm", "--filter", "@worlddock/web", "exec", "next", "start"]
 ```
 
 - [ ] **Step 4: Create Worker Dockerfile**
@@ -638,7 +639,7 @@ FROM node:24-alpine AS base
 WORKDIR /app
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN apk add --no-cache openssl && corepack enable
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -653,7 +654,7 @@ RUN pnpm build
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app ./
-CMD ["pnpm", "--filter", "@worlddock/worker", "start"]
+CMD ["pnpm", "--filter", "@worlddock/worker", "exec", "tsx", "src/main.ts"]
 ```
 
 - [ ] **Step 5: Run Dockerfile content check**
@@ -661,7 +662,7 @@ CMD ["pnpm", "--filter", "@worlddock/worker", "start"]
 Run:
 
 ```bash
-node -e 'const fs = require("node:fs"); const expectations = new Map([["apps/api/Dockerfile", "@worlddock/api"], ["apps/web/Dockerfile", "@worlddock/web"], ["apps/worker/Dockerfile", "@worlddock/worker"]]); for (const [file, filter] of expectations) { const text = fs.readFileSync(file, "utf8"); for (const token of ["node:24-alpine", "pnpm install --frozen-lockfile", "pnpm build", filter, "CMD"]) { if (!text.includes(token)) throw new Error(`${file} missing ${token}`); } }'
+node -e 'const fs = require("node:fs"); const expectations = new Map([["apps/api/Dockerfile", ["@worlddock/api", "corepack prepare pnpm@10.33.0 --activate", "tsx", "CMD"]], ["apps/web/Dockerfile", ["@worlddock/web", "corepack prepare pnpm@10.33.0 --activate", "next", "CMD"]], ["apps/worker/Dockerfile", ["@worlddock/worker", "corepack prepare pnpm@10.33.0 --activate", "tsx", "CMD"]]]); for (const [file, tokens] of expectations) { const text = fs.readFileSync(file, "utf8"); for (const token of ["node:24-alpine", "pnpm install --frozen-lockfile", "pnpm build", ...tokens]) { if (!text.includes(token)) throw new Error(`${file} missing ${token}`); } } if (!fs.existsSync(".dockerignore")) throw new Error("missing .dockerignore"); const ignore = fs.readFileSync(".dockerignore", "utf8"); for (const token of ["node_modules", "**/node_modules", "**/.next", "**/dist", "!.env.example"]) { if (!ignore.includes(token)) throw new Error(`.dockerignore missing ${token}`); }'
 ```
 
 Expected: PASS with no output.
@@ -684,7 +685,7 @@ Run:
 
 ```bash
 git status --short
-git add apps/api/Dockerfile apps/web/Dockerfile apps/worker/Dockerfile
+git add apps/api/Dockerfile apps/web/Dockerfile apps/worker/Dockerfile .dockerignore docs/superpowers/plans/2026-05-28-phase-1-production-engineering.md
 git commit -m "build: add production Docker entrypoints"
 git log -1 --format=fuller
 ```
@@ -806,7 +807,7 @@ Expected:
 
 - TypeScript 编译通过。
 - Worker 单元测试通过。
-- `dist/src/main.js` 存在并可由 Docker CMD 启动。
+- `pnpm --filter @worlddock/worker exec tsx src/main.ts` 是 Docker CMD 使用的运行入口。
 
 ## 积压处理
 
@@ -1008,4 +1009,3 @@ Then open the staging Web URL and confirm:
 - Placeholder scan: the plan uses concrete file paths, commands, code blocks, expected failures, expected passes, and commit messages.
 - Type consistency: `BETTER_AUTH_URL`, `AI_PROVIDER`, `AI_MODEL`, `OPENAI_API_KEY`, and `SENTRY_DSN` names match current config and API provider code.
 - Scope consistency: pi session config is intentionally left to Phase 5; Phase 1 enforces the current real OpenAI provider path.
-
