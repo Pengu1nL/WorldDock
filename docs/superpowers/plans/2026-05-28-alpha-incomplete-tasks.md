@@ -6,9 +6,9 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，本次调查没有发现可以安全标记为完成的 Alpha Task，因此未修改 Alpha 主计划中的 checkbox。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 2 验证，Phase 2 已可标记完成。除 Phase 2 外，本记录其余 Phase 的未完成判断保持不变。
 
-当前代码库已经具备一些早期后端能力，例如世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。但这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
+当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。但除已验证完成的 Phase 2 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
 
 ## 判定标准
 
@@ -36,23 +36,27 @@
 
 ## Phase 2: 个人账户认证、账户和 Onboarding
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `apps/web/src/app/(auth)/login/page.tsx`。
-- 缺少 `apps/web/src/app/(auth)/register/page.tsx`。
-- 缺少 `apps/web/src/app/(app)/onboarding/page.tsx`。
-- 缺少 `apps/web/src/features/account/account-api.ts`。
-- 缺少 `apps/web/src/features/onboarding/onboarding-flow.tsx`。
-- 缺少 `apps/api/src/modules/account/*`。
-- `packages/db/prisma/schema.prisma` 缺少 `UserProfile`。
-- 前端仍通过 `window.localStorage.getItem("worlddock.sessionToken")` 手动读取 session token。
-- 缺少 `apps/api/test/account.integration-spec.ts` 和 `apps/web/tests/e2e/auth-onboarding.spec.ts`。
+完成依据：
 
-已有但不足：
+- `apps/web/src/app/(auth)/login/page.tsx` 和 `apps/web/src/app/(auth)/register/page.tsx` 已提供 Alpha 邮箱密码登录/注册入口，并在成功后自动保存后端返回的 session token。
+- `apps/web/src/app/(app)/onboarding/page.tsx` 与 `apps/web/src/features/onboarding/onboarding-flow.tsx` 已提供三步 onboarding，完成后调用账户 API 并进入 `/app`。
+- `apps/web/src/features/account/account-api.ts` 已封装 `GET/PATCH /v1/account/profile` 和 `PATCH /v1/account/onboarding/complete`。
+- `apps/api/src/modules/account/*` 已提供账户资料读取、更新、onboarding 完成和 Alpha 软删除。
+- `packages/db/prisma/schema.prisma` 与 `packages/db/prisma/migrations/20260527192200_user_profiles/migration.sql` 已包含 `UserProfile`。
+- `apps/api/src/modules/auth/*` 已提供邮箱密码注册、登录、logout、`GET /v1/me` 和 bearer session 认证。
 
-- Better Auth 配置文件存在：`apps/api/src/modules/auth/better-auth.ts`。
-- API 已有 bearer session/access token 认证、`GET /v1/me`、`POST /v1/auth/logout` 和 access token 管理。
-- Better Auth 登录注册端点未挂到可用路由，前端也没有登录入口。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：passed。
+- `pnpm --filter @worlddock/api test:integration -- account.integration-spec.ts auth.integration-spec.ts`：passed。
+- `pnpm --filter @worlddock/web test:e2e -- auth-onboarding.spec.ts`：passed。
+
+剩余说明：
+
+- Phase 2 不包含邮箱验证、邮件找回、第三方 OAuth、模板库、真实支付或管理后台。
+- 代码中仍有集中式 `worlddock.sessionToken` 存储和读取，这是当前 Alpha bearer session 方案；Phase 2 的完成标准是登录/注册自动写入 session，不要求用户手动填写 token。
 
 ## Phase 3: 云端部署版范围冻结和 Cloud-only 主路径
 
