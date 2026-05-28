@@ -6,6 +6,7 @@ import {
   type ExceptionFilter,
 } from "@nestjs/common";
 import { apiErrorSchema, type ApiError } from "@worlddock/domain";
+import { ZodError } from "zod";
 import { captureException } from "./observability";
 import { getRequestId, type RequestWithRequestId } from "./request-id";
 
@@ -29,7 +30,7 @@ export class ApiErrorFilter implements ExceptionFilter {
     const response = context.getResponse<HttpResponse>();
     const payload = this.toApiError(exception, getRequestId(request));
     const status = this.getStatus(exception);
-    if (!(exception instanceof HttpException)) {
+    if (!(exception instanceof HttpException) && !(exception instanceof ZodError)) {
       captureException(exception);
     }
 
@@ -43,6 +44,7 @@ export class ApiErrorFilter implements ExceptionFilter {
 
   private getStatus(exception: unknown): number {
     if (exception instanceof HttpException) return exception.getStatus();
+    if (exception instanceof ZodError) return HttpStatus.BAD_REQUEST;
     return HttpStatus.INTERNAL_SERVER_ERROR;
   }
 
@@ -58,6 +60,18 @@ export class ApiErrorFilter implements ExceptionFilter {
         message: this.normalizeMessage(normalized.message ?? exception.message),
         requestId,
         details: normalized.details,
+      });
+    }
+
+    if (exception instanceof ZodError) {
+      return apiErrorSchema.parse({
+        code: "VALIDATION_FAILED",
+        message: "Request validation failed.",
+        requestId,
+        details: exception.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
       });
     }
 

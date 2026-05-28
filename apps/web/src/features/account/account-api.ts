@@ -1,4 +1,7 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL ?? "http://localhost:4000";
+const API_BASE_URL = firstConfigured(
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+  process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL,
+) ?? "http://localhost:4000";
 
 export type AccountProfile = {
   id: string;
@@ -54,4 +57,8 @@ async function requestAccount<T>(
     throw new Error(typeof payload.message === "string" ? payload.message : "Account request failed.");
   }
   return response.json() as Promise<T>;
+}
+
+function firstConfigured(...values: Array<string | undefined>) {
+  return values.find((value) => value && value.trim().length > 0);
 }

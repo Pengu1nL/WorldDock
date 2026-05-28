@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const API_BASE_URL = process.env.WORLD_DOCK_API_BASE_URL
-  ?? process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL
-  ?? "http://localhost:4000";
+const API_BASE_URL = firstConfigured(
+  process.env.WORLD_DOCK_API_BASE_URL,
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+  process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL,
+) ?? "http://localhost:4000";
 
 type RouteContext = {
   params: Promise<{ all: string[] }>;
@@ -40,4 +42,8 @@ async function proxyAuth(path: string, body: unknown) {
   });
   const payload = await response.json().catch(() => ({}));
   return NextResponse.json(payload, { status: response.status });
+}
+
+function firstConfigured(...values: Array<string | undefined>) {
+  return values.find((value) => value && value.trim().length > 0);
 }

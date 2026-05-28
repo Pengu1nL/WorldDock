@@ -67,6 +67,26 @@ describe("auth endpoints", () => {
     });
   });
 
+  it("returns VALIDATION_FAILED for invalid email/password payloads", async () => {
+    app = await createTestApp(createInMemoryAuthRepository());
+
+    const response = await request(app.getHttpServer())
+      .post("/v1/auth/register")
+      .set("x-request-id", "req_bad_register")
+      .send({ email: "not-an-email", password: "short", name: "Writer" })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      code: "VALIDATION_FAILED",
+      message: "Request validation failed.",
+      requestId: "req_bad_register",
+    });
+    expect(response.body.details).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "email" }),
+      expect.objectContaining({ path: "password" }),
+    ]));
+  });
+
   it("creates, lists, authenticates with, and revokes access tokens", async () => {
     const repository = createInMemoryAuthRepository();
     repository.users.set("user_1", {
