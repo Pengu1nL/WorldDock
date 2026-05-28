@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { writeStoredSessionToken } from "../../../features/worlddock/api";
+import { writeStoredSessionToken } from "@/features/worlddock/api";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
