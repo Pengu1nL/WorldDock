@@ -109,6 +109,23 @@ describe("@worlddock/config env", () => {
     ).toThrow(/SENTRY_DSN/);
   });
 
+  it("does not apply production-only gates when APP_ENV is explicitly staging", () => {
+    const parsed = parseWorldDockEnv(
+      baseEnv({
+        NODE_ENV: "production",
+        APP_ENV: "staging",
+        SENTRY_DSN: "",
+        AI_MODEL: "",
+        OPENAI_API_KEY: "",
+      }),
+    );
+
+    expect(parsed.APP_ENV).toBe("staging");
+    expect(parsed.SENTRY_DSN).toBeUndefined();
+    expect(parsed.AI_MODEL).toBeUndefined();
+    expect(parsed.OPENAI_API_KEY).toBeUndefined();
+  });
+
   it("rejects production without OpenAI model configuration", () => {
     expect(() =>
       parseWorldDockEnv(

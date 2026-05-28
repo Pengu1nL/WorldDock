@@ -67,8 +67,12 @@ export type WorldDockEnv = z.infer<typeof worldDockEnvSchema>;
 
 export function parseWorldDockEnv(env: Record<string, string | undefined>): WorldDockEnv {
   const parsed = worldDockEnvSchema.parse(env);
+  const hasExplicitAppEnv = typeof env.APP_ENV === "string" && env.APP_ENV.trim() !== "";
+  const isProduction = hasExplicitAppEnv
+    ? parsed.APP_ENV === "production"
+    : parsed.NODE_ENV === "production";
 
-  if (parsed.APP_ENV !== "production" && parsed.NODE_ENV !== "production") {
+  if (!isProduction) {
     return parsed;
   }
 
