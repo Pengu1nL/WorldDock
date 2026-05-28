@@ -91,7 +91,7 @@ git log -1 --format=fuller
 - Create: `.github/workflows/ci.yml`
 - Modify: `package.json`
 
-- [ ] **Step 1: Run failing CI contract check**
+- [x] **Step 1: Run failing CI contract check**
 
 Run:
 
@@ -101,7 +101,7 @@ node -e 'const fs = require("node:fs"); const pkg = require("./package.json"); i
 
 Expected: FAIL with `missing package script: verify` or `missing .github/workflows/ci.yml`.
 
-- [ ] **Step 2: Add root verification scripts**
+- [x] **Step 2: Add root verification scripts**
 
 Modify `package.json` so the `scripts` object contains these entries while preserving the existing scripts:
 
@@ -124,7 +124,7 @@ Modify `package.json` so the `scripts` object contains these entries while prese
 }
 ```
 
-- [ ] **Step 3: Create GitHub Actions workflow**
+- [x] **Step 3: Create GitHub Actions workflow**
 
 Create `.github/workflows/ci.yml`:
 
@@ -170,7 +170,7 @@ jobs:
         run: pnpm verify:ci
 ```
 
-- [ ] **Step 4: Re-run CI contract check**
+- [x] **Step 4: Re-run CI contract check**
 
 Run:
 
@@ -180,7 +180,7 @@ node -e 'const fs = require("node:fs"); const pkg = require("./package.json"); i
 
 Expected: PASS with no output.
 
-- [ ] **Step 5: Run fast local script validation**
+- [x] **Step 5: Run fast local script validation**
 
 Run:
 
@@ -190,7 +190,7 @@ pnpm --filter @worlddock/db prisma:validate
 
 Expected: PASS; Prisma schema validates without a database connection.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -211,7 +211,7 @@ Expected: commit succeeds, and Author/Committer do not contain real personal ide
 - Create: `apps/web/src/config/next-config.test.ts`
 - Modify: `apps/web/next.config.ts`
 
-- [ ] **Step 1: Write failing test for production Next config**
+- [x] **Step 1: Write failing test for production Next config**
 
 Create `apps/web/src/config/next-config.test.ts`:
 
@@ -230,7 +230,7 @@ describe("next production config", () => {
 });
 ```
 
-- [ ] **Step 2: Run test and confirm failure**
+- [x] **Step 2: Run test and confirm failure**
 
 Run:
 
@@ -240,7 +240,7 @@ pnpm --filter @worlddock/web test -- src/config/next-config.test.ts
 
 Expected: FAIL because current `next.config.ts` sets `output: "export"` and `assetPrefix: "."` outside development.
 
-- [ ] **Step 3: Replace Next config**
+- [x] **Step 3: Replace Next config**
 
 Replace `apps/web/next.config.ts` with:
 
@@ -254,7 +254,7 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
-- [ ] **Step 4: Run test and confirm pass**
+- [x] **Step 4: Run test and confirm pass**
 
 Run:
 
@@ -264,7 +264,7 @@ pnpm --filter @worlddock/web test -- src/config/next-config.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Verify Web build still works in server mode**
+- [x] **Step 5: Verify Web build still works in server mode**
 
 Run:
 
@@ -274,7 +274,7 @@ pnpm --filter @worlddock/web build
 
 Expected: PASS; `.next` build output is produced without static export mode.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -295,7 +295,7 @@ Expected: commit succeeds, and Author/Committer do not contain real personal ide
 - Modify: `packages/config/src/env.ts`
 - Modify: `packages/config/test/env.test.ts`
 
-- [ ] **Step 1: Replace env tests with production gate coverage**
+- [x] **Step 1: Replace env tests with production gate coverage**
 
 Replace `packages/config/test/env.test.ts` with:
 
@@ -430,7 +430,7 @@ describe("@worlddock/config env", () => {
 });
 ```
 
-- [ ] **Step 2: Run env tests and confirm failure**
+- [x] **Step 2: Run env tests and confirm failure**
 
 Run:
 
@@ -440,7 +440,7 @@ pnpm --filter @worlddock/config test -- env.test.ts
 
 Expected: FAIL because `BETTER_AUTH_SECRET` still allows 16 characters, `BETTER_AUTH_URL` is not in the schema, and production-only checks are missing.
 
-- [ ] **Step 3: Replace env schema implementation**
+- [x] **Step 3: Replace env schema implementation**
 
 Replace `packages/config/src/env.ts` with:
 
@@ -521,7 +521,7 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
 }
 ```
 
-- [ ] **Step 4: Run env tests and confirm pass**
+- [x] **Step 4: Run env tests and confirm pass**
 
 Run:
 
@@ -531,7 +531,7 @@ pnpm --filter @worlddock/config test -- env.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Run API and Worker type checks that consume config**
+- [x] **Step 5: Run API and Worker type checks that consume config**
 
 Run:
 
@@ -542,7 +542,7 @@ pnpm --filter @worlddock/worker lint
 
 Expected: PASS; added `BETTER_AUTH_URL` type is exported through `@worlddock/config` without breaking consumers.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -565,7 +565,7 @@ Expected: commit succeeds, and Author/Committer do not contain real personal ide
 - Create: `apps/worker/Dockerfile`
 - Create: `.dockerignore`
 
-- [ ] **Step 1: Run failing Dockerfile presence check**
+- [x] **Step 1: Run failing Dockerfile presence check**
 
 Run:
 
@@ -575,7 +575,7 @@ node -e 'const fs = require("node:fs"); for (const file of ["apps/api/Dockerfile
 
 Expected: FAIL with `missing apps/api/Dockerfile`.
 
-- [ ] **Step 2: Create API Dockerfile**
+- [x] **Step 2: Create API Dockerfile**
 
 Create `apps/api/Dockerfile`:
 
@@ -603,7 +603,7 @@ EXPOSE 4000
 CMD ["pnpm", "--filter", "@worlddock/api", "exec", "tsx", "src/main.ts"]
 ```
 
-- [ ] **Step 3: Create Web Dockerfile**
+- [x] **Step 3: Create Web Dockerfile**
 
 Create `apps/web/Dockerfile`:
 
@@ -631,7 +631,7 @@ EXPOSE 3000
 CMD ["pnpm", "--filter", "@worlddock/web", "start"]
 ```
 
-- [ ] **Step 4: Create Worker Dockerfile**
+- [x] **Step 4: Create Worker Dockerfile**
 
 Create `apps/worker/Dockerfile`:
 
@@ -658,7 +658,7 @@ COPY --from=build /app ./
 CMD ["pnpm", "--filter", "@worlddock/worker", "exec", "tsx", "src/main.ts"]
 ```
 
-- [ ] **Step 5: Run Dockerfile content check**
+- [x] **Step 5: Run Dockerfile content check**
 
 Run:
 
@@ -668,7 +668,7 @@ node -e 'const fs = require("node:fs"); const expectations = new Map([["apps/api
 
 Expected: PASS with no output.
 
-- [ ] **Step 6: Build images locally**
+- [x] **Step 6: Build images locally**
 
 Run:
 
@@ -680,7 +680,7 @@ docker build -f apps/worker/Dockerfile -t worlddock-worker:phase1 .
 
 Expected: all three Docker builds succeed.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -702,7 +702,7 @@ Expected: commit succeeds, and Author/Committer do not contain real personal ide
 - Create: `docs/operations/queue_runbook.md`
 - Modify: `docs/operations/production_release_checklist.md`
 
-- [ ] **Step 1: Run failing operations docs contract check**
+- [x] **Step 1: Run failing operations docs contract check**
 
 Run:
 
@@ -712,7 +712,7 @@ node -e 'const fs = require("node:fs"); for (const file of ["docs/operations/inc
 
 Expected: FAIL with missing runbook or missing checklist structure.
 
-- [ ] **Step 2: Create incident runbook**
+- [x] **Step 2: Create incident runbook**
 
 Create `docs/operations/incident_runbook.md`:
 
@@ -777,7 +777,7 @@ curl -fsS "$API_BASE_URL/v1/system/metrics"
 - 防复发行动项和负责人。
 ```
 
-- [ ] **Step 3: Create queue runbook**
+- [x] **Step 3: Create queue runbook**
 
 Create `docs/operations/queue_runbook.md`:
 
@@ -837,7 +837,7 @@ Expected:
 升级后按 `docs/operations/incident_runbook.md` 定级处理。
 ```
 
-- [ ] **Step 4: Replace production release checklist**
+- [x] **Step 4: Replace production release checklist**
 
 Replace `docs/operations/production_release_checklist.md` with:
 
@@ -866,7 +866,7 @@ Replace `docs/operations/production_release_checklist.md` with:
 | Post-release observation | Release owner | 发布后 30 分钟观察 API、Web、Worker、Sentry | 记录观察开始和结束时间 | [ ] |
 ```
 
-- [ ] **Step 5: Re-run operations docs contract check**
+- [x] **Step 5: Re-run operations docs contract check**
 
 Run:
 
@@ -876,7 +876,7 @@ node -e 'const fs = require("node:fs"); for (const file of ["docs/operations/inc
 
 Expected: PASS with no output.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -897,7 +897,7 @@ Expected: commit succeeds, and Author/Committer do not contain real personal ide
 - Modify: `docs/superpowers/plans/2026-05-27-creator-alpha-product-closure.md`
 - Read: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Run full local verification**
+- [x] **Step 1: Run full local verification**
 
 Run:
 
@@ -909,7 +909,7 @@ pnpm --filter @worlddock/web test:e2e
 
 Expected: all commands pass.
 
-- [ ] **Step 2: Rebuild Docker images after final code state**
+- [x] **Step 2: Rebuild Docker images after final code state**
 
 Run:
 
@@ -921,7 +921,7 @@ docker build -f apps/worker/Dockerfile -t worlddock-worker:phase1-final .
 
 Expected: all three Docker builds pass from a clean monorepo root context.
 
-- [ ] **Step 3: Verify Phase 1 missing-task list is closed**
+- [x] **Step 3: Verify Phase 1 missing-task list is closed**
 
 Run:
 
@@ -931,7 +931,7 @@ node -e 'const fs = require("node:fs"); const requiredFiles = [".github/workflow
 
 Expected: PASS with no output.
 
-- [ ] **Step 4: Update main plan Phase 1 checkboxes**
+- [x] **Step 4: Update main plan Phase 1 checkboxes**
 
 After Steps 1-3 pass, modify only the Phase 1 task checkbox lines in `docs/superpowers/plans/2026-05-27-creator-alpha-product-closure.md`:
 
@@ -943,7 +943,7 @@ After Steps 1-3 pass, modify only the Phase 1 task checkbox lines in `docs/super
 - [x] **Task 5: Run verification**
 ```
 
-- [ ] **Step 5: Record final status**
+- [x] **Step 5: Record final status**
 
 Run:
 
@@ -954,7 +954,7 @@ git diff -- docs/superpowers/plans/2026-05-27-creator-alpha-product-closure.md
 
 Expected: diff only changes Phase 1 task checkboxes from `[ ]` to `[x]`.
 
-- [ ] **Step 6: Commit final Phase 1 evidence**
+- [x] **Step 6: Commit final Phase 1 evidence**
 
 Run:
 
