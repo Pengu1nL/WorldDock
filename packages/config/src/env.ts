@@ -9,6 +9,9 @@ export const runtimeEnvironmentSchema = z.enum([
 
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
+const optionalNonEmptyString = z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional());
+const optionalUrlString = z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional());
+
 export const worldDockEnvSchema = z.object({
   NODE_ENV: nodeEnvironmentSchema.default("development"),
   APP_ENV: runtimeEnvironmentSchema.default("development"),
@@ -32,7 +35,10 @@ export const worldDockEnvSchema = z.object({
   SENTRY_DSN: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
-  AI_PROVIDER: z.enum(["openai", "anthropic", "mock"]).default("mock"),
+  AI_PROVIDER: z.enum(["openai"]).default("openai"),
+  AI_MODEL: optionalNonEmptyString,
+  OPENAI_BASE_URL: optionalUrlString,
+  OPENAI_API_KEY: optionalNonEmptyString,
 });
 
 export type RuntimeEnvironment = z.infer<typeof runtimeEnvironmentSchema>;

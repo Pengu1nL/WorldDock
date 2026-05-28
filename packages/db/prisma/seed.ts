@@ -3,6 +3,10 @@ import { createPrismaClient } from "../src";
 const prisma = createPrismaClient();
 
 export async function main() {
+  if (process.env.ALLOW_DEMO_SEED !== "true") {
+    throw new Error("Demo seed data is disabled. Set ALLOW_DEMO_SEED=true only for disposable demo databases.");
+  }
+
   const owner = await prisma.user.upsert({
     where: { email: "demo@worlddock.local" },
     update: {},

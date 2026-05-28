@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PublicRepository } from "@worlddock/domain";
 import { forkRepository, listPublicRepositories, reportRepository, searchPublicRepositories, starRepository, unstarRepository } from "./api";
-import { PUBLIC_REPOSITORIES } from "./fixtures";
 import { Icon } from "./components";
 
 type ToastInput = {
@@ -11,7 +10,7 @@ type ToastInput = {
 
 type CommunityViewProps = {
   onBack: () => void;
-  onFork: (repository: PublicRepository) => void;
+  onFork: (world: unknown) => void;
   onToast: (toast: ToastInput) => void;
 };
 
@@ -19,7 +18,7 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
   const [query, setQuery] = useState("");
   const [activeRepository, setActiveRepository] = useState<PublicRepository | null>(null);
   const [starredIds, setStarredIds] = useState<string[]>([]);
-  const [repositories, setRepositories] = useState<PublicRepository[]>(PUBLIC_REPOSITORIES);
+  const [repositories, setRepositories] = useState<PublicRepository[]>([]);
   const sessionToken = useCallback(() => typeof window === "undefined"
     ? ""
     : window.localStorage.getItem("worlddock.sessionToken") ?? "", []);
@@ -27,13 +26,9 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
   useEffect(() => {
     void listPublicRepositories({ sessionToken: sessionToken() })
       .then((result: any) => {
-        if (Array.isArray(result.repositories) && result.repositories.length > 0) {
-          setRepositories(result.repositories);
-        }
+        setRepositories(Array.isArray(result.repositories) ? result.repositories : []);
       })
-      .catch(() => {
-        setRepositories(PUBLIC_REPOSITORIES);
-      });
+      .catch(() => setRepositories([]));
   }, [sessionToken]);
 
   useEffect(() => {
@@ -41,7 +36,7 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
     void searchPublicRepositories(query, { sessionToken: sessionToken() })
       .then((result: any) => {
         if (Array.isArray(result.repositories)) {
-          setRepositories(result.repositories.length > 0 ? result.repositories : PUBLIC_REPOSITORIES);
+          setRepositories(result.repositories);
         }
       })
       .catch(() => {});
@@ -70,40 +65,47 @@ export function CommunityView({ onBack, onFork, onToast }: CommunityViewProps) {
                 : await starRepository(activeRepository.id, { sessionToken: session });
               setActiveRepository(result.repository);
               setRepositories((prev) => prev.map((item) => item.id === result.repository.id ? result.repository : item));
+              setStarredIds((prev) => alreadyStarred
+                ? prev.filter((id) => id !== activeRepository.id)
+                : [...prev, activeRepository.id]);
+              onToast({ kind: "save", text: (alreadyStarred ? "已取消 Star · " : "已 Star · ") + activeRepository.name });
+              return;
             }
           } catch {
-            onToast({ kind: "info", text: "云端 Star 暂不可用，已更新本地状态" });
+            onToast({ kind: "warn", text: "Star 失败 · 请检查登录状态和 API 服务" });
+            return;
           }
-          setStarredIds((prev) => alreadyStarred
-            ? prev.filter((id) => id !== activeRepository.id)
-            : [...prev, activeRepository.id]);
-          onToast({ kind: "save", text: (alreadyStarred ? "已取消 Star · " : "已 Star · ") + activeRepository.name });
+          onToast({ kind: "warn", text: "请先登录，再执行 Star" });
         }}
         onFork={async () => {
           const session = sessionToken();
-          if (session) {
-            try {
-              await forkRepository(activeRepository.id, { sessionToken: session });
-            } catch {
-              onToast({ kind: "info", text: "云端 Fork 暂不可用，已生成本地演示副本" });
-            }
+          if (!session) {
+            onToast({ kind: "warn", text: "请先登录，再 Fork" });
+            return;
           }
-          onFork(activeRepository);
-          onToast({ kind: "save", text: "Fork 成功 · 已生成私有世界" });
+          try {
+            const result: any = await forkRepository(activeRepository.id, { sessionToken: session });
+            onFork(result.world);
+            onToast({ kind: "save", text: "Fork 成功 · 已生成私有世界" });
+          } catch {
+            onToast({ kind: "warn", text: "Fork 失败 · 请检查 API 服务和权限" });
+          }
         }}
         onReport={async () => {
           const session = sessionToken();
-          if (session) {
-            try {
-              await reportRepository(activeRepository.id, {
-                reason: "other",
-                detail: "用户从社区详情页提交举报。",
-              }, { sessionToken: session });
-            } catch {
-              onToast({ kind: "info", text: "云端举报暂不可用，已保留本地反馈" });
-            }
+          if (!session) {
+            onToast({ kind: "warn", text: "请先登录，再举报" });
+            return;
           }
-          onToast({ kind: "warn", text: "举报已提交 · 管理员会复核" });
+          try {
+            await reportRepository(activeRepository.id, {
+              reason: "other",
+              detail: "用户从社区详情页提交举报。",
+            }, { sessionToken: session });
+            onToast({ kind: "warn", text: "举报已提交 · 管理员会复核" });
+          } catch {
+            onToast({ kind: "warn", text: "举报失败 · 请检查 API 服务和权限" });
+          }
         }}
       />
     );

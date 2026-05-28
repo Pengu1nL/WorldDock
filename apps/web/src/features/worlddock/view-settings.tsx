@@ -29,7 +29,7 @@ export function SettingsView({
 }: SettingsViewProps) {
   const [tab, setTab] = useState("billing");
   const [modelStatus, setModelStatus] = useState("未测试");
-  const [token, setToken] = useState(communityConnected ? "wd_mock_token" : "");
+  const [token, setToken] = useState("");
   const [tokenStatus, setTokenStatus] = useState(communityConnected ? "Token 已保存 · Push 权限正常" : "未连接");
   const [cloudTokens, setCloudTokens] = useState<AccessTokenSummary[]>([]);
   const [cloudTokenBusy, setCloudTokenBusy] = useState(false);
@@ -179,21 +179,18 @@ export function SettingsView({
         {tab === "model" && (
           <section className="card" style={{ padding: 18 }}>
             <h2 className="title-font" style={{ marginTop: 0 }}>模型配置</h2>
-            <Field label="MODEL_PROVIDER" value="openai-compatible" />
-            <Field label="MODEL_BASE_URL" value="http://localhost:8000/v1" />
-            <Field label="MODEL_API_KEY" value="********" />
-            <Field label="MODEL_NAME" value="qwen3-32b" />
-            <Field label="MAX_TOKENS" value="4096" />
-            <Field label="TEMPERATURE" value="0.7" />
-            <Field label="CONTEXT_LIMIT" value="32768" />
+            <Field label="AI_PROVIDER" value="openai" />
+            <Field label="OPENAI_BASE_URL" value="https://api.openai.com/v1" />
+            <Field label="OPENAI_API_KEY" value="服务端环境变量" />
+            <Field label="AI_MODEL" value="服务端环境变量" />
             <button
               className="btn primary"
               onClick={() => {
-                setModelStatus("模型连接正常 · 218ms");
-                onToast({ kind: "save", text: "模型连接正常" });
+                setModelStatus("请通过一次真实 Agent Run 验证模型连接");
+                onToast({ kind: "info", text: "请在工作台发起真实 Agent Run" });
               }}
             >
-              <Icon name="bolt" size={12} /><span>测试连接</span>
+              <Icon name="bolt" size={12} /><span>验证方式</span>
             </button>
             <div style={{ marginTop: 12, fontSize: 13 }}>{modelStatus}</div>
           </section>

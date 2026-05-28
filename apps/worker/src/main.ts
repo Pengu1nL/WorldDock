@@ -1,4 +1,4 @@
-import { parseWorldDockEnv } from "@worlddock/config";
+import { loadWorkspaceEnv, parseWorldDockEnv } from "@worlddock/config";
 import { createPrismaClient } from "@worlddock/db";
 import { pathToFileURL } from "node:url";
 import { configureMeilisearchRepositoryIndex, createMeilisearchSearchIndex } from "./meilisearch-index";
@@ -16,6 +16,8 @@ export * from "./search-indexing";
 export * from "./search-indexing.queue";
 export * from "./storage-cleanup";
 export * from "./worker-alerts";
+
+loadWorkspaceEnv(import.meta.url);
 
 async function runSearchWorkerCommand(command: string) {
   initWorkerObservability();

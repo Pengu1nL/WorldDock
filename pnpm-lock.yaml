@@ -37,6 +37,9 @@ importers:
       '@sentry/node':
         specifier: ^10.54.0
         version: 10.54.0
+      '@worlddock/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@worlddock/db':
         specifier: workspace:*
         version: link:../../packages/db

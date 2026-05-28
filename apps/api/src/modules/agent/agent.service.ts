@@ -23,7 +23,7 @@ export class AgentService {
       userId: subject.user.id,
       mode: input.mode,
       prompt: input.prompt,
-      model: process.env.AI_MODEL ?? "mock",
+      model: process.env.AI_MODEL ?? null,
     });
     await this.append(run.id, 1, "run.started", { runId: run.id, mode: input.mode });
     await this.billing.reserveAgentRun(subject.user.id, run.id);

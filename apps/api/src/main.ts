@@ -1,10 +1,13 @@
 import "reflect-metadata";
+import { loadWorkspaceEnv } from "@worlddock/config";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { AppModule } from "./app.module";
 import { createFastifyLoggerOptions, parseBodyLimit } from "./common/logging";
 import { initObservability } from "./common/observability";
 import { configureApiApp } from "./configure-api-app";
+
+loadWorkspaceEnv(import.meta.url);
 
 async function bootstrap() {
   initObservability("worlddock-api");
