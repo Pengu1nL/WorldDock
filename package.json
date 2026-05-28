@@ -9,6 +9,8 @@
     "start": "pnpm --filter @worlddock/web start",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
+    "verify": "pnpm --filter @worlddock/db prisma:validate && pnpm lint && pnpm test && pnpm build",
+    "verify:ci": "pnpm --filter @worlddock/db prisma:generate && pnpm --filter @worlddock/db prisma:validate && pnpm lint && pnpm test && pnpm build && pnpm --filter @worlddock/api test:integration && pnpm --filter @worlddock/web test:e2e",
     "test:e2e": "pnpm --filter @worlddock/web test:e2e",
     "test:static-export": "pnpm --filter @worlddock/web test:static-export",
     "web:dev": "pnpm --filter @worlddock/web dev",
