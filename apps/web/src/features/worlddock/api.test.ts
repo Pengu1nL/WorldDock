@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canUseFixtures,
+  clearStoredSessionToken,
   createAccessToken,
   createArchiveEntry,
   createAgentRun,
@@ -27,6 +28,7 @@ import {
   streamAgentEvents,
   unstarRepository,
   forkRepository,
+  writeStoredSessionToken,
 } from "./api";
 
 describe("worlddock API client", () => {
@@ -41,6 +43,24 @@ describe("worlddock API client", () => {
     expect(readStoredSessionToken({ getItem: () => "session_alpha" })).toBe("session_alpha");
     expect(readStoredSessionToken({ getItem: () => null })).toBe("");
     expect(readStoredSessionToken(null)).toBe("");
+  });
+
+  it("writes and clears the stored session token through a single cloud auth helper", () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    };
+
+    writeStoredSessionToken(" session_alpha ", storage);
+    expect(readStoredSessionToken(storage)).toBe("session_alpha");
+
+    writeStoredSessionToken("", storage);
+    expect(readStoredSessionToken(storage)).toBe("session_alpha");
+
+    clearStoredSessionToken(storage);
+    expect(readStoredSessionToken(storage)).toBe("");
   });
 
   it("creates access tokens through the backend API", async () => {
