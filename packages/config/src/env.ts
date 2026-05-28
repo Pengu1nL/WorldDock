@@ -9,8 +9,14 @@ export const runtimeEnvironmentSchema = z.enum([
 
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
-const optionalNonEmptyString = z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional());
-const optionalUrlString = z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional());
+const optionalNonEmptyString = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  z.string().min(1).optional(),
+);
+const optionalUrlString = z.preprocess(
+  (value) => value === "" ? undefined : value,
+  z.string().url().optional(),
+);
 
 export const worldDockEnvSchema = z.object({
   NODE_ENV: nodeEnvironmentSchema.default("development"),
@@ -31,7 +37,8 @@ export const worldDockEnvSchema = z.object({
   S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
   S3_PUBLIC_BASE_URL: z.string().url().optional(),
-  BETTER_AUTH_SECRET: z.string().min(16),
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.string().url(),
   SENTRY_DSN: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   OTEL_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
@@ -45,5 +52,23 @@ export type RuntimeEnvironment = z.infer<typeof runtimeEnvironmentSchema>;
 export type WorldDockEnv = z.infer<typeof worldDockEnvSchema>;
 
 export function parseWorldDockEnv(env: Record<string, string | undefined>): WorldDockEnv {
-  return worldDockEnvSchema.parse(env);
+  const parsed = worldDockEnvSchema.parse(env);
+
+  if (parsed.APP_ENV !== "production") {
+    return parsed;
+  }
+
+  if (!parsed.SENTRY_DSN) {
+    throw new Error("SENTRY_DSN is required in production.");
+  }
+
+  if (!parsed.AI_MODEL) {
+    throw new Error("AI_MODEL is required when AI_PROVIDER=openai in production.");
+  }
+
+  if (!parsed.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required when AI_PROVIDER=openai in production.");
+  }
+
+  return parsed;
 }
