@@ -113,7 +113,6 @@ Modify `package.json` so the `scripts` object contains these entries while prese
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "test:e2e": "pnpm --filter @worlddock/web test:e2e",
-    "test:static-export": "pnpm --filter @worlddock/web test:static-export",
     "verify": "pnpm --filter @worlddock/db prisma:validate && pnpm lint && pnpm test && pnpm build",
     "verify:ci": "pnpm --filter @worlddock/db prisma:generate && pnpm --filter @worlddock/db prisma:validate && pnpm lint && pnpm test && pnpm build && pnpm --filter @worlddock/api test:integration && pnpm --filter @worlddock/web test:e2e",
     "web:dev": "pnpm --filter @worlddock/web dev",
