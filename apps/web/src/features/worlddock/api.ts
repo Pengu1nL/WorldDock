@@ -1,4 +1,23 @@
+import type { Notification, PublicRepository, WorldAsset, WorldAssetKind, WorldPackage } from "@worlddock/domain";
+
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
+
+export const WORLD_DOCK_SESSION_TOKEN_KEY = "worlddock.sessionToken";
+
+type FixtureEnvironment = {
+  NODE_ENV?: string;
+  NEXT_PUBLIC_WORLD_DOCK_FIXTURES?: string;
+};
+
+type SessionTokenStorage = Pick<Storage, "getItem">;
+
+export function canUseFixtures(env: FixtureEnvironment = process.env) {
+  return env.NODE_ENV !== "production" && env.NEXT_PUBLIC_WORLD_DOCK_FIXTURES === "1";
+}
+
+export function readStoredSessionToken(storage: SessionTokenStorage | null = getBrowserSessionStorage()) {
+  return storage?.getItem(WORLD_DOCK_SESSION_TOKEN_KEY) ?? "";
+}
 
 export type AccessTokenSummary = {
   id: string;
@@ -36,6 +55,16 @@ export type CreateWorldInput = {
   summary: string;
   tags: string[];
   mode: "cloud" | "local";
+};
+
+export type CreateWorldAssetInput = {
+  kind: WorldAssetKind;
+  title: string;
+  category?: string;
+  summary: string;
+  body?: string;
+  payload?: Record<string, unknown>;
+  position?: number;
 };
 
 export type CreateArchiveEntryInput = {
@@ -91,6 +120,16 @@ export type UsageLedgerEntry = {
   createdAt: string;
 };
 
+export type BillingPlaceholderIntent = {
+  id: string;
+  userId: string;
+  accountId: string;
+  plan: string;
+  source: string;
+  status: "captured";
+  createdAt: string;
+};
+
 export type BillingUsage = {
   balance: BillingBalance;
   lastAgentRun: {
@@ -100,6 +139,7 @@ export type BillingUsage = {
     createdAt: string;
   } | null;
   entries: UsageLedgerEntry[];
+  placeholderIntents?: BillingPlaceholderIntent[];
 };
 
 export type PublishWorldInput = {
@@ -119,9 +159,99 @@ export type LocalPushInput = PublishWorldInput & {
   };
 };
 
+export type ReleaseChange = {
+  assetId: string;
+  kind: "added" | "changed" | "removed";
+  title: string;
+  beforeHash?: string;
+  afterHash?: string;
+};
+
+export type ReleasePreflight = {
+  ok: boolean;
+  checks: Array<{
+    code: "assets" | "license" | "release_note" | "moderation" | "entitlement";
+    ok: boolean;
+    message: string;
+  }>;
+  changes: ReleaseChange[];
+};
+
 export type ReportRepositoryInput = {
   reason: "spam" | "sensitive_content" | "abuse" | "copyright" | "other";
-  detail?: string;
+  detail: string;
+};
+
+export type CommunityRepositoryAsset = {
+  id: string;
+  assetId: string;
+  kind: "archive" | "seed" | "conflict";
+  title: string;
+  category: string;
+  summary: string;
+  body: string;
+  related: string[];
+};
+
+export type CommunityRepository = PublicRepository & {
+  latestRelease?: {
+    id: string;
+    repositoryId: string;
+    version: string;
+    note: string;
+    status: string;
+    license: string;
+    createdAt: string;
+  } | null;
+  releaseHistory?: Array<{
+    id: string;
+    repositoryId: string;
+    version: string;
+    note: string;
+    status: string;
+    license: string;
+    createdAt: string;
+  }>;
+  assetCounts?: { archive: number; seeds: number; conflicts: number };
+  forkGraph?: {
+    repositoryId: string;
+    forks: Array<{
+      id: string;
+      sourceReleaseId: string;
+      targetWorldId: string;
+      userId: string;
+      createdAt: string;
+    }>;
+  };
+};
+
+export type CommunityCreator = {
+  handle: string;
+  displayName: string;
+  bio: string;
+  stats: { repositories: number; stars: number; forks: number };
+  tags: string[];
+  latestUpdated: string | null;
+};
+
+export type RepositoryCollection = {
+  id: string;
+  repositoryId: string;
+  userId: string;
+  name: string;
+  createdAt: string;
+};
+
+export type ExportSummary = {
+  id: string;
+  kind: "world" | "account";
+  status: "ready";
+  createdAt: string;
+};
+
+export type NotificationList = {
+  notifications: Notification[];
+  unreadCount: number;
 };
 
 export async function createAccessToken(
@@ -180,6 +310,54 @@ export async function getBillingUsage(options: ApiClientOptions): Promise<{ usag
   });
 }
 
+export async function listNotifications(options: ApiClientOptions): Promise<NotificationList> {
+  return requestJson("/v1/notifications", {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function markNotificationRead(notificationId: string, options: ApiClientOptions): Promise<{ notification: Notification }> {
+  return requestJson(`/v1/notifications/${notificationId}/read`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function submitSupportFeedback(
+  input: { message: string; context?: Record<string, unknown> },
+  options: ApiClientOptions,
+) {
+  return requestJson("/v1/support/feedback", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function captureBillingPlaceholderIntent(
+  input: { plan: "creator" | "studio" | "team" },
+  options: ApiClientOptions,
+): Promise<{ intent: BillingPlaceholderIntent }> {
+  return requestJson("/v1/billing/placeholder-intents", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function listWorlds(options: ApiClientOptions) {
   return requestJson("/v1/worlds", {
     method: "GET",
@@ -196,6 +374,171 @@ export async function createWorld(input: CreateWorldInput, options: ApiClientOpt
     body: input,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
+  });
+}
+
+export async function deleteWorld(worldId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function exportWorldPackage(worldId: string, options: ApiClientOptions): Promise<{ export: ExportSummary }> {
+  return requestJson(`/v1/worlds/${worldId}/export`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getWorldExport(exportId: string, options: ApiClientOptions): Promise<{ export: ExportSummary; package: WorldPackage }> {
+  return requestJson(`/v1/exports/${exportId}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function importWorldPackage(input: WorldPackage, options: ApiClientOptions) {
+  return requestJson("/v1/worlds/import", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: { package: input },
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function requestAccountDataExport(options: ApiClientOptions): Promise<{ export: ExportSummary }> {
+  return requestJson("/v1/account/data-export", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getAccountDataExport(exportId: string, options: ApiClientOptions): Promise<{ export: ExportSummary; data: unknown }> {
+  return requestJson(`/v1/account/data-export/${exportId}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function deleteAccount(options: ApiClientOptions) {
+  return requestJson("/v1/account", {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function duplicateWorld(worldId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/duplicate`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+  });
+}
+
+export async function listWorldAssets(
+  worldId: string,
+  options: ApiClientOptions & { kind?: WorldAssetKind; q?: string; cursor?: string },
+): Promise<{ assets: WorldAsset[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.kind) params.set("kind", options.kind);
+  if (options.q) params.set("q", options.q);
+  if (options.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  return requestJson(`/v1/worlds/${worldId}/assets${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function createWorldAsset(
+  worldId: string,
+  input: CreateWorldAssetInput,
+  options: ApiClientOptions,
+): Promise<{ asset: WorldAsset }> {
+  return requestJson(`/v1/worlds/${worldId}/assets`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function updateWorldAsset(
+  worldId: string,
+  assetId: string,
+  input: Partial<Omit<CreateWorldAssetInput, "kind">>,
+  options: ApiClientOptions,
+): Promise<{ asset: WorldAsset }> {
+  return requestJson(`/v1/worlds/${worldId}/assets/${assetId}`, {
+    method: "PATCH",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function deleteWorldAsset(worldId: string, assetId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/assets/${assetId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function reorderWorldAssets(worldId: string, assetIds: string[], options: ApiClientOptions) {
+  return requestJson(`/v1/worlds/${worldId}/assets/reorder`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: { assetIds },
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function relateWorldAssets(
+  worldId: string,
+  sourceAssetId: string,
+  targetAssetId: string,
+  options: ApiClientOptions,
+) {
+  return requestJson(`/v1/worlds/${worldId}/assets/${sourceAssetId}/relations`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: { targetAssetId },
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
   });
 }
 
@@ -271,6 +614,21 @@ export async function publishWorld(worldId: string, input: PublishWorldInput, op
   });
 }
 
+export async function previewWorldRelease(
+  worldId: string,
+  input: Partial<PublishWorldInput>,
+  options: ApiClientOptions,
+): Promise<{ preflight: ReleasePreflight }> {
+  return requestJson(`/v1/worlds/${worldId}/releases/preview`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function listPublicRepositories(options: ApiClientOptions) {
   return requestJson("/v1/repositories", {
     method: "GET",
@@ -285,6 +643,114 @@ export type RepositorySearchOptions = {
   tags?: string[];
   sort?: "relevance" | "stars" | "forks" | "updated";
 };
+
+export type CommunityRepositorySearchOptions = RepositorySearchOptions & {
+  query?: string;
+  cursor?: string;
+};
+
+export async function listCommunityRepositories(
+  options: ApiClientOptions & CommunityRepositorySearchOptions,
+): Promise<{ repositories: CommunityRepository[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.query) params.set("q", options.query);
+  if (options.cursor) params.set("cursor", options.cursor);
+  for (const tag of options.tags ?? []) params.append("tag", tag);
+  if (options.sort) params.set("sort", options.sort);
+  const query = params.toString();
+  return requestJson(`/v1/community/repositories${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getCommunityRepository(
+  owner: string,
+  slug: string,
+  options: ApiClientOptions,
+): Promise<{ repository: CommunityRepository }> {
+  return requestJson(`/v1/community/repositories/${owner}/${slug}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listCommunityRepositoryAssets(
+  repositoryId: string,
+  options: ApiClientOptions & { kind?: "archive" | "seed" | "conflict"; cursor?: string },
+): Promise<{ repositoryId: string; releaseId: string | null; assets: CommunityRepositoryAsset[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.kind) params.set("kind", options.kind);
+  if (options.cursor) params.set("cursor", options.cursor);
+  const query = params.toString();
+  return requestJson(`/v1/community/repositories/${repositoryId}/assets${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function getCommunityCreator(handle: string, options: ApiClientOptions): Promise<{ creator: CommunityCreator }> {
+  return requestJson(`/v1/community/creators/${handle}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function listCommunityCreatorRepositories(
+  handle: string,
+  options: ApiClientOptions & { cursor?: string; sort?: RepositorySearchOptions["sort"] },
+): Promise<{ repositories: CommunityRepository[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (options.cursor) params.set("cursor", options.cursor);
+  if (options.sort) params.set("sort", options.sort);
+  const query = params.toString();
+  return requestJson(`/v1/community/creators/${handle}/repositories${query ? `?${query}` : ""}`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function addRepositoryToCollection(
+  repositoryId: string,
+  options: ApiClientOptions,
+): Promise<{ collection: RepositoryCollection }> {
+  return requestJson(`/v1/community/repositories/${repositoryId}/collections`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function removeRepositoryFromCollection(
+  repositoryId: string,
+  collectionId: string,
+  options: ApiClientOptions,
+): Promise<{ collection: RepositoryCollection; removed: true }> {
+  return requestJson(`/v1/community/repositories/${repositoryId}/collections/${collectionId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
 
 export async function searchPublicRepositories(query: string, options: ApiClientOptions & RepositorySearchOptions) {
   const params = new URLSearchParams({ q: query });
@@ -313,6 +779,16 @@ export async function getPublicRepository(owner: string, slug: string, options: 
 export async function listRepositoryReleases(repositoryId: string, options: ApiClientOptions) {
   return requestJson(`/v1/repositories/${repositoryId}/releases`, {
     method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function rollbackRelease(releaseId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/releases/${releaseId}/rollback`, {
+    method: "POST",
     sessionToken: options.sessionToken,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
@@ -350,8 +826,49 @@ export async function forkRepository(repositoryId: string, options: ApiClientOpt
   });
 }
 
+export async function getForkUpstreamDiff(forkId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/forks/${forkId}/upstream-diff`, {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function syncFork(forkId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/forks/${forkId}/sync`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function detachFork(forkId: string, options: ApiClientOptions) {
+  return requestJson(`/v1/forks/${forkId}/detach`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function reportRepository(repositoryId: string, input: ReportRepositoryInput, options: ApiClientOptions) {
   return requestJson(`/v1/repositories/${repositoryId}/reports`, {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
+export async function reportCreatorProfile(handle: string, input: ReportRepositoryInput, options: ApiClientOptions) {
+  return requestJson(`/v1/community/creators/${handle}/reports`, {
     method: "POST",
     sessionToken: options.sessionToken,
     body: input,
@@ -501,10 +1018,15 @@ function getBoundaryLength(text: string, boundary: number) {
   return text.startsWith("\r\n\r\n", boundary) ? 4 : 2;
 }
 
+function getBrowserSessionStorage(): SessionTokenStorage | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage;
+}
+
 async function requestJson<T>(
   path: string,
   options: {
-    method: "GET" | "POST" | "DELETE";
+    method: "GET" | "POST" | "PATCH" | "DELETE";
     sessionToken: string;
     body?: unknown;
     fetcher?: typeof fetch;

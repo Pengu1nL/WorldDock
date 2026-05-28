@@ -25,11 +25,30 @@ model User {
   repositories  PublicRepository[]
   stars         RepositoryStar[]
   forks         RepositoryFork[]
+  collections   RepositoryCollection[]
   reports       Report[]
   moderationActions ModerationAction[]
   storageObjects StorageObject[]
+  profile       UserProfile?
+  notifications Notification[]
+  supportFeedback SupportFeedback[]
 
   @@map("users")
+}
+
+model UserProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  displayName           String
+  handle                String   @unique
+  avatarObjectId        String?
+  onboardingCompletedAt DateTime?
+  deletedAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
 }
 
 model Account {
@@ -123,6 +142,7 @@ model World {
   forkRecords       RepositoryFork[]
   coverObject       StorageObject?     @relation("WorldCoverObject", fields: [coverObjectId], references: [id], onDelete: SetNull)
   storageObjects    StorageObject[]
+  assetRelations    WorldAssetRelation[]
 
   @@index([ownerId])
   @@index([coverObjectId])
@@ -137,6 +157,7 @@ model ArchiveEntry {
   summary   String
   body      String
   relations String[] @default([])
+  position  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   world     World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -154,6 +175,7 @@ model StorySeed {
   conflict     String
   protagonists String?
   questions    String[] @default([])
+  position     Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -170,6 +192,7 @@ model Conflict {
   body         String
   related      String[] @default([])
   derivedSeeds String[] @default([])
+  position     Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   world        World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
@@ -193,6 +216,20 @@ model ConsistencyIssue {
   @@map("consistency_issues")
 }
 
+model WorldAssetRelation {
+  id            String   @id @default(cuid())
+  worldId       String
+  sourceAssetId String
+  targetAssetId String
+  createdAt     DateTime @default(now())
+  world         World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+
+  @@unique([worldId, sourceAssetId, targetAssetId])
+  @@index([worldId, sourceAssetId])
+  @@index([worldId, targetAssetId])
+  @@map("world_asset_relations")
+}
+
 model AgentRun {
   id             String            @id @default(cuid())
   worldId        String
@@ -201,6 +238,8 @@ model AgentRun {
   mode           String
   prompt         String
   model          String?
+  provider       String            @default("openai")
+  piSessionId    String?
   tokenUsage     Json?
   errorCode      String?
   errorMessage   String?
@@ -217,6 +256,7 @@ model AgentRun {
 
   @@index([worldId])
   @@index([userId])
+  @@index([piSessionId])
   @@map("agent_runs")
 }
 
@@ -258,10 +298,13 @@ model ContextRef {
   title     String
   excerpt   String
   targetId  String?
+  level     String   @default("card")
+  source    String   @default("initial")
   createdAt DateTime @default(now())
   run       AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
+  @@index([runId, level])
   @@map("context_refs")
 }
 
@@ -274,6 +317,7 @@ model BillingAccount {
   updatedAt           DateTime           @updatedAt
   user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   entries             UsageLedgerEntry[]
+  placeholderIntents  BillingPlaceholderIntent[]
 
   @@map("billing_accounts")
 }
@@ -296,6 +340,21 @@ model UsageLedgerEntry {
   @@index([userId])
   @@index([agentRunId])
   @@map("usage_ledger")
+}
+
+model BillingPlaceholderIntent {
+  id        String   @id @default(cuid())
+  userId    String
+  accountId String
+  plan      String
+  source    String   @default("alpha_ui")
+  status    String   @default("captured")
+  createdAt DateTime @default(now())
+  account   BillingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([accountId])
+  @@map("billing_placeholder_intents")
 }
 
 model PublicRepository {
@@ -321,6 +380,7 @@ model PublicRepository {
   snapshots ReleaseSnapshot[]
   starRecords RepositoryStar[]
   forkRecords RepositoryFork[]
+  collections RepositoryCollection[]
   reports   Report[]
   moderationActions ModerationAction[]
   storageObjects StorageObject[]
@@ -335,9 +395,11 @@ model RepositoryRelease {
   id           String          @id @default(cuid())
   repositoryId String
   version      String
+  status       String          @default("published")
   note         String
   license      String
   diff         Json
+  changes      Json            @default("[]")
   source       String
   createdAt    DateTime        @default(now())
   repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
@@ -347,6 +409,7 @@ model RepositoryRelease {
 
   @@unique([repositoryId, version])
   @@index([repositoryId])
+  @@index([status])
   @@map("releases")
 }
 
@@ -374,6 +437,21 @@ model RepositoryStar {
   @@unique([repositoryId, userId])
   @@index([userId])
   @@map("stars")
+}
+
+model RepositoryCollection {
+  id           String           @id @default(cuid())
+  repositoryId String
+  userId       String
+  name         String           @default("saved")
+  createdAt    DateTime         @default(now())
+  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, userId, name])
+  @@index([userId, createdAt])
+  @@index([repositoryId])
+  @@map("repository_collections")
 }
 
 model RepositoryFork {
@@ -410,19 +488,23 @@ model OutboxEvent {
 
 model Report {
   id           String           @id @default(cuid())
-  repositoryId String
+  repositoryId String?
   reporterId   String
+  targetType   String           @default("repository")
+  targetId     String
   reason       String
   detail       String?
   status       String           @default("open")
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
-  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  repository   PublicRepository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
   reporter     User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
   actions      ModerationAction[]
 
   @@index([repositoryId, status])
   @@index([reporterId])
+  @@index([targetType, targetId, status])
+  @@index([reporterId, targetType, targetId, createdAt])
   @@index([status, createdAt])
   @@map("reports")
 }
@@ -477,4 +559,35 @@ model StorageObject {
   @@index([repositoryId])
   @@index([releaseId])
   @@map("storage_objects")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  dedupeKey String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+model SupportFeedback {
+  id        String   @id @default(cuid())
+  userId    String
+  message   String
+  context   Json
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("support_feedback")
 }

@@ -4,9 +4,10 @@ import { ReadinessService, DEPENDENCY_HEALTH_CHECKERS } from "./readiness.servic
 import { RedisHealthChecker } from "./redis-health.checker";
 import { SearchHealthChecker } from "./search-health.checker";
 import { SystemController } from "./system.controller";
+import { WorkerHealthController } from "./worker-health.controller";
 
 @Module({
-  controllers: [SystemController],
+  controllers: [SystemController, WorkerHealthController],
   providers: [
     DatabaseHealthChecker,
     RedisHealthChecker,

@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Param, Post, Sse, UseGuards, type MessageEvent } from "@nestjs/common";
+import { Body, Controller, HttpCode, Param, Patch, Post, Sse, UseGuards, type MessageEvent } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
@@ -62,6 +62,13 @@ export class AgentController {
   @RequireScopes("world:write")
   async save(@CurrentSubject() subject: AuthSubject, @Param("suggestionId") suggestionId: string) {
     return { suggestion: await this.agentService.saveSuggestion(subject, suggestionId) };
+  }
+
+  @Patch("agent-suggestions/:suggestionId")
+  @RequireScopes("world:write")
+  async edit(@CurrentSubject() subject: AuthSubject, @Param("suggestionId") suggestionId: string, @Body() body: unknown) {
+    const input = z.object({ suggestion: z.unknown() }).parse(body);
+    return { suggestion: await this.agentService.editSuggestion(subject, suggestionId, input) };
   }
 
   @Post("agent-suggestions/:suggestionId/discard")

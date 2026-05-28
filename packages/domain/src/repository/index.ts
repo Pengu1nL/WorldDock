@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { moderationStatusSchema } from "../moderation";
+import { releaseChangeSchema, releaseStatusSchema } from "../releases";
 
 export const licenseSchema = z.enum([
   "all-rights-reserved",
@@ -13,6 +14,7 @@ export const releaseSchema = z.object({
   version: z.string().min(1),
   updated: z.string().min(1),
   note: z.string().min(1),
+  status: releaseStatusSchema.default("published"),
   addedSettings: z.number().int().min(0),
   changedSettings: z.number().int().min(0),
   removedSettings: z.number().int().min(0),
@@ -32,8 +34,10 @@ export const releaseDetailSchema = z.object({
   repositoryId: z.string().min(1),
   version: z.string().min(1),
   note: z.string().min(1),
+  status: releaseStatusSchema.default("published"),
   license: licenseSchema,
   diff: releaseDiffSchema,
+  changes: z.array(releaseChangeSchema).default([]),
   createdAt: z.string().datetime(),
 });
 

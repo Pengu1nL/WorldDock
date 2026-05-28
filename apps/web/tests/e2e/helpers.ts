@@ -70,12 +70,14 @@ const tideRepository = {
   ],
 };
 
-export async function gotoApp(page: Page) {
-  await installApiMocks(page);
-  await page.addInitScript((token) => {
-    window.localStorage.setItem("worlddock.sessionToken", token);
-  }, sessionToken);
-  await page.goto("/");
+export async function gotoApp(page: Page, options: { installMocks?: boolean } = {}) {
+  if (options.installMocks ?? true) {
+    await installApiMocks(page);
+    await page.addInitScript((token) => {
+      window.localStorage.setItem("worlddock.sessionToken", token);
+    }, sessionToken);
+  }
+  await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
 }
 
@@ -113,7 +115,11 @@ async function installApiMocks(page: Page) {
     }
 
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/archive$/.test(path)) {
-      return json(route, { archiveEntries: [] });
+      const worldId = path.split("/")[3];
+      const archiveEntries = worldId === "tide" || worldId === "ledger"
+        ? [{ id: "archive_1", title: "潮汐律", category: "世界规则", summary: "公开发布所需的已确认设定。", body: "潮汐律定义文明周期。", relations: [] }]
+        : [];
+      return json(route, { archiveEntries });
     }
 
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/seeds$/.test(path)) {
@@ -183,6 +189,52 @@ async function installApiMocks(page: Page) {
 
     if (method === "GET" && path === "/v1/repositories") {
       return json(route, { repositories: [tideRepository] });
+    }
+
+    if (method === "GET" && path === "/v1/community/repositories") {
+      return json(route, { repositories: [toCommunityRepository(tideRepository)], nextCursor: null });
+    }
+
+    if (method === "GET" && path === "/v1/community/repositories/ren/tide-book") {
+      return json(route, { repository: toCommunityRepository(tideRepository) });
+    }
+
+    if (method === "GET" && path === "/v1/community/repositories/repo_tide/assets") {
+      return json(route, {
+        repositoryId: "repo_tide",
+        releaseId: "release_tide_1",
+        assets: [],
+        nextCursor: null,
+      });
+    }
+
+    if (method === "GET" && path === "/v1/community/creators/ren") {
+      return json(route, {
+        creator: {
+          handle: "ren",
+          displayName: "ren",
+          bio: "Alpha 创作者主页",
+          stats: { repositories: 1, stars: tideRepository.stars, forks: tideRepository.forks },
+          tags: tideRepository.tags,
+          latestUpdated: tideRepository.updated,
+        },
+      });
+    }
+
+    if (method === "GET" && path === "/v1/community/creators/ren/repositories") {
+      return json(route, { repositories: [toCommunityRepository(tideRepository)], nextCursor: null });
+    }
+
+    if (method === "POST" && path === "/v1/community/repositories/repo_tide/collections") {
+      return json(route, {
+        collection: {
+          id: "collection_1",
+          repositoryId: "repo_tide",
+          userId: "user_1",
+          name: "saved",
+          createdAt: "2026-05-28T10:00:00.000Z",
+        },
+      });
     }
 
     if (method === "GET" && path === "/v1/repositories/search") {
@@ -298,6 +350,16 @@ function json(route: Route, body: unknown, status = 200) {
 
 function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function toCommunityRepository(repository: typeof tideRepository) {
+  return {
+    ...repository,
+    latestRelease: repository.releases[0],
+    releaseHistory: repository.releases,
+    assetCounts: { archive: 47, seeds: repository.seeds, conflicts: 6 },
+    forkGraph: { repositoryId: repository.id, forks: [] },
+  };
 }
 
 function postData(request: ReturnType<Route["request"]>) {

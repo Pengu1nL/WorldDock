@@ -1,6 +1,11 @@
 import * as Sentry from "@sentry/node";
 import { trace } from "@opentelemetry/api";
 
+type ObservabilityContext = {
+  tags?: Record<string, string>;
+  extra?: Record<string, unknown>;
+};
+
 export function initObservability(serviceName: string) {
   if (process.env.SENTRY_DSN) {
     Sentry.init({
@@ -12,12 +17,33 @@ export function initObservability(serviceName: string) {
   }
 }
 
-export function captureException(error: unknown) {
+export function captureException(error: unknown, context?: ObservabilityContext) {
   if (process.env.SENTRY_DSN) {
-    Sentry.captureException(error);
+    Sentry.withScope((scope) => {
+      applyContext(scope, context);
+      Sentry.captureException(error);
+    });
+  }
+}
+
+export function captureMessage(message: string, context?: ObservabilityContext) {
+  if (process.env.SENTRY_DSN) {
+    Sentry.withScope((scope) => {
+      applyContext(scope, context);
+      Sentry.captureMessage(message);
+    });
   }
 }
 
 export function getTracer() {
   return trace.getTracer("worlddock-api");
+}
+
+function applyContext(scope: Sentry.Scope, context?: ObservabilityContext) {
+  for (const [key, value] of Object.entries(context?.tags ?? {})) {
+    scope.setTag(key, value);
+  }
+  if (context?.extra) {
+    scope.setExtras(context.extra);
+  }
 }

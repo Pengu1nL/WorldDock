@@ -27,7 +27,7 @@ export type ModerationScanSource = {
   flagRepository(repositoryId: string, reason: string): Promise<unknown>;
 };
 
-const sensitiveWords = ["违禁", "暴恐", "仇恨"];
+const sensitiveWords = ["违禁", "暴恐", "仇恨", "spam", "api key", "credential"];
 
 export function scanRepositoryForModeration(repository: RepositoryModerationSnapshot, openReportCount: number) {
   const findings: string[] = [];
@@ -39,6 +39,10 @@ export function scanRepositoryForModeration(repository: RepositoryModerationSnap
 
   if (sensitiveWords.some((word) => text.includes(word))) {
     findings.push("sensitive_word");
+  }
+
+  if (repository.tags.some((tag) => ["spam", "scam", "credential-leak"].includes(tag.toLowerCase()))) {
+    findings.push("abuse_tag");
   }
 
   if (openReportCount >= DUPLICATE_REPORT_THRESHOLD) {

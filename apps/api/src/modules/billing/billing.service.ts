@@ -1,5 +1,5 @@
 import { HttpException, Inject, Injectable } from "@nestjs/common";
-import type { TokenUsage } from "@worlddock/domain";
+import { calculateModelRunCostCents, type ModelPrice, type TokenUsage } from "@worlddock/domain";
 import { BILLING_REPOSITORY, type BillingAccountRecord, type BillingRepository, type UsageLedgerEntryRecord } from "./billing.repository";
 
 export const INITIAL_FREE_CREDIT_CENTS = 10_000;
@@ -23,6 +23,7 @@ export class BillingService {
       balance: this.toBalance(userId, entries, account.updatedAt),
       lastAgentRun: this.findLastAgentRun(entries),
       entries,
+      placeholderIntents: await this.billing.listPlaceholderIntents(userId),
     };
   }
 
@@ -50,13 +51,18 @@ export class BillingService {
     });
   }
 
-  async settleAgentRun(userId: string, agentRunId: string, tokenUsage: TokenUsage) {
+  async settleAgentRun(
+    userId: string,
+    agentRunId: string,
+    tokenUsage: TokenUsage,
+    priceInput: { provider?: ModelPrice["provider"] | string | null; model?: string | null } = {},
+  ) {
     const account = await this.ensureAccount(userId);
     const entries = await this.billing.listLedgerEntriesForRun(agentRunId);
     if (entries.some((entry) => entry.type === "model_run_settled")) return null;
 
     const reservedCents = this.reservedCents(entries);
-    const costCents = calculateAgentRunCostCents(tokenUsage);
+    const costCents = calculateAgentRunCostCents(tokenUsage, priceInput);
     return this.billing.createLedgerEntry({
       accountId: account.id,
       userId,
@@ -84,6 +90,16 @@ export class BillingService {
       amountCents: reservedCents,
       tokenUsage: null,
       reason,
+    });
+  }
+
+  async capturePlaceholderIntent(userId: string, plan: string) {
+    const account = await this.ensureAccount(userId);
+    return this.billing.createPlaceholderIntent({
+      accountId: account.id,
+      userId,
+      plan,
+      source: "alpha_ui",
     });
   }
 
@@ -135,9 +151,33 @@ export class BillingService {
   }
 }
 
-export function calculateAgentRunCostCents(tokenUsage: TokenUsage) {
+export function calculateAgentRunCostCents(
+  tokenUsage: TokenUsage,
+  priceInput: { provider?: ModelPrice["provider"] | string | null; model?: string | null } = {},
+) {
   if (tokenUsage.totalTokens <= 0) return 0;
-  return Math.max(1, Math.ceil(tokenUsage.totalTokens / 10));
+  const modelPrice = normalizeModelPriceInput(priceInput);
+  return calculateModelRunCostCents({
+    provider: modelPrice.provider,
+    model: modelPrice.model,
+    inputTokens: tokenUsage.inputTokens,
+    outputTokens: tokenUsage.outputTokens,
+  });
+}
+
+function normalizeModelPriceInput(input: { provider?: ModelPrice["provider"] | string | null; model?: string | null }) {
+  const model = normalizeModelName(input.model ?? "qwen3-32b");
+  if (input.provider === "openai" || model.startsWith("gpt-")) return { provider: "openai" as const, model };
+  if (input.provider === "anthropic" || model.startsWith("claude")) return { provider: "anthropic" as const, model };
+  if (input.provider === "openai-compatible") return { provider: "openai-compatible" as const, model };
+  if (model === "mock") return { provider: "openai-compatible" as const, model: "qwen3-32b" };
+  return { provider: "openai-compatible" as const, model };
+}
+
+function normalizeModelName(model: string) {
+  if (model.startsWith("openai/")) return model.replace("openai/", "");
+  if (model.startsWith("anthropic/")) return model.replace("anthropic/", "");
+  return model;
 }
 
 function calculateSettledCostCents(entries: UsageLedgerEntryRecord[]) {

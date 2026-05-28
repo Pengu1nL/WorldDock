@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
+import { DataRightsPage } from "../account/data-rights-page";
+import { BillingPage } from "../billing/billing-page";
+import { ImportExportPanel } from "../worlds/import-export-panel";
 import {
+  captureBillingPlaceholderIntent,
   createAccessToken,
   getBillingUsage,
   listAccessTokens,
@@ -14,6 +18,7 @@ type SettingsViewProps = {
   mode: WorldMode;
   balance: number;
   communityConnected: boolean;
+  currentWorld?: { id: string; name: string } | null;
   onBack: () => void;
   onToast: (toast: { kind: "save" | "warn" | "info"; text: string }) => void;
   onCommunityConnected: (connected: boolean) => void;
@@ -23,6 +28,7 @@ export function SettingsView({
   mode,
   balance,
   communityConnected,
+  currentWorld,
   onBack,
   onToast,
   onCommunityConnected,
@@ -55,6 +61,22 @@ export function SettingsView({
       setBillingBusy(false);
     }
   }, [onToast]);
+
+  const joinBillingWaitlist = async (plan: "creator" | "studio" | "team") => {
+    const session = sessionToken();
+    if (!session) {
+      onToast({ kind: "info", text: "已记录本地候补意向 · 登录后可同步" });
+      return;
+    }
+
+    try {
+      await captureBillingPlaceholderIntent({ plan }, { sessionToken: session });
+      onToast({ kind: "save", text: "已加入 Beta 支付候补" });
+      await refreshBilling();
+    } catch {
+      onToast({ kind: "warn", text: "候补登记失败 · 请稍后重试" });
+    }
+  };
 
   useEffect(() => {
     if (tab === "billing") void refreshBilling();
@@ -153,28 +175,13 @@ export function SettingsView({
 
       <div style={{ padding: "20px 32px 40px", maxWidth: 860 }}>
         {tab === "billing" && (
-          <section className="card" style={{ padding: 18 }}>
-            <h2 className="title-font" style={{ marginTop: 0 }}>用量与余额</h2>
-            <Metric label="当前余额" value={formatCents(billingUsage?.balance.balanceCents ?? Math.round(balance * 100))} />
-            <Metric label="最近一次 Agent Run" value={formatLastAgentRun(billingUsage)} />
-            <Metric label="最近账本条目" value={billingUsage ? `${billingUsage.entries.length} 条` : "未同步"} />
-            <div className="badge amber">余额低于 ¥5.00 时会拦截新的 Agent Run</div>
-            <div style={{ marginTop: 12 }}>
-              <button className="btn ghost" disabled={billingBusy} onClick={refreshBilling}>
-                <Icon name="refresh" size={12} /><span>{billingBusy ? "同步中" : "刷新用量"}</span>
-              </button>
-            </div>
-            {billingUsage && billingUsage.entries.length > 0 && (
-              <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-                {billingUsage.entries.slice(0, 5).map((entry) => (
-                  <div key={entry.id} className="row gap-2" style={{ justifyContent: "space-between", borderTop: "1px solid var(--hairline)", paddingTop: 8 }}>
-                    <span className="mono">{entry.type}</span>
-                    <span className="mono">{formatSignedCents(entry.amountCents)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <BillingPage
+            balanceCents={Math.round(balance * 100)}
+            usage={billingUsage}
+            busy={billingBusy}
+            onRefresh={refreshBilling}
+            onWaitlist={joinBillingWaitlist}
+          />
         )}
         {tab === "model" && (
           <section className="card" style={{ padding: 18 }}>
@@ -254,22 +261,18 @@ export function SettingsView({
           </section>
         )}
         {tab === "data" && (
-          <section className="card" style={{ padding: 18 }}>
+          <section style={{ display: "grid", gap: 18 }}>
+            <div className="card" style={{ padding: 18 }}>
             <h2 className="title-font" style={{ marginTop: 0 }}>导入导出</h2>
-            <button className="btn"><Icon name="download" size={12} /><span>导出世界包</span></button>
-            <button className="btn" style={{ marginLeft: 8 }}><Icon name="upload" size={12} /><span>导入世界包</span></button>
+              <ImportExportPanel world={currentWorld} sessionToken={sessionToken()} onToast={onToast} />
+            </div>
+            <div className="card" style={{ padding: 18 }}>
+              <h2 className="title-font" style={{ marginTop: 0 }}>数据权利</h2>
+              <DataRightsPage sessionToken={sessionToken()} onToast={onToast} />
+            </div>
           </section>
         )}
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="row gap-2" style={{ justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--hairline)" }}>
-      <span>{label}</span>
-      <span className="mono">{value}</span>
     </div>
   );
 }
@@ -281,18 +284,4 @@ function Field({ label, value }: { label: string; value: string }) {
       <input className="input" aria-label={label} value={value} readOnly style={{ width: "min(100%, 360px)" }} />
     </label>
   );
-}
-
-function formatCents(cents: number) {
-  return `¥${(cents / 100).toFixed(2)}`;
-}
-
-function formatSignedCents(cents: number) {
-  const prefix = cents > 0 ? "+" : "";
-  return `${prefix}${formatCents(cents)}`;
-}
-
-function formatLastAgentRun(usage: BillingUsage | null) {
-  if (!usage?.lastAgentRun) return "暂无真实记录";
-  return `${usage.lastAgentRun.tokenUsage.totalTokens} tokens / ${formatCents(usage.lastAgentRun.costCents)}`;
 }

@@ -1,6 +1,7 @@
 import { type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import { parseWorldDockEnv } from "@worlddock/config";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { AppModule } from "../src/app.module";
@@ -98,6 +99,26 @@ describe("system endpoints", () => {
         ],
       },
     });
+  });
+
+  it("rejects unsafe production runtime configuration before service startup", () => {
+    expect(() =>
+      parseWorldDockEnv({
+        NODE_ENV: "production",
+        APP_ENV: "production",
+        API_PORT: "4000",
+        WEB_APP_URL: "https://worlddock.example",
+        DATABASE_URL: "postgresql://worlddock:worlddock@db.example:5432/worlddock",
+        REDIS_URL: "redis://redis.example:6379",
+        MEILISEARCH_HOST: "https://search.worlddock.example",
+        S3_ENDPOINT: "https://s3.worlddock.example",
+        S3_BUCKET: "worlddock-prod",
+        BETTER_AUTH_SECRET: "prod_secret_at_least_32_chars_value",
+        BETTER_AUTH_URL: "https://api.worlddock.example",
+        AI_PROVIDER: "mock",
+        SENTRY_DSN: "https://public@example.com/1",
+      }),
+    ).toThrow("AI_PROVIDER=mock is not allowed in production.");
   });
 });
 

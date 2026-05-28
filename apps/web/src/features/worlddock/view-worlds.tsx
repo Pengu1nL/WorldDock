@@ -3,6 +3,45 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon, Maturity } from "./components";
 
+const CREATION_SEEDS = {
+  memory: {
+    tools: [
+      { id: "ctx", label: "分析灵感主题", detail: "提取核心概念：记忆 / 交易 / 财产权 / 身份" },
+      { id: "rules", label: "检索相关规则模板", detail: "近未来法律体系 · 经济制度 · 神经科技伦理" },
+      { id: "shape", label: "生成世界雏形", detail: "收束名称、类型、核心设定与第一轮问题" },
+    ],
+    suggestedName: "回忆所",
+    suggestedType: "近未来 / 软科幻 / 社会派",
+    styles: ["冷静观察", "制度细节", "道德灰度"],
+    coreSetting: "在一个允许记忆作为资产交易的近未来社会，个人最私密的体验成为了可估值、可转让、可继承的财产。",
+    coreConflict: "记忆是不可让渡的人格延伸，还是可以定价的私有财产？",
+    directions: [
+      "深入《记忆交易法》的制度细节与监管漏洞",
+      "聚焦黑市与「完整人生」打包交易",
+      "探讨记忆植入后宿主的身份连续性",
+    ],
+    firstQuestion: "你倾向于让记忆交易是成熟合法市场，还是刚被立法承认、仍在制造伦理震荡的新行业？",
+  },
+  city: {
+    tools: [
+      { id: "ctx", label: "分析灵感主题", detail: "提取核心概念：意识 / 城市 / 居民" },
+      { id: "rules", label: "检索相关规则模板", detail: "都市奇幻 · 集体意识 · 拟人化制度" },
+      { id: "shape", label: "生成世界雏形", detail: "收束名称、类型、核心设定与第一轮问题" },
+    ],
+    suggestedName: "市声",
+    suggestedType: "都市奇幻 / 思辨",
+    styles: ["拟人化制度", "建筑学诗意", "缓慢张力"],
+    coreSetting: "城市拥有集体意识，居民同时是它的细胞、它的语言、它的食物。",
+    coreConflict: "城市的福祉与个体居民的福祉何时一致，何时撕裂？",
+    directions: [
+      "城市的「神经系统」如何通过交通、电力和广播表达",
+      "失语城市与流亡居民的关系",
+      "两座有意识城市之间的外交",
+    ],
+    firstQuestion: "城市的意识是单一的「她」，还是由街区议会争吵出来的「我们」？",
+  },
+};
+
 // ────────── World card ──────────
 const WorldCard = ({ world, onOpen, onDelete, onDuplicate }: any) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -120,7 +159,7 @@ const EmptyWorldCard = ({ inspirations, onPick }: any) => (
 );
 
 // ────────── Worlds list view ──────────
-export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDraft, onDelete, onDuplicate, hideDraftFromList }: any) => {
+export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDraft, onDelete, onDuplicate, hideDraftFromList, cloudState = "fixture", cloudOnly = false }: any) => {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
 
@@ -140,6 +179,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
     "如果一座城市本身是有意识的。",
     "审判必须由被告自己说出。",
   ];
+  const showCloudState = cloudState === "loading" || cloudState === "error" || (cloudState === "ready" && worlds.length === 0);
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
@@ -172,7 +212,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
           { id: "all", label: "全部", n: worlds.length },
           { id: "published", label: "已公开", n: worlds.filter((w: any) => w.status === "published").length },
           { id: "draft", label: "草稿 / 未公开", n: worlds.filter((w: any) => w.status !== "published").length },
-          { id: "local", label: "Local", n: worlds.filter((w: any) => w.mode === "local").length },
+          ...(!cloudOnly ? [{ id: "local", label: "Local", n: worlds.filter((w: any) => w.mode === "local").length }] : []),
         ].map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
             className={"sb-btn " + (filter === f.id ? "primary" : "")}
@@ -191,6 +231,21 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
         gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
         gap: 14,
       }}>
+        {cloudState === "loading" && (
+          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+            正在同步云端世界...
+          </div>
+        )}
+        {cloudState === "error" && (
+          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+            云端世界暂不可用，请稍后重试。
+          </div>
+        )}
+        {cloudState === "ready" && worlds.length === 0 && (
+          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+            还没有云端世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个</a>
+          </div>
+        )}
         {savedDraft && (
           <button className="card hover" onClick={onContinueDraft}
             style={{
@@ -221,7 +276,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
           </button>
         )}
         {filtered.map((w: any) => <WorldCard key={w.id} world={w} onOpen={onOpen} onDelete={onDelete} onDuplicate={onDuplicate}/>)}
-        {!savedDraft && filtered.length === 0 && (
+        {!savedDraft && filtered.length === 0 && !showCloudState && (
           <div style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
             没有匹配的世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个 →</a>
           </div>
@@ -232,12 +287,43 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
   );
 };
 
-export const CreateView = ({ initialInspiration, onConfirm, onCancel }: any) => {
+// ────────── Create World view ──────────
+export const CreateView = ({ initialInspiration, seedKey, onConfirm, onCancel }: any) => {
+  const [step, setStep] = useState("input");   // 'input' | 'generating' | 'confirm'
   const [inspiration, setInspiration] = useState(initialInspiration || "");
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [styleKw, setStyleKw] = useState("");
   const [avoid, setAvoid] = useState("");
+  const [seedData, setSeedData] = useState<any>(null);
+  const [progressIdx, setProgressIdx] = useState(0);
+
+  const seed = (CREATION_SEEDS as Record<string, typeof CREATION_SEEDS.memory>)[seedKey] ?? CREATION_SEEDS.memory;
+
+  useEffect(() => {
+    if (step !== "generating") return;
+    const data = seed;
+    let i = 0;
+    const adv = () => {
+      if (i < data.tools.length) {
+        setProgressIdx(i + 1);
+        i++;
+        setTimeout(adv, 700);
+      } else {
+        setTimeout(() => {
+          setSeedData(data);
+          setStep("confirm");
+        }, 400);
+      }
+    };
+    adv();
+  }, [step, seedKey, seed]);
+
+  const startGen = () => {
+    if (!inspiration.trim()) return;
+    setProgressIdx(0);
+    setStep("generating");
+  };
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
@@ -245,55 +331,208 @@ export const CreateView = ({ initialInspiration, onConfirm, onCancel }: any) => 
         <div className="col">
           <div className="crumb">/ ren / worlds / <span style={{ color: "var(--fg-1)" }}>new</span></div>
           <h1>创建世界</h1>
-          <div className="sub">用一句灵感启动。创建后会直接进入真实 Agent 推演。</div>
+          <div className="sub">用一句灵感启动。其余的，让 Agent 先帮你推演出第一个雏形。</div>
         </div>
         <button className="btn ghost" onClick={onCancel}>取消</button>
       </div>
 
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "32px 32px 60px" }}>
-        <div className="col gap-6" style={{ gap: 20 }}>
+        {step === "input" && (
+          <div className="col gap-6" style={{ gap: 20 }}>
+            <div>
+              <label className="label" htmlFor="initial-inspiration">初始灵感 <span className="opt">必填</span></label>
+              <textarea id="initial-inspiration" className="textarea" placeholder="一句话就够。例如：一个世界里，记忆可以被买卖。"
+                value={inspiration} onChange={(e: any) => setInspiration(e.target.value)} rows={3}
+                style={{ fontSize: "var(--t-15)", lineHeight: 1.6 }} autoFocus/>
+            </div>
+            <div className="row gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              <div>
+                <label className="label" htmlFor="world-name">世界名称 <span className="opt">可选 — Agent 会建议</span></label>
+                <input id="world-name" className="input" placeholder="留空让 Agent 起名"
+                  value={name} onChange={(e: any) => setName(e.target.value)}/>
+              </div>
+              <div>
+                <label className="label" htmlFor="world-type">类型 <span className="opt">可选</span></label>
+                <input id="world-type" className="input" placeholder="近未来 / 奇幻 / 蒸汽朋克…"
+                  value={type} onChange={(e: any) => setType(e.target.value)}/>
+              </div>
+            </div>
+            <div className="row gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+              <div>
+                <label className="label" htmlFor="world-style">风格关键词 <span className="opt">可选</span></label>
+                <input id="world-style" className="input" placeholder="冷静观察 · 制度细节 · 道德灰度"
+                  value={styleKw} onChange={(e: any) => setStyleKw(e.target.value)}/>
+              </div>
+              <div>
+                <label className="label" htmlFor="world-avoid">不想要的方向 <span className="opt">可选</span></label>
+                <input id="world-avoid" className="input" placeholder="例如：爽文 / 单线主角 / 一键拯救世界"
+                  value={avoid} onChange={(e: any) => setAvoid(e.target.value)}/>
+              </div>
+            </div>
+
+            <div className="row gap-2" style={{ justifyContent: "space-between", marginTop: 10 }}>
+              <span style={{ fontSize: 12, color: "var(--fg-3)" }}>
+                Agent 会先生成一个可推演的雏形，让你确认再创建世界。
+              </span>
+              <button className="btn primary lg" onClick={startGen} disabled={!inspiration.trim()}>
+                <Icon name="spark" size={14}/>
+                <span>开始推演</span>
+                <span className="kbd">↵</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === "generating" && (
+          <div className="col gap-4" style={{ padding: "20px 0", gap: 14 }}>
+            <div className="card" style={{ padding: 16 }}>
+              <div className="row gap-2" style={{ marginBottom: 10 }}>
+                <span className="dot sage pulse"/>
+                <span className="mono" style={{ fontSize: 12, color: "var(--sage)" }}>agent.run.started</span>
+                <span style={{ flex: 1 }}/>
+                <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{progressIdx}/{seed.tools.length}</span>
+              </div>
+              <div className="col" style={{ gap: 6 }}>
+                {seed.tools.map((t: any, i: number) => {
+                  const state = i < progressIdx ? "done" : i === progressIdx ? "running" : "queued";
+                  return (
+                    <div key={t.id} className="row gap-2" style={{
+                      padding: "8px 10px", borderRadius: 4,
+                      background: state === "running" ? "var(--surface-2)" : "transparent",
+                      opacity: state === "queued" ? 0.5 : 1,
+                    }}>
+                      {state === "done" && <Icon name="check" size={12} style={{ color: "var(--sage)" }}/>}
+                      {state === "running" && <span className="dot sage pulse" style={{ width: 6, height: 6, boxShadow: "none" }}/>}
+                      {state === "queued" && <span className="dot muted" style={{ width: 6, height: 6, boxShadow: "none" }}/>}
+                      <span className="mono" style={{ fontSize: 11, color: "var(--fg-2)", minWidth: 110 }}>{t.label}</span>
+                      <span style={{ fontSize: 12, color: "var(--fg-1)", flex: 1 }}>{t.detail}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{ textAlign: "center", color: "var(--fg-3)", fontSize: 12 }}>
+              正在生成世界雏形，请稍候 …
+            </div>
+          </div>
+        )}
+
+        {step === "confirm" && seedData && (
+          <ConfirmCard
+            seed={seedData}
+            overrideName={name}
+            overrideType={type}
+            onRegenerate={() => { setSeedData(null); setStep("generating"); }}
+            onConfirm={(finalName: any) => onConfirm({
+              name: finalName || seedData.suggestedName,
+              type: type || seedData.suggestedType,
+              inspiration,
+              styleKw,
+              avoid,
+              seedKey,
+            })}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ────────── World seed confirmation card ──────────
+const ConfirmCard = ({ seed, overrideName, overrideType, onRegenerate, onConfirm }: any) => {
+  const [name, setName] = useState(overrideName || seed.suggestedName);
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="col gap-4" style={{ gap: 14 }}>
+      <div className="row gap-2">
+        <span className="badge sage"><Icon name="check" size={10}/>&nbsp;雏形已生成</span>
+        <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
+          agent.run.completed · 4.2s · 1,283 tokens
+        </span>
+      </div>
+
+      <div className="card" style={{ padding: 20, borderColor: "var(--border-2)" }}>
+        <div className="col gap-3" style={{ gap: 14 }}>
           <div>
-            <label className="label" htmlFor="initial-inspiration">初始灵感 <span className="opt">必填</span></label>
-            <textarea id="initial-inspiration" className="textarea" placeholder="一句话就够。例如：一个世界里，记忆可以被买卖。"
-              value={inspiration} onChange={(e: any) => setInspiration(e.target.value)} rows={3}
-              style={{ fontSize: "var(--t-15)", lineHeight: 1.6 }} autoFocus/>
-          </div>
-          <div className="row gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-            <div>
-              <label className="label" htmlFor="world-name">世界名称 <span className="opt">可选</span></label>
-              <input id="world-name" className="input" placeholder="留空使用灵感摘要"
-                value={name} onChange={(e: any) => setName(e.target.value)}/>
-            </div>
-            <div>
-              <label className="label" htmlFor="world-type">类型 <span className="opt">可选</span></label>
-              <input id="world-type" className="input" placeholder="近未来 / 奇幻 / 蒸汽朋克…"
-                value={type} onChange={(e: any) => setType(e.target.value)}/>
-            </div>
-          </div>
-          <div className="row gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
-            <div>
-              <label className="label" htmlFor="world-style">风格关键词 <span className="opt">可选</span></label>
-              <input id="world-style" className="input" placeholder="冷静观察 · 制度细节 · 道德灰度"
-                value={styleKw} onChange={(e: any) => setStyleKw(e.target.value)}/>
-            </div>
-            <div>
-              <label className="label" htmlFor="world-avoid">不想要的方向 <span className="opt">可选</span></label>
-              <input id="world-avoid" className="input" placeholder="例如：爽文 / 单线主角 / 一键拯救世界"
-                value={avoid} onChange={(e: any) => setAvoid(e.target.value)}/>
+            <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 4 }} className="mono">建议名称</div>
+            {editing ? (
+              <input className="input" value={name} onChange={(e: any) => setName(e.target.value)} autoFocus
+                onBlur={() => setEditing(false)}
+                style={{ fontSize: "var(--t-22)", fontWeight: 600, fontFamily: "var(--font-serif)" }}/>
+            ) : (
+              <div className="row gap-2">
+                <h2 className="title-font">{name}</h2>
+                <button className="btn ghost sm" onClick={() => setEditing(true)}>
+                  <Icon name="edit" size={11}/><span>改</span>
+                </button>
+              </div>
+            )}
+            <div className="row gap-2" style={{ marginTop: 6 }}>
+              <span className="tag plain">{overrideType || seed.suggestedType}</span>
+              {seed.styles.map((s: any) => <span key={s} className="tag">{s}</span>)}
             </div>
           </div>
 
-          <div className="row gap-2" style={{ justifyContent: "flex-end", marginTop: 10 }}>
-            <button
-              className="btn primary lg"
-              onClick={() => onConfirm({ name, type, inspiration, styleKw, avoid })}
-              disabled={!inspiration.trim()}
-            >
-              <Icon name="spark" size={14}/>
-              <span>创建并进入工作台</span>
-              <span className="kbd">↵</span>
-            </button>
+          <div className="divider"/>
+
+          <div>
+            <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 6 }} className="mono">核心设定</div>
+            <p className="prose" style={{ fontSize: "var(--t-15)", color: "var(--fg)", lineHeight: 1.65 }}>
+              {seed.coreSetting}
+            </p>
           </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 6 }} className="mono">核心矛盾</div>
+            <p className="prose" style={{ fontSize: "var(--t-14)", color: "var(--fg-1)", lineHeight: 1.6 }}>
+              {seed.coreConflict}
+            </p>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: "var(--fg-3)", marginBottom: 6 }} className="mono">可推演方向</div>
+            <div className="col" style={{ gap: 4 }}>
+              {seed.directions.map((d: any, i: number) => (
+                <div key={i} className="row gap-2" style={{ fontSize: "var(--t-13)", color: "var(--fg-1)" }}>
+                  <span className="mono" style={{ color: "var(--amber)", minWidth: 16 }}>0{i + 1}</span>
+                  <span>{d}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="divider"/>
+
+          <div className="card" style={{
+            padding: 12, background: "var(--slate-bg)", borderColor: "var(--slate-dim)",
+          }}>
+            <div className="row gap-2" style={{ marginBottom: 6 }}>
+              <Icon name="spark" size={12} style={{ color: "var(--slate)" }}/>
+              <span className="mono" style={{ fontSize: 11, color: "var(--slate)" }}>第一轮追问</span>
+            </div>
+            <p style={{ fontSize: "var(--t-14)", color: "var(--fg)", lineHeight: 1.55 }}>
+              {seed.firstQuestion}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, color: "var(--fg-3)", padding: "0 4px" }}>
+        这只是一个起点。创建后可以在工作台继续推演、收束、保存为档案。
+      </div>
+
+      <div className="row gap-2" style={{ justifyContent: "space-between" }}>
+        <button className="btn ghost" onClick={onRegenerate}>
+          <Icon name="refresh" size={12}/>
+          <span>重新生成</span>
+        </button>
+        <div className="row gap-2">
+          <button className="btn">编辑后创建</button>
+          <button className="btn primary lg" onClick={() => onConfirm(name)}>
+            <span>确认并进入工作台</span>
+            <Icon name="chevron" size={13}/>
+          </button>
         </div>
       </div>
     </div>

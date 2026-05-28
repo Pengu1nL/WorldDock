@@ -9,6 +9,7 @@ import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type Stor
 import {
   BILLING_REPOSITORY,
   type BillingAccountRecord,
+  type BillingPlaceholderIntentRecord,
   type BillingRepository,
   type UsageLedgerEntryRecord,
 } from "../src/modules/billing/billing.repository";
@@ -101,6 +102,7 @@ function createInMemoryAuthRepository() {
 function createInMemoryBillingRepository() {
   const accounts = new Map<string, BillingAccountRecord>();
   const entries = new Map<string, UsageLedgerEntryRecord>();
+  const placeholderIntents = new Map<string, BillingPlaceholderIntentRecord>();
 
   const repository: BillingRepository = {
     async findAccountByUserId(userId) {
@@ -140,6 +142,19 @@ function createInMemoryBillingRepository() {
     },
     async listLedgerEntriesForRun(agentRunId) {
       return [...entries.values()].filter((entry) => entry.agentRunId === agentRunId);
+    },
+    async createPlaceholderIntent(input) {
+      const intent: BillingPlaceholderIntentRecord = {
+        id: `bpi_${placeholderIntents.size + 1}`,
+        createdAt: new Date(),
+        status: input.status ?? "captured",
+        ...input,
+      };
+      placeholderIntents.set(intent.id, intent);
+      return intent;
+    },
+    async listPlaceholderIntents(userId) {
+      return [...placeholderIntents.values()].filter((intent) => intent.userId === userId);
     },
   };
 

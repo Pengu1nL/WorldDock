@@ -11,6 +11,7 @@ import { createRepositorySearchQueue, createRepositorySearchWorker, enqueuePendi
 export * from "./meilisearch-index";
 export * from "./moderation-scan";
 export * from "./observability";
+export * from "./queue-dashboard";
 export * from "./repository-source";
 export * from "./search-indexing";
 export * from "./search-indexing.queue";

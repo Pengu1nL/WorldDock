@@ -10,6 +10,8 @@ export type AgentRunRecord = {
   mode: "expand" | "challenge" | "fork" | "polish";
   prompt: string;
   model?: string | null;
+  provider: "openai" | "mock" | "vercel-ai" | "pi";
+  piSessionId?: string | null;
   tokenUsage?: TokenUsage | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,7 +30,7 @@ export type AgentSuggestionRecord = {
   id: string;
   runId: string;
   worldId: string;
-  status: "pending" | "saved" | "discarded";
+  status: "pending" | "edited" | "saved" | "discarded" | "superseded";
   suggestion: WorldSuggestion;
   savedAssetId?: string | null;
 };
@@ -40,10 +42,12 @@ export type ContextRefRecord = {
   title: string;
   excerpt: string;
   targetId?: string | null;
+  level?: "manifest" | "card" | "brief" | "detail" | "source_fragment" | "release_delta";
+  source?: "initial" | "tool";
 };
 
 export type AgentRepository = {
-  createRun(input: Pick<AgentRunRecord, "worldId" | "userId" | "mode" | "prompt" | "model">): Promise<AgentRunRecord>;
+  createRun(input: Pick<AgentRunRecord, "worldId" | "userId" | "mode" | "prompt" | "model"> & Partial<Pick<AgentRunRecord, "provider" | "piSessionId">>): Promise<AgentRunRecord>;
   findRunById(id: string): Promise<AgentRunRecord | null>;
   updateRun(id: string, input: Partial<AgentRunRecord>): Promise<AgentRunRecord | null>;
   appendEvent(input: Omit<AgentEventRecord, "id" | "createdAt">): Promise<AgentEventRecord>;

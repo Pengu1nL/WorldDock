@@ -1,6 +1,6 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
-import { moderationActionSchema, moderationStatusSchema, reportReasonSchema, reportStatusSchema } from "@worlddock/domain";
+import { moderationActionSchema, moderationStatusSchema, reportReasonSchema, reportStatusSchema, reportTargetTypeSchema } from "@worlddock/domain";
 import type { ModerationActionRecord, ModerationRepository, ReportRecord } from "./moderation.repository";
 
 @Injectable()
@@ -10,6 +10,22 @@ export class PrismaModerationRepository implements ModerationRepository, OnModul
   async createReport(input: Parameters<ModerationRepository["createReport"]>[0]) {
     const report = await this.prisma.report.create({ data: input });
     return mapReport(report);
+  }
+
+  async findReportByReporterTargetOnDay(input: Parameters<ModerationRepository["findReportByReporterTargetOnDay"]>[0]) {
+    const report = await this.prisma.report.findFirst({
+      where: {
+        reporterId: input.reporterId,
+        targetType: input.targetType,
+        targetId: input.targetId,
+        createdAt: {
+          gte: input.dayStart,
+          lt: input.dayEnd,
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    return report ? mapReport(report) : null;
   }
 
   async listReports(status?: ReportRecord["status"]) {
@@ -36,6 +52,10 @@ export class PrismaModerationRepository implements ModerationRepository, OnModul
     return this.prisma.report.count({ where: { repositoryId, status: "open" } });
   }
 
+  async countOpenReportsForTarget(targetType: ReportRecord["targetType"], targetId: string) {
+    return this.prisma.report.count({ where: { targetType, targetId, status: "open" } });
+  }
+
   async createAction(input: Parameters<ModerationRepository["createAction"]>[0]) {
     const action = await this.prisma.moderationAction.create({ data: input });
     return mapAction(action);
@@ -48,8 +68,10 @@ export class PrismaModerationRepository implements ModerationRepository, OnModul
 
 function mapReport(record: {
   id: string;
-  repositoryId: string;
+  repositoryId: string | null;
   reporterId: string;
+  targetType: string;
+  targetId: string;
   reason: string;
   detail: string | null;
   status: string;
@@ -60,6 +82,8 @@ function mapReport(record: {
     id: record.id,
     repositoryId: record.repositoryId,
     reporterId: record.reporterId,
+    targetType: reportTargetTypeSchema.parse(record.targetType),
+    targetId: record.targetId,
     reason: reportReasonSchema.parse(record.reason),
     detail: record.detail,
     status: reportStatusSchema.parse(record.status),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWorldDockEnv, runtimeEnvironmentSchema } from "../src";
+import { parseWorldDockEnv, runtimeEnvironmentSchema, worldDockEditionSchema } from "../src";
 
 function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
@@ -25,8 +25,17 @@ describe("@worlddock/config env", () => {
     expect(runtimeEnvironmentSchema.parse("production")).toBe("production");
   });
 
+  it("accepts supported WorldDock editions", () => {
+    expect(worldDockEditionSchema.parse("cloud")).toBe("cloud");
+    expect(worldDockEditionSchema.parse("local")).toBe("local");
+  });
+
   it("parses the minimal backend environment shared by API and worker", () => {
-    expect(parseWorldDockEnv(baseEnv()).API_PORT).toBe(4000);
+    const parsed = parseWorldDockEnv(baseEnv());
+
+    expect(parsed.API_PORT).toBe(4000);
+    expect(parsed.WORLD_DOCK_EDITION).toBe("cloud");
+    expect(parsed.AI_PROVIDER).toBe("openai");
   });
 
   it("requires a 32 character Better Auth secret", () => {
@@ -41,28 +50,30 @@ describe("@worlddock/config env", () => {
     ).toThrow();
   });
 
-  it("defaults the agent provider to the real OpenAI provider", () => {
-    expect(parseWorldDockEnv(baseEnv()).AI_PROVIDER).toBe("openai");
-  });
-
   it("rejects the disabled mock agent provider", () => {
     expect(() =>
       parseWorldDockEnv(baseEnv({ AI_PROVIDER: "mock" })),
-    ).toThrow();
+    ).toThrow(/AI_PROVIDER=mock/);
   });
 
-  it("normalizes blank optional AI secrets so non-agent workers can parse copied env files", () => {
+  it("normalizes blank optional provider secrets so copied env files can parse", () => {
     const parsed = parseWorldDockEnv(
       baseEnv({
         AI_MODEL: "",
         OPENAI_API_KEY: "",
         OPENAI_BASE_URL: "",
+        PI_MODEL_PROVIDER: "",
+        PI_MODEL_ID: "",
+        PI_PROVIDER_API_KEY: "",
       }),
     );
 
     expect(parsed.AI_MODEL).toBeUndefined();
     expect(parsed.OPENAI_API_KEY).toBeUndefined();
     expect(parsed.OPENAI_BASE_URL).toBeUndefined();
+    expect(parsed.PI_MODEL_PROVIDER).toBeUndefined();
+    expect(parsed.PI_MODEL_ID).toBeUndefined();
+    expect(parsed.PI_PROVIDER_API_KEY).toBeUndefined();
   });
 
   it("normalizes blank optional observability URLs in non-production environments", () => {
@@ -114,6 +125,7 @@ describe("@worlddock/config env", () => {
       baseEnv({
         NODE_ENV: "production",
         APP_ENV: "staging",
+        WORLD_DOCK_EDITION: "local",
         SENTRY_DSN: "",
         AI_MODEL: "",
         OPENAI_API_KEY: "",
@@ -121,9 +133,25 @@ describe("@worlddock/config env", () => {
     );
 
     expect(parsed.APP_ENV).toBe("staging");
+    expect(parsed.WORLD_DOCK_EDITION).toBe("local");
     expect(parsed.SENTRY_DSN).toBeUndefined();
     expect(parsed.AI_MODEL).toBeUndefined();
     expect(parsed.OPENAI_API_KEY).toBeUndefined();
+  });
+
+  it("rejects local edition in production", () => {
+    expect(() =>
+      parseWorldDockEnv(
+        baseEnv({
+          NODE_ENV: "production",
+          APP_ENV: "production",
+          WORLD_DOCK_EDITION: "local",
+          SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
+          AI_MODEL: "gpt-5-mini",
+          OPENAI_API_KEY: "sk-test",
+        }),
+      ),
+    ).toThrow("Production deployment must use WORLD_DOCK_EDITION=cloud.");
   });
 
   it("rejects production without OpenAI model configuration", () => {
@@ -180,7 +208,7 @@ describe("@worlddock/config env", () => {
     ).toThrow(/OPENAI_API_KEY/);
   });
 
-  it("accepts production with release-critical secrets and real model configuration", () => {
+  it("accepts production with OpenAI model configuration", () => {
     const parsed = parseWorldDockEnv(
       baseEnv({
         NODE_ENV: "production",
@@ -194,5 +222,34 @@ describe("@worlddock/config env", () => {
     expect(parsed.APP_ENV).toBe("production");
     expect(parsed.BETTER_AUTH_URL).toBe("http://localhost:4000");
     expect(parsed.AI_PROVIDER).toBe("openai");
+  });
+
+  it("requires pi model settings in production", () => {
+    expect(() =>
+      parseWorldDockEnv(
+        baseEnv({
+          NODE_ENV: "production",
+          APP_ENV: "production",
+          AI_PROVIDER: "pi",
+          SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
+        }),
+      ),
+    ).toThrow("PI_MODEL_PROVIDER, PI_MODEL_ID, and PI_PROVIDER_API_KEY are required");
+  });
+
+  it("accepts a production pi environment", () => {
+    expect(
+      parseWorldDockEnv(
+        baseEnv({
+          NODE_ENV: "production",
+          APP_ENV: "production",
+          AI_PROVIDER: "pi",
+          PI_MODEL_PROVIDER: "openai",
+          PI_MODEL_ID: "gpt-5-mini",
+          PI_PROVIDER_API_KEY: "test_key",
+          SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
+        }),
+      ).AI_PROVIDER,
+    ).toBe("pi");
   });
 });

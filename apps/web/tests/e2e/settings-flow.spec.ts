@@ -6,7 +6,7 @@ test("user can inspect billing, model, and community connection states", async (
   await page.getByRole("button", { name: /设置/ }).click();
 
   await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
-  await expect(page.getByText("当前余额")).toBeVisible();
+  await expect(page.getByText("当前 Alpha 余额")).toBeVisible();
 
   await page.getByRole("button", { name: "模型" }).click();
   await expect(page.getByLabel("OPENAI_BASE_URL")).toBeVisible();

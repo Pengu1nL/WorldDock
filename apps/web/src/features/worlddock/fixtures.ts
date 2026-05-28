@@ -22,6 +22,7 @@ export const PUBLIC_REPOSITORIES: PublicRepository[] = [
     releases: [
       {
         version: "v1.2.0",
+        status: "published",
         updated: "3 小时前",
         note: "新增潮税制度与两条高潜力故事种子。",
         addedSettings: 6,
@@ -53,6 +54,7 @@ export const PUBLIC_REPOSITORIES: PublicRepository[] = [
     releases: [
       {
         version: "v0.8.0",
+        status: "published",
         updated: "昨天",
         note: "公开审计庭与债务婚姻设定。",
         addedSettings: 4,

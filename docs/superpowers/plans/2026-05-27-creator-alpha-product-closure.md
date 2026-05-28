@@ -391,7 +391,7 @@ Expected: all commands pass.
 - Test: `apps/web/tests/e2e/auth-onboarding.spec.ts`
 - Test: `apps/api/test/account.integration-spec.ts`
 
-- [ ] **Task 1: 定义账户产品能力**
+- [x] **Task 1: 定义账户产品能力**
 
 Add account data fields in `packages/db/prisma/schema.prisma`:
 
@@ -412,7 +412,7 @@ model UserProfile {
 }
 ```
 
-- [ ] **Task 2: 暴露账户 API**
+- [x] **Task 2: 暴露账户 API**
 
 Create endpoints in `apps/api/src/modules/account/account.controller.ts`:
 
@@ -456,7 +456,7 @@ export class AccountController {
 }
 ```
 
-- [ ] **Task 3: 建立 Alpha 登录注册 UI，不做邮箱验证**
+- [x] **Task 3: 建立 Alpha 登录注册 UI，不做邮箱验证**
 
 Create `apps/web/src/app/(auth)/login/page.tsx` and matching register route. Alpha uses email/password as the login identifier but does not send email verification or password reset email. Each route must include:
 
@@ -505,7 +505,7 @@ export default function LoginPage() {
 }
 ```
 
-- [ ] **Task 4: 建立首次体验，不做模板库**
+- [x] **Task 4: 建立首次体验，不做模板库**
 
 Create `apps/web/src/features/onboarding/onboarding-flow.tsx` with a three-step flow:
 
@@ -517,7 +517,7 @@ export const ONBOARDING_STEPS = [
 ] as const;
 ```
 
-- [ ] **Task 5: Run verification**
+- [x] **Task 5: Run verification**
 
 Run:
 
@@ -540,12 +540,13 @@ Expected: new user can register, log in, complete onboarding, and enter the app 
 - Modify: `packages/config/src/env.ts`
 - Modify: `apps/web/src/features/worlddock/api.ts`
 - Modify: `apps/web/src/features/worlddock/world-dock-app.tsx`
+- Modify: `apps/web/src/features/worlddock/view-worlds.tsx`
 - Modify: `docs/operations/production_release_checklist.md`
 - Test: `packages/config/test/env.test.ts`
 - Test: `apps/web/src/features/worlddock/api.test.ts`
 - Test: `apps/web/tests/e2e/cloud-deployment-flow.spec.ts`
 
-- [ ] **Task 1: 冻结云端部署版范围**
+- [x] **Task 1: 冻结云端部署版范围**
 
 Create `docs/product/cloud-release-scope.md`:
 
@@ -600,7 +601,7 @@ That later plan should cover:
 - Local/Cloud privacy boundary and no-secret upload guarantees
 ```
 
-- [ ] **Task 2: 增加 Cloud edition 环境门禁**
+- [x] **Task 2: 增加 Cloud edition 环境门禁**
 
 Modify `packages/config/src/env.ts`:
 
@@ -622,7 +623,7 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
 }
 ```
 
-- [ ] **Task 3: 建立 Cloud API contract，前端不再依赖 Local 兜底**
+- [x] **Task 3: 建立 Cloud API contract，前端不再依赖 Local 兜底**
 
 Create `docs/product/cloud-api-contract.md`:
 
@@ -667,7 +668,7 @@ export function canUseFixtures() {
 }
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 
@@ -685,9 +686,14 @@ Expected: production env requires `WORLD_DOCK_EDITION=cloud`, authenticated clou
 ### Phase 4: 云端世界 CRUD 和资产编辑器
 
 **Files:**
+- Create: `packages/domain/src/assets/index.ts`
+- Modify: `packages/domain/src/index.ts`
+- Modify: `packages/db/prisma/schema.prisma`
+- Create: `packages/db/prisma/migrations/20260527200500_world_asset_order_relations/migration.sql`
 - Create: `apps/api/src/modules/world-assets/world-assets.controller.ts`
 - Create: `apps/api/src/modules/world-assets/world-assets.service.ts`
 - Create: `apps/api/src/modules/world-assets/world-assets.module.ts`
+- Modify: `apps/web/src/features/worlddock/api.ts`
 - Create: `apps/web/src/features/worlds/worlds-api.ts`
 - Create: `apps/web/src/features/world-assets/asset-editor.tsx`
 - Create: `apps/web/src/features/world-assets/asset-search.tsx`
@@ -697,7 +703,7 @@ Expected: production env requires `WORLD_DOCK_EDITION=cloud`, authenticated clou
 - Test: `apps/api/test/world-assets.integration-spec.ts`
 - Test: `apps/web/tests/e2e/cloud-world-crud.spec.ts`
 
-- [ ] **Task 1: 补齐资产 API 行为**
+- [x] **Task 1: 补齐资产 API 行为**
 
 World asset endpoints must support:
 
@@ -712,7 +718,7 @@ POST   /v1/worlds/:worldId/assets/:assetId/relations
 DELETE /v1/worlds/:worldId/assets/:assetId/relations/:targetAssetId
 ```
 
-- [ ] **Task 2: 统一资产 domain schema**
+- [x] **Task 2: 统一资产 domain schema**
 
 Create `packages/domain/src/assets/index.ts`:
 
@@ -738,7 +744,7 @@ export const worldAssetSchema = z.object({
 export type WorldAsset = z.infer<typeof worldAssetSchema>;
 ```
 
-- [ ] **Task 3: 前端主链路移除本地 CRUD**
+- [x] **Task 3: 前端主链路移除本地 CRUD**
 
 Modify `apps/web/src/features/worlddock/world-dock-app.tsx` so these actions call cloud APIs:
 
@@ -750,7 +756,7 @@ handleSave -> POST /v1/worlds/:worldId/assets or save agent suggestion
 handleDiscard -> discard agent suggestion and update cloud state
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 
@@ -796,7 +802,7 @@ Expected: create, edit, delete, duplicate, search, reorder, and relate assets pe
 - Test: `apps/api/test/agent-context.integration-spec.ts`
 - Test: `apps/web/tests/e2e/pi-agent.spec.ts`
 
-- [ ] **Task 1: 锁定 pi upstream 版本和真实 API**
+- [x] **Task 1: 锁定 pi upstream 版本和真实 API**
 
 Before writing the Phase 5 detailed execution document, inspect the real upstream repository and record evidence. Do not invent package names, endpoints, event types, or method signatures.
 
@@ -899,7 +905,7 @@ Implementation decision:
 WorldDock will integrate pi as a TypeScript package adapter, not as a guessed HTTP `/v1/sessions/stream` service. If the upstream API differs from this plan, update the Phase 5 detailed execution document before writing code.
 ```
 
-- [ ] **Task 2: 固化 pi Agent 架构边界**
+- [x] **Task 2: 固化 pi Agent 架构边界**
 
 Create `docs/product/pi-agent-architecture.md`:
 
@@ -939,7 +945,7 @@ Dangerous operations stay outside pi and require explicit user confirmation thro
 Billing rule: only pi/model execution consumes creation credits. Manual editing, browsing, Star, Fork, import/export, Push, and release viewing do not consume credits unless the user explicitly asks pi to generate or review content.
 ```
 
-- [ ] **Task 3: 定义 pi 事件和工具契约**
+- [x] **Task 3: 定义 pi 事件和工具契约**
 
 Create `packages/domain/src/agent/pi.ts`:
 
@@ -1044,7 +1050,7 @@ baseAgentEventSchema.extend({
 }),
 ```
 
-- [ ] **Task 4: 定义 World Asset Progressive Disclosure Protocol**
+- [x] **Task 4: 定义 World Asset Progressive Disclosure Protocol**
 
 Create `docs/product/world-asset-progressive-disclosure.md`:
 
@@ -1160,7 +1166,7 @@ export type WorldManifest = z.infer<typeof worldManifestSchema>;
 export type WorldContextRef = z.infer<typeof worldContextRefSchema>;
 ```
 
-- [ ] **Task 5: 建立 World Context Builder**
+- [x] **Task 5: 建立 World Context Builder**
 
 Create `apps/api/src/modules/agent/context-builder.ts`:
 
@@ -1233,7 +1239,7 @@ export function selectInitialWorldContext(input: {
 }
 ```
 
-- [ ] **Task 6: 建立 Pi Runtime Client 和 Session Runner**
+- [x] **Task 6: 建立 Pi Runtime Client 和 Session Runner**
 
 Create `apps/api/src/modules/agent/pi/pi-runtime.client.ts`:
 
@@ -1460,7 +1466,7 @@ export class PiSessionRunner {
 }
 ```
 
-- [ ] **Task 7: 建立 World Tool Registry 和 Safety Gate**
+- [x] **Task 7: 建立 World Tool Registry 和 Safety Gate**
 
 Create `apps/api/src/modules/agent/pi/safety-gate.ts`:
 
@@ -1724,7 +1730,7 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
 }
 ```
 
-- [ ] **Task 8: 建立 Skill Loader 和 Event Adapter**
+- [x] **Task 8: 建立 Skill Loader 和 Event Adapter**
 
 Create `apps/api/src/modules/agent/pi/skill-loader.ts`:
 
@@ -1786,7 +1792,7 @@ export function adaptPiEvent(event: PiRuntimeEvent): AgentProviderChunk[] {
 }
 ```
 
-- [ ] **Task 9: 将 AgentProvider 切换为 PiAgentProvider**
+- [x] **Task 9: 将 AgentProvider 切换为 PiAgentProvider**
 
 Modify `apps/api/src/modules/agent/agent.provider.ts` so pi becomes the production provider:
 
@@ -1864,7 +1870,7 @@ Modify `apps/api/src/modules/agent/agent.module.ts`:
 }
 ```
 
-- [ ] **Task 10: 将 AgentService 改为 pi session 编排器**
+- [x] **Task 10: 将 AgentService 改为 pi session 编排器**
 
 Modify `apps/api/src/modules/agent/agent.repository.ts` and `apps/api/src/modules/agent/prisma-agent.repository.ts` so:
 - `AgentRunRecord` includes `piSessionId?: string | null` and `provider: "mock" | "pi"`.
@@ -1929,7 +1935,7 @@ for await (const chunk of this.provider.stream({
 
 WorldDock API remains the only writer for product data. pi output can create pending suggestions and tool events, but saving suggestions still goes through `POST /v1/agent-suggestions/:suggestionId/save`.
 
-- [ ] **Task 11: 建议生命周期产品化**
+- [x] **Task 11: 建议生命周期产品化**
 
 Agent suggestions must support:
 
@@ -1942,7 +1948,7 @@ failed run -> refunded
 cancelled run -> refunded
 ```
 
-- [ ] **Task 12: Run verification**
+- [x] **Task 12: Run verification**
 
 Run:
 
@@ -1972,7 +1978,7 @@ Expected: `AI_PROVIDER=pi` runs through Pi Session Runner, pi can only call regi
 - Test: `apps/api/test/releases.integration-spec.ts`
 - Test: `apps/web/tests/e2e/release-flow.spec.ts`
 
-- [ ] **Task 1: 定义 release 状态机**
+- [x] **Task 1: 定义 release 状态机**
 
 Create `packages/domain/src/releases/index.ts`:
 
@@ -2002,7 +2008,7 @@ export const worldReleaseSchema = z.object({
 });
 ```
 
-- [ ] **Task 2: 发布前检查**
+- [x] **Task 2: 发布前检查**
 
 Release wizard must block publish when:
 
@@ -2014,7 +2020,7 @@ moderation pre-scan fails
 billing entitlement does not include public publishing
 ```
 
-- [ ] **Task 3: Fork 同步**
+- [x] **Task 3: Fork 同步**
 
 Add APIs:
 
@@ -2024,7 +2030,7 @@ POST /v1/forks/:forkId/sync
 POST /v1/forks/:forkId/detach
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 
@@ -2053,7 +2059,7 @@ Expected: user can preview diff, publish, view release, roll back, Fork, compare
 - Test: `apps/api/test/billing-alpha.integration-spec.ts`
 - Test: `apps/web/tests/e2e/billing-flow.spec.ts`
 
-- [ ] **Task 1: 建立价格表**
+- [x] **Task 1: 建立价格表**
 
 Create `packages/domain/src/billing/price-book.ts`:
 
@@ -2085,7 +2091,7 @@ export function calculateModelRunCostCents(input: {
 }
 ```
 
-- [ ] **Task 2: 增加 Alpha 用量和余额模型，不接真实支付**
+- [x] **Task 2: 增加 Alpha 用量和余额模型，不接真实支付**
 
 Add models:
 
@@ -2103,7 +2109,7 @@ model BillingPlaceholderIntent {
 }
 ```
 
-- [ ] **Task 3: 建立支付 UI 占位**
+- [x] **Task 3: 建立支付 UI 占位**
 
 Billing UI must show:
 
@@ -2135,7 +2141,7 @@ Deferred to Beta:
 - Production tax and refund policy
 ```
 
-- [ ] **Task 4: Run verification**
+- [x] **Task 4: Run verification**
 
 Run:
 
@@ -2166,7 +2172,7 @@ Expected: Agent Run uses real price book, low balance blocks runs, billing page 
 - Test: `apps/api/test/community.integration-spec.ts`
 - Test: `apps/web/tests/e2e/community-product-flow.spec.ts`
 
-- [ ] **Task 1: 分页和过滤 API**
+- [x] **Task 1: 分页和过滤 API**
 
 Community APIs must provide:
 
@@ -2180,7 +2186,7 @@ POST /v1/community/repositories/:repositoryId/collections
 DELETE /v1/community/repositories/:repositoryId/collections/:collectionId
 ```
 
-- [ ] **Task 2: 替换 repository detail 未接入标签页**
+- [x] **Task 2: 替换 repository detail 未接入标签页**
 
 Repository detail must render:
 
@@ -2193,7 +2199,7 @@ Releases: full release history
 Forks: fork graph and linked worlds
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
@@ -2219,7 +2225,7 @@ Expected: Explore works without fixtures, search is paginated, repository detail
 - Test: `apps/api/test/alpha-moderation.integration-spec.ts`
 - Test: `apps/web/tests/e2e/report-flow.spec.ts`
 
-- [ ] **Task 1: 建立 Alpha 举报入口，不做管理后台**
+- [x] **Task 1: 建立 Alpha 举报入口，不做管理后台**
 
 Report flow must support:
 
@@ -2266,7 +2272,7 @@ Deferred to Beta:
 - Admin role management
 ```
 
-- [ ] **Task 2: 分布式限流**
+- [x] **Task 2: 分布式限流**
 
 Replace in-memory buckets in `apps/api/src/common/security.ts` with Redis-backed keys:
 
@@ -2286,7 +2292,7 @@ user id + route family
 access token id + route family
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
@@ -2314,7 +2320,7 @@ Expected: users can submit reports, duplicate reports are idempotent, no admin U
 - Test: `apps/api/test/exports.integration-spec.ts`
 - Test: `apps/web/tests/e2e/import-export.spec.ts`
 
-- [ ] **Task 1: 设计世界包格式**
+- [x] **Task 1: 设计世界包格式**
 
 Create `packages/domain/src/worlds/world-package.ts`:
 
@@ -2346,7 +2352,7 @@ export const worldPackageSchema = z.object({
 });
 ```
 
-- [ ] **Task 2: 增加导入导出 API**
+- [x] **Task 2: 增加导入导出 API**
 
 APIs:
 
@@ -2358,7 +2364,7 @@ POST /v1/account/data-export
 GET  /v1/account/data-export/:exportId
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
@@ -2385,7 +2391,7 @@ Expected: user can export a world package, import it into a new private world, r
 - Modify: `packages/db/prisma/schema.prisma`
 - Test: `apps/api/test/notifications.integration-spec.ts`
 
-- [ ] **Task 1: 定义通知类型**
+- [x] **Task 1: 定义通知类型**
 
 Create `packages/domain/src/notifications/index.ts`:
 
@@ -2413,7 +2419,7 @@ export const notificationSchema = z.object({
 });
 ```
 
-- [ ] **Task 2: 建立站内通知和 Alpha 反馈入口**
+- [x] **Task 2: 建立站内通知和 Alpha 反馈入口**
 
 In-app notification and support entry must support:
 
@@ -2448,7 +2454,7 @@ Deferred to Beta:
 - Moderation action email
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
@@ -2477,7 +2483,7 @@ Expected: notification records are created idempotently, notification center sho
 - Create: `docs/product/data-and-ip-policy.md`
 - Test: `apps/web/tests/e2e/marketing-and-activation.spec.ts`
 
-- [ ] **Task 1: 定义产品事件**
+- [x] **Task 1: 定义产品事件**
 
 Create `apps/web/src/features/analytics/product-events.ts`:
 
@@ -2497,7 +2503,7 @@ export const PRODUCT_EVENTS = {
 export type ProductEventName = typeof PRODUCT_EVENTS[keyof typeof PRODUCT_EVENTS];
 ```
 
-- [ ] **Task 2: 建立 Alpha 官网和定价占位，不做模板库**
+- [x] **Task 2: 建立 Alpha 官网和定价占位，不做模板库**
 
 Marketing pages must support:
 
@@ -2525,7 +2531,7 @@ Deferred to Beta:
 - Community-submitted templates
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
@@ -2550,7 +2556,7 @@ Expected: landing page explains the Alpha, pricing page uses non-payment Alpha c
 - Test: `apps/api/test/worker-health.integration-spec.ts`
 - Test: `apps/worker/test/queue-dashboard.test.ts`
 
-- [ ] **Task 1: Worker 队列健康快照**
+- [x] **Task 1: Worker 队列健康快照**
 
 Create `apps/worker/src/queue-dashboard.ts`:
 
@@ -2573,7 +2579,7 @@ export function classifyQueueHealth(queue: QueueHealth) {
 }
 ```
 
-- [ ] **Task 2: 发布 checklist 可执行化**
+- [x] **Task 2: 发布 checklist 可执行化**
 
 Modify `docs/operations/production_release_checklist.md` so each item has owner, evidence, and command:
 
@@ -2584,7 +2590,7 @@ Modify `docs/operations/production_release_checklist.md` so each item has owner,
   - Command: `pnpm lint`
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 
@@ -2610,7 +2616,7 @@ Expected: API exposes queue health, failed queues raise Sentry events, release c
 - Test: `apps/api/test/public-api.integration-spec.ts`
 - Test: `packages/worlddock-cli/test/cli.test.ts`
 
-- [ ] **Task 1: 定义个人访问令牌 scope**
+- [x] **Task 1: 定义个人访问令牌 scope**
 
 Personal access token scopes:
 
@@ -2621,7 +2627,7 @@ repository:read
 billing:read
 ```
 
-- [ ] **Task 2: CLI 最小能力**
+- [x] **Task 2: CLI 最小能力**
 
 CLI commands:
 
@@ -2633,7 +2639,7 @@ worlddock worlds import ./memory-market.worlddock.json
 worlddock repositories pull ren/memory-market
 ```
 
-- [ ] **Task 3: Run verification**
+- [x] **Task 3: Run verification**
 
 Run:
 

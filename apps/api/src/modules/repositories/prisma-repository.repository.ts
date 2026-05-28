@@ -1,7 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
-import { moderationStatusSchema, releaseDiffSchema, releaseSnapshotSchema } from "@worlddock/domain";
-import type { PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryRepository } from "./repository.repository";
+import { moderationStatusSchema, releaseChangeSchema, releaseDiffSchema, releaseSnapshotSchema, releaseStatusSchema } from "@worlddock/domain";
+import type { ForkRecord, PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryCollectionRecord, RepositoryRepository } from "./repository.repository";
 
 @Injectable()
 export class PrismaRepositoryRepository implements RepositoryRepository, OnModuleDestroy {
@@ -59,8 +59,25 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
   }
 
   async createRelease(input: Parameters<RepositoryRepository["createRelease"]>[0]) {
-    const release = await this.prisma.repositoryRelease.create({ data: input as never });
+    const release = await this.prisma.repositoryRelease.create({
+      data: {
+        ...input,
+        status: input.status ?? "published",
+        changes: input.changes ?? [],
+      } as never,
+    });
     return mapRelease(release);
+  }
+
+  async findReleaseById(id: string) {
+    const release = await this.prisma.repositoryRelease.findUnique({ where: { id } });
+    return release ? mapRelease(release) : null;
+  }
+
+  async updateReleaseStatus(id: string, status: Parameters<RepositoryRepository["updateReleaseStatus"]>[1]) {
+    const updated = await this.prisma.repositoryRelease.updateMany({ where: { id }, data: { status } });
+    if (updated.count === 0) return null;
+    return this.findReleaseById(id);
   }
 
   async listReleases(repositoryId: string) {
@@ -112,8 +129,69 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
     return fork;
   }
 
+  async findForkById(id: string) {
+    const fork = await this.prisma.repositoryFork.findUnique({ where: { id } });
+    return fork ? mapFork(fork) : null;
+  }
+
+  async updateForkSourceRelease(id: string, sourceReleaseId: string) {
+    const updated = await this.prisma.repositoryFork.updateMany({ where: { id }, data: { sourceReleaseId } });
+    if (updated.count === 0) return null;
+    return this.findForkById(id);
+  }
+
+  async deleteFork(id: string) {
+    const fork = await this.findForkById(id);
+    if (!fork) return null;
+    await this.prisma.repositoryFork.delete({ where: { id } });
+    const forks = await this.prisma.repositoryFork.count({ where: { repositoryId: fork.repositoryId } });
+    await this.prisma.publicRepository.update({ where: { id: fork.repositoryId }, data: { forks } });
+    return fork;
+  }
+
   async listForksForRepository(repositoryId: string) {
-    return this.prisma.repositoryFork.findMany({ where: { repositoryId }, orderBy: { createdAt: "desc" } });
+    const forks = await this.prisma.repositoryFork.findMany({ where: { repositoryId }, orderBy: { createdAt: "desc" } });
+    return forks.map(mapFork);
+  }
+
+  async saveToCollection(input: Parameters<RepositoryRepository["saveToCollection"]>[0]) {
+    const collection = await this.prisma.repositoryCollection.upsert({
+      where: {
+        repositoryId_userId_name: {
+          repositoryId: input.repositoryId,
+          userId: input.userId,
+          name: input.name ?? "saved",
+        },
+      },
+      create: {
+        repositoryId: input.repositoryId,
+        userId: input.userId,
+        name: input.name ?? "saved",
+      },
+      update: {},
+    });
+    return mapCollection(collection);
+  }
+
+  async removeFromCollection(input: Parameters<RepositoryRepository["removeFromCollection"]>[0]) {
+    const collection = await this.prisma.repositoryCollection.findFirst({
+      where: {
+        id: input.collectionId,
+        repositoryId: input.repositoryId,
+        userId: input.userId,
+      },
+    });
+    if (!collection) return null;
+    await this.prisma.repositoryCollection.delete({ where: { id: collection.id } });
+    return mapCollection(collection);
+  }
+
+  async listCollectionsForUser(userId: string) {
+    const collections = await this.prisma.repositoryCollection.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+    return collections.map(mapCollection);
   }
 
   async onModuleDestroy() {
@@ -132,9 +210,11 @@ function mapRelease(record: {
   id: string;
   repositoryId: string;
   version: string;
+  status: string;
   note: string;
   license: string;
   diff: unknown;
+  changes: unknown;
   source: string;
   createdAt: Date;
 }): ReleaseRecord {
@@ -142,12 +222,18 @@ function mapRelease(record: {
     id: record.id,
     repositoryId: record.repositoryId,
     version: record.version,
+    status: releaseStatusSchema.parse(record.status),
     note: record.note,
     license: record.license,
     diff: releaseDiffSchema.parse(record.diff),
+    changes: zodReleaseChanges(record.changes),
     source: parseReleaseSource(record.source),
     createdAt: record.createdAt,
   };
+}
+
+function zodReleaseChanges(value: unknown) {
+  return releaseChangeSchema.array().parse(value);
 }
 
 function mapSnapshot(record: {
@@ -169,4 +255,12 @@ function mapSnapshot(record: {
 function parseReleaseSource(value: string): ReleaseRecord["source"] {
   if (value === "cloud-publish" || value === "local-push") return value;
   throw new Error(`Unknown release source: ${value}`);
+}
+
+function mapFork(record: ForkRecord): ForkRecord {
+  return record;
+}
+
+function mapCollection(record: RepositoryCollectionRecord): RepositoryCollectionRecord {
+  return record;
 }

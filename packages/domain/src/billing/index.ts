@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { tokenUsageSchema } from "../agent";
+export * from "./price-book";
 
 export const usageLedgerEntryTypeSchema = z.enum([
   "credit_granted",
@@ -47,6 +48,14 @@ export const usageSummarySchema = z.object({
     createdAt: z.string().datetime(),
   }).nullable(),
   entries: z.array(usageLedgerEntrySchema),
+  placeholderIntents: z.array(z.object({
+    id: z.string().min(1),
+    userId: z.string().min(1),
+    plan: z.string().min(1),
+    source: z.string().min(1),
+    status: z.string().min(1),
+    createdAt: z.string().datetime(),
+  })).default([]),
 });
 
 export type UsageLedgerEntryType = z.infer<typeof usageLedgerEntryTypeSchema>;

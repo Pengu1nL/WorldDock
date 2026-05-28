@@ -1,5 +1,5 @@
 import { WorldDockApp } from "@/features/worlddock/world-dock-app";
 
-export default function Home() {
+export default function AppPage() {
   return <WorldDockApp />;
 }

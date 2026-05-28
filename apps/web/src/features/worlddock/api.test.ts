@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  canUseFixtures,
   createAccessToken,
   createArchiveEntry,
   createAgentRun,
@@ -20,6 +21,7 @@ import {
   publishWorld,
   reportRepository,
   revokeAccessToken,
+  readStoredSessionToken,
   saveAgentSuggestion,
   starRepository,
   streamAgentEvents,
@@ -28,6 +30,19 @@ import {
 } from "./api";
 
 describe("worlddock API client", () => {
+  it("allows fixture data only outside production when explicitly enabled", () => {
+    expect(canUseFixtures({ NODE_ENV: "development", NEXT_PUBLIC_WORLD_DOCK_FIXTURES: "1" })).toBe(true);
+    expect(canUseFixtures({ NODE_ENV: "test", NEXT_PUBLIC_WORLD_DOCK_FIXTURES: "1" })).toBe(true);
+    expect(canUseFixtures({ NODE_ENV: "development", NEXT_PUBLIC_WORLD_DOCK_FIXTURES: undefined })).toBe(false);
+    expect(canUseFixtures({ NODE_ENV: "production", NEXT_PUBLIC_WORLD_DOCK_FIXTURES: "1" })).toBe(false);
+  });
+
+  it("reads the stored session token through a single cloud auth helper", () => {
+    expect(readStoredSessionToken({ getItem: () => "session_alpha" })).toBe("session_alpha");
+    expect(readStoredSessionToken({ getItem: () => null })).toBe("");
+    expect(readStoredSessionToken(null)).toBe("");
+  });
+
   it("creates access tokens through the backend API", async () => {
     const fetcher = vi.fn(async () => jsonResponse({
       token: "wdl_prefix_secret",

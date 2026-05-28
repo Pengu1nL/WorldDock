@@ -5,9 +5,11 @@ test("creator can create a world, switch agent mode, and save suggestions", asyn
   await gotoApp(page);
   await page.getByRole("button", { name: /新建世界/ }).click();
   await page.getByLabel(/初始灵感/).fill("一个世界里，记忆可以被买卖。");
-  await page.getByRole("button", { name: /创建并进入工作台/ }).click();
+  await page.getByRole("button", { name: /开始推演/ }).click();
+  await expect(page.getByText("雏形已生成")).toBeVisible();
+  await page.getByRole("button", { name: /确认并进入工作台/ }).click();
 
-  await expect(page.getByText("可保存设定")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("可保存设定", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: /扩展/ })).toBeVisible();
   await page.getByRole("button", { name: /挑刺/ }).click();
   await expect(page.getByText(/已切换为 挑刺/)).toBeVisible();

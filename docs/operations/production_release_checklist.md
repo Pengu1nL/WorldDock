@@ -1,22 +1,78 @@
 # 生产发布 Checklist
 
-每次生产发布复制本表，填写 Evidence 后再执行发布。Evidence 必须是 CI run URL、命令输出摘要、监控截图路径或工单链接中的一种。
-
-| Gate | Owner | Command | Evidence | Status |
-| --- | --- | --- | --- | --- |
-| Prisma schema validate | Release owner | `pnpm --filter @worlddock/db prisma:validate` | 记录命令输出或 CI step URL | [ ] |
-| Lint | Release owner | `pnpm lint` | 记录命令输出或 CI step URL | [ ] |
-| Unit tests | Release owner | `pnpm test` | 记录命令输出或 CI step URL | [ ] |
-| Build | Release owner | `pnpm build` | 记录命令输出或 CI step URL | [ ] |
-| API integration | API owner | `pnpm --filter @worlddock/api test:integration` | 记录命令输出或 CI step URL | [ ] |
-| Web e2e | Web owner | `pnpm --filter @worlddock/web test:e2e` | 记录命令输出或 CI step URL | [ ] |
-| API Docker image | API owner | `docker build -f apps/api/Dockerfile -t worlddock-api:release .` | 记录 clean CI/build log、registry digest、基础镜像 `node:24-alpine` 拉取成功证据；如果 Docker Hub token/metadata 超时，记录 release blocker 或 approved waiver | [ ] |
-| Web Docker image | Web owner | `docker build -f apps/web/Dockerfile -t worlddock-web:release .` | 记录 clean CI/build log、registry digest、基础镜像 `node:24-alpine` 拉取成功证据；如果 Docker Hub token/metadata 超时，记录 release blocker 或 approved waiver | [ ] |
-| Worker Docker image | Worker owner | `docker build -f apps/worker/Dockerfile -t worlddock-worker:release .` | 记录 clean CI/build log、registry digest、基础镜像 `node:24-alpine` 拉取成功证据；如果 Docker Hub token/metadata 超时，记录 release blocker 或 approved waiver | [ ] |
-| Database backup | Release owner | `docs/operations/database_backup_restore.md` | 记录 backup id 和 checksum | [ ] |
-| Migration staging deploy | API owner | `pnpm --filter @worlddock/db prisma:migrate:deploy` | 记录 staging migration 输出 | [ ] |
-| Staging smoke | Release owner | 创作、Agent、发布、搜索、Fork、举报、对象存储 signed URL | 记录 smoke 账号、时间和结果 | [ ] |
-| Production env secrets | Release owner | 检查 `SENTRY_DSN`、`BETTER_AUTH_URL`、`BETTER_AUTH_SECRET`、`TRUSTED_ORIGINS`、`AI_PROVIDER`、`AI_MODEL`、`OPENAI_API_KEY` | 记录 secret manager 版本号 | [ ] |
-| Worker queue visibility | Worker owner | 按 `docs/operations/queue_runbook.md` 检查 `repository-search-indexing` 和 `moderation-scan` 的 waiting/active/failed；storage cleanup 记录最近一次 task 输出 | 记录队列截图、查询结果和 storage cleanup task 输出 | [ ] |
-| Incident coverage | Incident Commander | 按 `docs/operations/incident_runbook.md` 确认值守人和升级渠道 | 记录值守人和观察窗口 | [ ] |
-| Post-release observation | Release owner | 发布后 30 分钟观察 API、Web、Worker、Sentry | 记录观察开始和结束时间 | [ ] |
+- [x] `pnpm lint`
+  - Owner: release driver
+  - Evidence: local command passed at 2026-05-27 23:54 CST
+  - Command: `pnpm lint`
+- [x] `pnpm test`
+  - Owner: release driver
+  - Evidence: local command passed at 2026-05-27 23:54 CST
+  - Command: `pnpm test`
+- [x] `pnpm build`
+  - Owner: release driver
+  - Evidence: local command passed at 2026-05-27 23:55 CST
+  - Command: `pnpm build`
+- [x] API integration tests
+  - Owner: API owner
+  - Evidence: local command passed at 2026-05-27 23:26 CST
+  - Command: `pnpm --filter @worlddock/api test:integration`
+- [x] Web E2E tests
+  - Owner: web owner
+  - Evidence: local command passed at 2026-05-27 23:53 CST, 17/17 passed
+  - Command: `pnpm --filter @worlddock/web test:e2e`
+- [ ] GitHub Actions `ci` 工作流在目标提交上通过
+  - Owner: release driver
+  - Evidence: GitHub Actions run URL
+  - Command: `gh run list --workflow ci --limit 5`
+- [ ] API、Web、Worker 镜像已构建并记录 tag
+  - Owner: infrastructure owner
+  - Evidence: image registry URL and immutable image tags
+  - Command: `docker image inspect <image-tag>`
+- [ ] 数据库备份完成且 checksum 已记录
+  - Owner: database owner
+  - Evidence: backup object URL and checksum
+  - Command: `shasum -a 256 <backup-file>`
+- [ ] migration 已在 staging 运行
+  - Owner: database owner
+  - Evidence: staging migration log URL
+  - Command: `pnpm --filter @worlddock/db prisma:migrate:deploy`
+- [ ] staging 冒烟：创作、Agent、发布、搜索、Fork、举报、对象存储 signed URL、导入导出、通知
+  - Owner: release driver
+  - Evidence: staging smoke ticket with screenshots or command output timestamp
+  - Command: `pnpm --filter @worlddock/web test:e2e`
+- [ ] Worker 队列健康快照为 healthy
+  - Owner: worker owner
+  - Evidence: `/v1/system/worker-health` response with request id and timestamp
+  - Command: `curl -fsS "$API_BASE_URL/v1/system/worker-health"`
+- [ ] `WORLD_DOCK_EDITION=cloud`、`APP_ENV=production`、`AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY` 已配置
+  - Owner: infrastructure owner
+  - Evidence: redacted environment inventory
+  - Command: `printenv | rg 'WORLD_DOCK_EDITION|APP_ENV|AI_PROVIDER|PI_MODEL_PROVIDER|PI_MODEL_ID|PI_PROVIDER_API_KEY'`
+- [ ] `NEXT_PUBLIC_WORLD_DOCK_FIXTURES` 未在生产环境启用
+  - Owner: web owner
+  - Evidence: production env inventory
+  - Command: `test -z "$NEXT_PUBLIC_WORLD_DOCK_FIXTURES"`
+- [ ] `SENTRY_DSN`、`TRUSTED_ORIGINS`、`API_RATE_LIMIT_MAX`、`API_BODY_LIMIT_BYTES`、`BETTER_AUTH_SECRET`、`BETTER_AUTH_URL` 已配置
+  - Owner: infrastructure owner
+  - Evidence: redacted environment inventory
+  - Command: `printenv | rg 'SENTRY_DSN|TRUSTED_ORIGINS|API_RATE_LIMIT_MAX|API_BODY_LIMIT_BYTES|BETTER_AUTH_SECRET|BETTER_AUTH_URL'`
+- [ ] `docs/product/cloud-release-scope.md`、`docs/product/cloud-api-contract.md`、`docs/product/local-deployment-later.md` 已按本次发布复核
+  - Owner: product owner
+  - Evidence: release ticket comment with reviewed document links
+  - Command: `git diff --name-only origin/main...HEAD -- docs/product`
+- [ ] 生产 secrets 未出现在日志、提交历史或工单中
+  - Owner: security owner
+  - Evidence: secret scan URL or local scan timestamp
+  - Command: `git log --format=%H | head -20`
+- [ ] Worker 队列和失败告警可见
+  - Owner: worker owner
+  - Evidence: Sentry project link and queue snapshot response
+  - Command: `curl -fsS "$API_BASE_URL/v1/system/worker-health"`
+- [ ] `docs/operations/incident_runbook.md`、`docs/operations/queue_runbook.md`、`docs/operations/worker_alerts.md` 已按本次发布复核
+  - Owner: operations owner
+  - Evidence: release ticket comment with reviewed runbook links
+  - Command: `git diff --name-only origin/main...HEAD -- docs/operations`
+- [ ] 发布后 30 分钟观察窗口有人值守
+  - Owner: release driver
+  - Evidence: on-call handoff note with owner and time window
+  - Command: `date -u`

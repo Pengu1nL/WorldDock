@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { worldContextRefSchema } from "./context";
 
 export const suggestionKindSchema = z.enum(["setting", "conflict", "seed"]);
 
@@ -104,13 +105,15 @@ export const contextRefSchema = z.object({
   title: z.string().min(1),
   excerpt: z.string().min(1),
   targetId: z.string().min(1).optional(),
+  level: worldContextRefSchema.shape.level.default("card"),
+  source: worldContextRefSchema.shape.source.default("initial"),
 });
 
 export const agentSuggestionRecordSchema = z.object({
   id: z.string().min(1),
   runId: z.string().min(1),
   worldId: z.string().min(1),
-  status: z.enum(["pending", "saved", "discarded"]),
+  status: z.enum(["pending", "edited", "saved", "discarded", "superseded"]),
   suggestion: suggestionSchema,
   savedAssetId: z.string().min(1).nullable().optional(),
 });
@@ -120,6 +123,23 @@ const baseAgentEventSchema = z.object({
   runId: z.string().min(1),
   sequence: z.number().int().min(1),
   createdAt: z.string().datetime(),
+});
+
+const agentPiToolCallSchema = z.object({
+  id: z.string().min(1),
+  name: z.enum([
+    "get_world_manifest",
+    "search_world_assets",
+    "get_asset_brief",
+    "get_asset_detail",
+    "get_asset_source_fragments",
+    "list_repository_releases",
+    "propose_setting",
+    "propose_story_seed",
+    "propose_conflict",
+    "propose_release_notes",
+  ]),
+  arguments: z.record(z.string(), z.unknown()),
 });
 
 export const agentEventSchema = z.discriminatedUnion("type", [
@@ -132,8 +152,20 @@ export const agentEventSchema = z.discriminatedUnion("type", [
     payload: z.object({ contextRef: contextRefSchema.omit({ runId: true }) }),
   }),
   baseAgentEventSchema.extend({
+    type: z.literal("pi.session.started"),
+    payload: z.object({ piSessionId: z.string().min(1) }),
+  }),
+  baseAgentEventSchema.extend({
     type: z.literal("message.delta"),
     payload: z.object({ text: z.string() }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("tool.requested"),
+    payload: z.object({ toolCall: agentPiToolCallSchema }),
+  }),
+  baseAgentEventSchema.extend({
+    type: z.literal("tool.completed"),
+    payload: z.object({ toolCallId: z.string().min(1), result: z.record(z.string(), z.unknown()) }),
   }),
   baseAgentEventSchema.extend({
     type: z.literal("suggestion.created"),

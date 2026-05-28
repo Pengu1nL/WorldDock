@@ -1,7 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
 import { tokenUsageSchema } from "@worlddock/domain";
-import type { BillingAccountRecord, BillingRepository, UsageLedgerEntryRecord } from "./billing.repository";
+import type { BillingAccountRecord, BillingPlaceholderIntentRecord, BillingRepository, UsageLedgerEntryRecord } from "./billing.repository";
 
 @Injectable()
 export class PrismaBillingRepository implements BillingRepository, OnModuleDestroy {
@@ -51,6 +51,24 @@ export class PrismaBillingRepository implements BillingRepository, OnModuleDestr
       orderBy: { createdAt: "asc" },
     });
     return entries.map(mapLedgerEntry);
+  }
+
+  async createPlaceholderIntent(input: Parameters<BillingRepository["createPlaceholderIntent"]>[0]) {
+    const intent = await this.prisma.billingPlaceholderIntent.create({
+      data: {
+        ...input,
+        status: input.status ?? "captured",
+      },
+    });
+    return mapPlaceholderIntent(intent);
+  }
+
+  async listPlaceholderIntents(userId: string) {
+    const intents = await this.prisma.billingPlaceholderIntent.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+    return intents.map(mapPlaceholderIntent);
   }
 
   async onModuleDestroy() {
@@ -112,4 +130,24 @@ function parseEntryType(value: string): UsageLedgerEntryRecord["type"] {
     return value;
   }
   throw new Error(`Unknown usage ledger entry type: ${value}`);
+}
+
+function mapPlaceholderIntent(record: {
+  id: string;
+  userId: string;
+  accountId: string;
+  plan: string;
+  source: string;
+  status: string;
+  createdAt: Date;
+}): BillingPlaceholderIntentRecord {
+  return {
+    ...record,
+    status: parsePlaceholderStatus(record.status),
+  };
+}
+
+function parsePlaceholderStatus(value: string): BillingPlaceholderIntentRecord["status"] {
+  if (value === "captured") return value;
+  throw new Error(`Unknown billing placeholder intent status: ${value}`);
 }
