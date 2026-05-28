@@ -10,11 +10,25 @@ export const runtimeEnvironmentSchema = z.enum([
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
 const optionalNonEmptyString = z.preprocess(
-  (value) => value === "" ? undefined : value,
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
   z.string().min(1).optional(),
 );
 const optionalUrlString = z.preprocess(
-  (value) => value === "" ? undefined : value,
+  (value) => {
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
   z.string().url().optional(),
 );
 
@@ -39,8 +53,8 @@ export const worldDockEnvSchema = z.object({
   S3_PUBLIC_BASE_URL: z.string().url().optional(),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.string().url(),
-  SENTRY_DSN: z.string().url().optional(),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
+  SENTRY_DSN: optionalUrlString,
+  OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrlString,
   OTEL_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   AI_PROVIDER: z.enum(["openai"]).default("openai"),
   AI_MODEL: optionalNonEmptyString,
@@ -54,7 +68,7 @@ export type WorldDockEnv = z.infer<typeof worldDockEnvSchema>;
 export function parseWorldDockEnv(env: Record<string, string | undefined>): WorldDockEnv {
   const parsed = worldDockEnvSchema.parse(env);
 
-  if (parsed.APP_ENV !== "production") {
+  if (parsed.APP_ENV !== "production" && parsed.NODE_ENV !== "production") {
     return parsed;
   }
 

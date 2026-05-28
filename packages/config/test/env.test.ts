@@ -65,6 +65,18 @@ describe("@worlddock/config env", () => {
     expect(parsed.OPENAI_BASE_URL).toBeUndefined();
   });
 
+  it("normalizes blank optional observability URLs in non-production environments", () => {
+    const parsed = parseWorldDockEnv(
+      baseEnv({
+        SENTRY_DSN: "",
+        OTEL_EXPORTER_OTLP_ENDPOINT: "",
+      }),
+    );
+
+    expect(parsed.SENTRY_DSN).toBeUndefined();
+    expect(parsed.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
+  });
+
   it("rejects malformed dependency URLs", () => {
     expect(() =>
       parseWorldDockEnv(baseEnv({ WEB_APP_URL: "not-a-url" })),
@@ -77,6 +89,19 @@ describe("@worlddock/config env", () => {
         baseEnv({
           NODE_ENV: "production",
           APP_ENV: "production",
+          AI_MODEL: "gpt-5-mini",
+          OPENAI_API_KEY: "sk-test",
+        }),
+      ),
+    ).toThrow(/SENTRY_DSN/);
+  });
+
+  it("rejects NODE_ENV production without Sentry when APP_ENV is unset", () => {
+    expect(() =>
+      parseWorldDockEnv(
+        baseEnv({
+          NODE_ENV: "production",
+          APP_ENV: undefined,
           AI_MODEL: "gpt-5-mini",
           OPENAI_API_KEY: "sk-test",
         }),
@@ -97,6 +122,20 @@ describe("@worlddock/config env", () => {
     ).toThrow(/AI_MODEL/);
   });
 
+  it("rejects production with whitespace-only OpenAI model configuration", () => {
+    expect(() =>
+      parseWorldDockEnv(
+        baseEnv({
+          NODE_ENV: "production",
+          APP_ENV: "production",
+          SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
+          AI_MODEL: "   ",
+          OPENAI_API_KEY: "sk-test",
+        }),
+      ),
+    ).toThrow(/AI_MODEL/);
+  });
+
   it("rejects production without OpenAI API credentials", () => {
     expect(() =>
       parseWorldDockEnv(
@@ -105,6 +144,20 @@ describe("@worlddock/config env", () => {
           APP_ENV: "production",
           SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
           AI_MODEL: "gpt-5-mini",
+        }),
+      ),
+    ).toThrow(/OPENAI_API_KEY/);
+  });
+
+  it("rejects production with whitespace-only OpenAI API credentials", () => {
+    expect(() =>
+      parseWorldDockEnv(
+        baseEnv({
+          NODE_ENV: "production",
+          APP_ENV: "production",
+          SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
+          AI_MODEL: "gpt-5-mini",
+          OPENAI_API_KEY: "   ",
         }),
       ),
     ).toThrow(/OPENAI_API_KEY/);
