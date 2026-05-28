@@ -18,4 +18,4 @@ FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app ./
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@worlddock/web", "exec", "next", "start"]
+CMD ["pnpm", "--filter", "@worlddock/web", "start"]

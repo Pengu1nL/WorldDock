@@ -14,6 +14,7 @@ coverage
 **/coverage
 test-results
 playwright-report
+logs
 *.log
 *.tsbuildinfo
 .env

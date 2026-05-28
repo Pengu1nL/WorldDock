@@ -563,6 +563,7 @@ Expected: commit succeeds, and Author/Committer do not contain real personal ide
 - Create: `apps/api/Dockerfile`
 - Create: `apps/web/Dockerfile`
 - Create: `apps/worker/Dockerfile`
+- Create: `.dockerignore`
 
 - [ ] **Step 1: Run failing Dockerfile presence check**
 
@@ -627,7 +628,7 @@ FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /app ./
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@worlddock/web", "exec", "next", "start"]
+CMD ["pnpm", "--filter", "@worlddock/web", "start"]
 ```
 
 - [ ] **Step 4: Create Worker Dockerfile**
