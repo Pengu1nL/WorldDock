@@ -19,6 +19,7 @@ export function AssetSearch({ assets, query, onQueryChange, onPick }: AssetSearc
   return (
     <div className="col gap-3">
       <input
+        aria-label="搜索资产"
         className="input"
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
@@ -31,6 +32,11 @@ export function AssetSearch({ assets, query, onQueryChange, onPick }: AssetSearc
             <span className="mono" style={{ marginLeft: "auto", color: "var(--fg-3)" }}>{asset.kind}</span>
           </button>
         ))}
+        {filtered.length === 0 && (
+          <div role="status" className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
+            没有匹配资产
+          </div>
+        )}
       </div>
     </div>
   );

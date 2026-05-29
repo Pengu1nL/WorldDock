@@ -116,6 +116,17 @@ export type AgentEvent = {
   [key: string]: any;
 };
 
+export type SaveAgentSuggestionResponse = {
+  suggestion?: {
+    savedAssetId?: string | null;
+    asset?: WorldAsset;
+    savedAsset?: WorldAsset;
+    [key: string]: unknown;
+  };
+  asset?: WorldAsset;
+  savedAsset?: WorldAsset;
+};
+
 export type BillingBalance = {
   userId: string;
   currency: "CNY";
@@ -558,6 +569,21 @@ export async function relateWorldAssets(
   });
 }
 
+export async function unrelateWorldAssets(
+  worldId: string,
+  sourceAssetId: string,
+  targetAssetId: string,
+  options: ApiClientOptions,
+) {
+  return requestJson(`/v1/worlds/${worldId}/assets/${sourceAssetId}/relations/${targetAssetId}`, {
+    method: "DELETE",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function createArchiveEntry(
   worldId: string,
   input: CreateArchiveEntryInput,
@@ -970,8 +996,11 @@ export async function cancelAgentRun(runId: string, options: ApiClientOptions) {
   });
 }
 
-export async function saveAgentSuggestion(suggestionId: string, options: ApiClientOptions) {
-  return requestJson(`/v1/agent-suggestions/${suggestionId}/save`, {
+export async function saveAgentSuggestion(
+  suggestionId: string,
+  options: ApiClientOptions,
+): Promise<SaveAgentSuggestionResponse> {
+  return requestJson<SaveAgentSuggestionResponse>(`/v1/agent-suggestions/${suggestionId}/save`, {
     method: "POST",
     sessionToken: options.sessionToken,
     fetcher: options.fetcher,

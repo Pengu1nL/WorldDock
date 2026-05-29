@@ -85,23 +85,30 @@
 
 ## Phase 4: 云端世界 CRUD 和资产编辑器
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `apps/api/src/modules/world-assets/*`。
-- 缺少 `packages/domain/src/assets/index.ts`。
-- 缺少 `apps/web/src/features/worlds/worlds-api.ts`。
-- 缺少 `apps/web/src/features/world-assets/asset-editor.tsx` 和 `asset-search.tsx`。
-- 计划要求的统一资产端点未实现：`/assets` 查询、详情、PATCH、DELETE、reorder、relations。
-- 前端 `deleteWorld`、`duplicateWorld` 仍是本地状态操作，没有调用云端 API。
-- `handleSave` 只在有 agent suggestion id 时保存云端建议；普通本地 item 仍只更新前端状态。
-- 缺少 `apps/api/test/world-assets.integration-spec.ts` 和 `apps/web/tests/e2e/cloud-world-crud.spec.ts`。
+完成依据：
 
-已有但不足：
+- `packages/domain/src/assets/index.ts` 定义统一 `WorldAsset`、资产列表和资产关系 schema。
+- `packages/db/prisma/schema.prisma` 与 `packages/db/prisma/migrations/20260529090000_phase4_world_delete_semantics/migration.sql` 支持资产排序、资产关系和世界软删除。
+- `apps/api/src/modules/world-assets/*` 提供 `/v1/worlds/:worldId/assets` 查询、详情、创建、更新、删除、排序和关系 API；查询和详情会把关系表回填到 `payload.relationLabels/relationTargets`，不污染旧 `relations/related` 字段，并复用 owner 权限校验。
+- `apps/api/src/modules/worlds/*` 支持 Cloud 世界创建、详情、更新、删除隐藏和带资产复制。
+- `apps/web/src/features/worlddock/api.ts` 与 `apps/web/src/features/worlds/worlds-api.ts` 提供 Cloud 世界和统一资产 API client。
+- `apps/web/src/features/world-assets/asset-editor.tsx`、`asset-search.tsx` 和 `apps/web/src/features/worlddock/world-dock-app.tsx` 接入 Cloud 主路径资产创建、搜索、编辑、删除、排序、关系操作和真实 Agent suggestion 保存响应。
+- `apps/api/src/modules/world-assets/world-assets.service.spec.ts`、`apps/api/test/world-assets.integration-spec.ts` 与 `apps/api/test/worlds.integration-spec.ts` 覆盖资产 CRUD、权限、关系回填、关系删除、关系标签不回写旧字段、世界删除和复制。
+- `apps/web/tests/e2e/cloud-world-crud.spec.ts` 覆盖登录后的 Cloud 世界创建、真实 Agent suggestion 保存、刷新持久化、资产搜索编辑、关系新增/删除、复制和删除。
 
-- 已有 `GET/POST /v1/worlds`。
-- 已有 `GET/PATCH/DELETE /v1/worlds/:worldId`，但 DELETE 当前语义是 archive/unpublished。
-- 已有 archive/seeds/conflicts 的 list/create API。
-- `apps/api/test/worlds.integration-spec.ts` 覆盖了部分世界和资产持久化。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test -- world-assets.service.spec.ts`：通过。
+- `pnpm --filter @worlddock/api test:integration -- worlds.integration-spec.ts world-assets.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/api test:integration -- world-assets.integration-spec.ts agent.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- cloud-world-crud.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
 
 ## Phase 5: 基于 pi 的 Agent Session、工具和长世界记忆
 

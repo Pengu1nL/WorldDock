@@ -9,21 +9,26 @@ import {
   createAgentRun,
   createWorld as createWorldRequest,
   createWorldAsset,
+  deleteWorldAsset,
   deleteWorld as deleteCloudWorld,
   discardAgentSuggestion,
   duplicateWorld as duplicateCloudWorld,
   getBillingBalance,
-  listArchiveEntries,
-  listConflicts,
-  listStorySeeds,
+  listWorldAssets,
   listWorlds,
   publishWorld,
   readStoredSessionToken,
+  relateWorldAssets,
+  reorderWorldAssets,
   saveAgentSuggestion,
   streamAgentEvents,
+  unrelateWorldAssets,
+  updateWorldAsset,
   WorldDockApiError,
   type CreateWorldInput,
 } from "./api";
+import { AssetEditor } from "../world-assets/asset-editor";
+import { AssetSearch } from "../world-assets/asset-search";
 import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
 import { CommunityView } from "./view-community";
 import {
@@ -94,6 +99,13 @@ function WorldDockRuntime() {
   const [communityConnected, setCommunityConnected] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
+  const [assetSaving, setAssetSaving] = useState(false);
+  const [assetRelationQuery, setAssetRelationQuery] = useState("");
+  const [localAssetRelationLabels, setLocalAssetRelationLabels] = useState<Record<string, {
+    labels: string[];
+    targets?: Array<{ targetAssetId: string; label: string }>;
+    dataUpdatedAt: number;
+  }>>({});
 
   const agentAbortRef = useRef<AbortController | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -128,46 +140,52 @@ function WorldDockRuntime() {
         : "ready"
     : "ready";
 
-  const archiveQuery = useQuery({
-    queryKey: ["archive", sessionToken, currentWorld?.id],
-    queryFn: async () => listArchiveEntries(currentWorld.id, { sessionToken }) as Promise<{ archiveEntries: any[] }>,
-    enabled: Boolean(sessionToken && currentWorld?.id),
-    retry: false,
-  });
-  const seedsQuery = useQuery({
-    queryKey: ["seeds", sessionToken, currentWorld?.id],
-    queryFn: async () => listStorySeeds(currentWorld.id, { sessionToken }) as Promise<{ storySeeds: any[] }>,
-    enabled: Boolean(sessionToken && currentWorld?.id),
-    retry: false,
-  });
-  const conflictsQuery = useQuery({
-    queryKey: ["conflicts", sessionToken, currentWorld?.id],
-    queryFn: async () => listConflicts(currentWorld.id, { sessionToken }) as Promise<{ conflicts: any[] }>,
+  const assetsQuery = useQuery({
+    queryKey: ["world-assets", sessionToken, currentWorld?.id],
+    queryFn: async ({ signal }) => listAllWorldAssets(currentWorld.id, { sessionToken, signal }),
     enabled: Boolean(sessionToken && currentWorld?.id),
     retry: false,
   });
 
   useEffect(() => {
-    if (!archiveQuery.data?.archiveEntries) return;
-    setSavedSettings(archiveQuery.data.archiveEntries.map((entry: any) => ({ ...entry, kind: "setting" })));
-  }, [archiveQuery.data]);
+    if (!assetsQuery.data?.assets) return;
+    const assets = assetsQuery.data.assets;
+    const worldId = currentWorld?.id;
+    const fromAssetWithLocalRelations = (asset: any) => (
+      applyLocalRelationLabels(
+        fromWorldAsset(asset),
+        worldId ? (localAssetRelationLabels[getAssetRelationOverlayKey(worldId, asset.id)]?.labels ?? []) : [],
+        worldId ? (localAssetRelationLabels[getAssetRelationOverlayKey(worldId, asset.id)]?.targets ?? []) : [],
+      )
+    );
+    setSavedSettings(assets.filter((asset: any) => asset.kind === "setting").map(fromAssetWithLocalRelations));
+    setSavedSeeds(assets.filter((asset: any) => asset.kind === "seed").map(fromAssetWithLocalRelations));
+    setSavedConflicts(assets.filter((asset: any) => asset.kind === "conflict").map(fromAssetWithLocalRelations));
+    if (worldId) {
+      const refreshedIds = new Set(assets.map((asset: any) => asset.id));
+      const keyPrefix = `${worldId}:`;
+      setLocalAssetRelationLabels((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [key, overlay] of Object.entries(prev)) {
+          if (!key.startsWith(keyPrefix)) continue;
+          const sourceAssetId = key.slice(keyPrefix.length);
+          if (refreshedIds.has(sourceAssetId) && assetsQuery.dataUpdatedAt > overlay.dataUpdatedAt) {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [assetsQuery.data, assetsQuery.dataUpdatedAt, currentWorld?.id, localAssetRelationLabels]);
 
   useEffect(() => {
-    if (!seedsQuery.data?.storySeeds) return;
-    setSavedSeeds(seedsQuery.data.storySeeds.map((seed: any) => ({ ...seed, kind: "seed", questions: seed.questions || [] })));
-  }, [seedsQuery.data]);
-
-  useEffect(() => {
-    if (!conflictsQuery.data?.conflicts) return;
-    setSavedConflicts(conflictsQuery.data.conflicts.map((conflict: any) => ({ ...conflict, kind: "conflict" })));
-  }, [conflictsQuery.data]);
-
-  useEffect(() => {
-    if (!currentWorld || !sessionToken) return;
+    if (!currentWorld || !sessionToken || !assetsQuery.data?.assets) return;
     const nextCounts = {
-      archive: archiveQuery.data?.archiveEntries?.length ?? currentWorld.archive,
-      seeds: seedsQuery.data?.storySeeds?.length ?? currentWorld.seeds,
-      conflicts: conflictsQuery.data?.conflicts?.length ?? currentWorld.conflicts,
+      archive: assetsQuery.data.assets.filter((asset: any) => asset.kind === "setting").length,
+      seeds: assetsQuery.data.assets.filter((asset: any) => asset.kind === "seed").length,
+      conflicts: assetsQuery.data.assets.filter((asset: any) => asset.kind === "conflict").length,
     };
     if (
       currentWorld.archive === nextCounts.archive &&
@@ -179,7 +197,7 @@ function WorldDockRuntime() {
     const nextWorld = { ...currentWorld, ...nextCounts };
     setCurrentWorld(nextWorld);
     setWorlds((prev: any[]) => prev.map((world: any) => world.id === nextWorld.id ? nextWorld : world));
-  }, [archiveQuery.data, conflictsQuery.data, currentWorld, seedsQuery.data, sessionToken]);
+  }, [assetsQuery.data, currentWorld, sessionToken]);
 
   // Persist current world's workbench state whenever it changes
   useEffect(() => {
@@ -194,6 +212,14 @@ function WorldDockRuntime() {
     setToasts((prev: any[]) => [...prev, { id, ...toast }]);
     setTimeout(() => setToasts((prev: any[]) => prev.filter((x: any) => x.id !== id)), toast.timeout || 3000);
   }, []);
+
+  const allSavedAssets = useMemo(
+    () => [...savedSettings, ...savedSeeds, ...savedConflicts],
+    [savedSettings, savedSeeds, savedConflicts],
+  );
+  const drawerRelationTargets = drawerOpen?.kind === "asset-relation"
+    ? readRelationTargets(drawerOpen.item?.relationTargets ?? drawerOpen.item?.payload?.relationTargets)
+    : [];
 
   const startAgentRun = useCallback(async (userText: string, targetWorld = currentWorld) => {
     if (agentBusy) return;
@@ -386,41 +412,49 @@ function WorldDockRuntime() {
 
   // Save suggestion handler
   const handleSave = async (item: any) => {
-    if (savedIds.includes(item.id)) return;
+    const suggestionKey = getSuggestionKey(item);
+    if (savedIds.includes(suggestionKey)) return;
+    let savedItem = item;
+    let appendSavedItem = true;
     if (sessionToken && item.agentSuggestionId) {
       try {
-        await saveAgentSuggestion(item.agentSuggestionId, { sessionToken });
+        const saved = await saveAgentSuggestion(item.agentSuggestionId, { sessionToken });
+        const returnedAsset = saved.asset ?? saved.savedAsset ?? saved.suggestion?.asset ?? saved.suggestion?.savedAsset;
+        if (returnedAsset) savedItem = fromWorldAsset(returnedAsset);
+        else appendSavedItem = false;
+        if (currentWorld?.id) {
+          void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+        }
       } catch {
         pushToast({ kind: "warn", text: "云端保存失败 · 请检查网络后重试" });
         return;
       }
     } else if (sessionToken && currentWorld?.id && isCloudPersistedWorldId(currentWorld.id)) {
       try {
-        await createWorldAsset(currentWorld.id, toWorldAssetInput(item), { sessionToken });
+        const created = await createWorldAsset(currentWorld.id, toWorldAssetInput(item), { sessionToken });
+        savedItem = fromWorldAsset(created.asset);
+        void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
       } catch {
         pushToast({ kind: "warn", text: "云端资产保存失败 · 请检查网络后重试" });
         return;
       }
     }
-    setSavedIds((prev: any[]) => [...prev, item.id]);
-    if (item.kind === "setting") {
-      setSavedSettings((prev: any[]) => [...prev, item]);
-      pushToast({ kind: "save", text: `已保存到档案 · ${item.title}`, action: { label: "查看", onClick: () => setView("archive") } });
-    } else if (item.kind === "seed") {
-      setSavedSeeds((prev: any[]) => [...prev, item]);
-      pushToast({ kind: "save", text: `已保存到种子池 · ${item.title}`, action: { label: "查看", onClick: () => setView("seeds") } });
-    } else if (item.kind === "conflict") {
-      setSavedConflicts((prev: any[]) => [...prev, item]);
-      pushToast({ kind: "save", text: `已记入冲突池 · ${item.title}` });
+    setSavedIds((prev: any[]) => [...new Set([...prev, suggestionKey].filter(Boolean))]);
+    if (appendSavedItem) {
+      if (savedItem.kind === "setting") setSavedSettings((prev: any[]) => [...prev, savedItem]);
+      if (savedItem.kind === "seed") setSavedSeeds((prev: any[]) => [...prev, savedItem]);
+      if (savedItem.kind === "conflict") setSavedConflicts((prev: any[]) => [...prev, savedItem]);
     }
-    // Update current world counters
+    if (savedItem.kind === "setting") {
+      pushToast({ kind: "save", text: `已保存到档案 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("archive") } });
+    } else if (savedItem.kind === "seed") {
+      pushToast({ kind: "save", text: `已保存到种子池 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("seeds") } });
+    } else if (savedItem.kind === "conflict") {
+      pushToast({ kind: "save", text: `已记入冲突池 · ${savedItem.title}` });
+    }
     if (currentWorld) {
       setCurrentWorld((prev: any) => ({
         ...prev,
-        archive: item.kind === "setting" ? prev.archive + 1 : prev.archive,
-        seeds:   item.kind === "seed"    ? prev.seeds + 1   : prev.seeds,
-        conflicts: item.kind === "conflict" ? prev.conflicts + 1 : prev.conflicts,
-        maturity: Math.min(100, prev.maturity + (item.kind === "setting" ? 6 : 3)),
         hasUnsaved: false,
       }));
     }
@@ -429,6 +463,7 @@ function WorldDockRuntime() {
   };
 
   const handleDiscard = async (item: any) => {
+    const suggestionKey = getSuggestionKey(item);
     if (sessionToken && item.agentSuggestionId) {
       try {
         await discardAgentSuggestion(item.agentSuggestionId, { sessionToken });
@@ -437,9 +472,174 @@ function WorldDockRuntime() {
         return;
       }
     }
-    setSavedIds((prev: any[]) => [...prev, item.id]);
+    setSavedIds((prev: any[]) => [...new Set([...prev, suggestionKey].filter(Boolean))]);
     pushToast({ kind: "warn", text: `已丢弃 · ${item.title}` });
     setDrawerOpen(null);
+  };
+
+  const openAssetEditor = (kind: "setting" | "seed" | "conflict", asset?: any) => {
+    setAssetSaving(false);
+    setDrawerOpen({
+      kind: "asset-editor",
+      item: asset ?? {
+        kind,
+        title: "",
+        category: kind === "setting" ? "世界规则" : kind === "seed" ? "故事种子" : "冲突",
+        summary: "",
+        body: "",
+        payload: {},
+      },
+    });
+  };
+
+  const openAssetRelation = (asset: any) => {
+    setAssetRelationQuery("");
+    setDrawerOpen({ kind: "asset-relation", item: asset });
+  };
+
+  const saveEditedAsset = async (draft: any) => {
+    if (!sessionToken || !currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+      return;
+    }
+    setAssetSaving(true);
+    try {
+      const saved = draft.id
+        ? await updateWorldAsset(currentWorld.id, draft.id, toWorldAssetUpdateInput(draft), { sessionToken })
+        : await createWorldAsset(currentWorld.id, toWorldAssetInput(draft), { sessionToken });
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      setDrawerOpen(null);
+      pushToast({ kind: "save", text: `已保存资产 · ${saved.asset.title}` });
+    } catch {
+      pushToast({ kind: "warn", text: "资产保存失败 · 请稍后重试" });
+    } finally {
+      setAssetSaving(false);
+    }
+  };
+
+  const removeEditedAsset = async (asset: any) => {
+    if (!sessionToken || !currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+      return;
+    }
+    if (!asset.id) {
+      pushToast({ kind: "warn", text: "缺少资产 ID，无法删除" });
+      return;
+    }
+    setAssetSaving(true);
+    try {
+      await deleteWorldAsset(currentWorld.id, asset.id, { sessionToken });
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      setDrawerOpen(null);
+      pushToast({ kind: "warn", text: `已删除资产 · ${asset.title}` });
+    } catch {
+      pushToast({ kind: "warn", text: "资产删除失败 · 请稍后重试" });
+    } finally {
+      setAssetSaving(false);
+    }
+  };
+
+  const reorderAssets = async (assetIds: string[]) => {
+    if (!sessionToken || !currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+      return;
+    }
+    if (assetIds.length === 0) {
+      pushToast({ kind: "warn", text: "缺少资产，无法排序" });
+      return;
+    }
+    try {
+      await reorderWorldAssets(currentWorld.id, assetIds, { sessionToken });
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+    } catch {
+      pushToast({ kind: "warn", text: "资产排序失败 · 请稍后重试" });
+    }
+  };
+
+  const relateAssets = async (sourceAsset: any, targetAsset: any) => {
+    if (!sessionToken || !currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+      return false;
+    }
+    if (!sourceAsset?.id || !targetAsset?.id) {
+      pushToast({ kind: "warn", text: "缺少资产 ID，无法关联" });
+      return false;
+    }
+    try {
+      await relateWorldAssets(currentWorld.id, sourceAsset.id, targetAsset.id, { sessionToken });
+      const relationLabel = targetAsset.title || targetAsset.id;
+      const relationTarget = { targetAssetId: targetAsset.id, label: relationLabel };
+      const overlayKey = getAssetRelationOverlayKey(currentWorld.id, sourceAsset.id);
+      setLocalAssetRelationLabels((prev) => ({
+        ...prev,
+        [overlayKey]: {
+          labels: appendUniqueRelations(prev[overlayKey]?.labels, [relationLabel]),
+          targets: appendUniqueRelationTargets(prev[overlayKey]?.targets, [relationTarget]),
+          dataUpdatedAt: prev[overlayKey]?.dataUpdatedAt ?? assetsQuery.dataUpdatedAt,
+        },
+      }));
+      setSavedSettings((prev: any[]) => prev.map((asset: any) =>
+        asset.id === sourceAsset.id ? applyLocalRelationLabels(asset, [relationLabel], [relationTarget]) : asset,
+      ));
+      setSavedSeeds((prev: any[]) => prev.map((asset: any) =>
+        asset.id === sourceAsset.id ? applyLocalRelationLabels(asset, [relationLabel], [relationTarget]) : asset,
+      ));
+      setSavedConflicts((prev: any[]) => prev.map((asset: any) =>
+        asset.id === sourceAsset.id ? applyLocalRelationLabels(asset, [relationLabel], [relationTarget]) : asset,
+      ));
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      pushToast({ kind: "save", text: `已关联资产 · ${relationLabel}` });
+      return true;
+    } catch {
+      pushToast({ kind: "warn", text: "资产关联失败 · 请稍后重试" });
+      return false;
+    }
+  };
+
+  const unrelateAssets = async (sourceAsset: any, targetAssetId: string, relationLabel: string) => {
+    if (!sessionToken || !currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+      return false;
+    }
+    if (!sourceAsset?.id || !targetAssetId) {
+      pushToast({ kind: "warn", text: "缺少资产 ID，无法解除关联" });
+      return false;
+    }
+    try {
+      await unrelateWorldAssets(currentWorld.id, sourceAsset.id, targetAssetId, { sessionToken });
+      const overlayKey = getAssetRelationOverlayKey(currentWorld.id, sourceAsset.id);
+      setLocalAssetRelationLabels((prev) => {
+        const overlay = prev[overlayKey];
+        if (!overlay) return prev;
+        const labels = removeRelations(overlay.labels, [relationLabel]);
+        const targets = removeRelationTargets(overlay.targets, [targetAssetId]);
+        if (labels.length === 0 && targets.length === 0) {
+          const next = { ...prev };
+          delete next[overlayKey];
+          return next;
+        }
+        return {
+          ...prev,
+          [overlayKey]: { ...overlay, labels, targets },
+        };
+      });
+      const removeFromAsset = (asset: any) =>
+        asset.id === sourceAsset.id ? removeLocalRelationLabels(asset, [relationLabel], [targetAssetId]) : asset;
+      setSavedSettings((prev: any[]) => prev.map(removeFromAsset));
+      setSavedSeeds((prev: any[]) => prev.map(removeFromAsset));
+      setSavedConflicts((prev: any[]) => prev.map(removeFromAsset));
+      setDrawerOpen((prev: any) => (
+        prev?.kind === "asset-relation" && prev.item?.id === sourceAsset.id
+          ? { ...prev, item: removeLocalRelationLabels(prev.item, [relationLabel], [targetAssetId]) }
+          : prev
+      ));
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      pushToast({ kind: "save", text: `已解除关联 · ${relationLabel}` });
+      return true;
+    } catch {
+      pushToast({ kind: "warn", text: "解除关联失败 · 请稍后重试" });
+      return false;
+    }
   };
 
   // ────────── Issue triage (一致性问题) ──────────
@@ -486,11 +686,11 @@ function WorldDockRuntime() {
   const allSuggestions = useMemo(() => {
     const set = new Map<string, any>();
     for (const m of messages) {
-      if (m.suggestions) for (const s of m.suggestions) set.set(s.id, s);
+      if (m.suggestions) for (const s of m.suggestions) set.set(getSuggestionKey(s), s);
     }
     return [...set.values()];
   }, [messages]);
-  const pendingItems = useMemo(() => allSuggestions.filter((s: any) => !savedIds.includes(s.id)), [allSuggestions, savedIds]);
+  const pendingItems = useMemo(() => allSuggestions.filter((s: any) => !savedIds.includes(getSuggestionKey(s))), [allSuggestions, savedIds]);
 
   // ────────── Top-level render ──────────
   return (
@@ -582,17 +782,32 @@ function WorldDockRuntime() {
             <ArchiveView world={currentWorld} savedSettings={savedSettings} savedIssues={savedIssues}
               onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
               onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
+              onCreateAsset={openAssetEditor}
+              onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
+              onDeleteAsset={removeEditedAsset}
+              onReorderAssets={reorderAssets}
+              onRelateAssets={openAssetRelation}
               onBackToWorkbench={() => setView("workbench")}/>
           )}
           {view === "seeds" && currentWorld && (
             <SeedsView world={currentWorld} savedSeeds={savedSeeds} savedConflicts={savedConflicts}
               onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
               onJumpToConflict={(c: any) => { setDrawerOpen(null); setView("conflicts"); setTimeout(() => setDrawerOpen({ kind: "detail", item: c, readonly: true }), 50); }}
+              onCreateAsset={openAssetEditor}
+              onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
+              onDeleteAsset={removeEditedAsset}
+              onReorderAssets={reorderAssets}
+              onRelateAssets={openAssetRelation}
               onBackToWorkbench={() => setView("workbench")}/>
           )}
           {view === "conflicts" && currentWorld && (
             <ConflictsView world={currentWorld} savedConflicts={savedConflicts} savedSeeds={savedSeeds}
               onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
+              onCreateAsset={openAssetEditor}
+              onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
+              onDeleteAsset={removeEditedAsset}
+              onReorderAssets={reorderAssets}
+              onRelateAssets={openAssetRelation}
               onBackToWorkbench={() => setView("workbench")}/>
           )}
           {view === "publish" && currentWorld && (
@@ -658,18 +873,79 @@ function WorldDockRuntime() {
             onClose={() => setDrawerOpen(null)}
             width={drawerOpen?.kind === "issues" ? 520 : undefined}
             title={
+              drawerOpen?.kind === "asset-editor" ? (drawerOpen.item?.id ? "编辑资产" : "新建资产") :
+              drawerOpen?.kind === "asset-relation" ? "关联资产" :
               drawerOpen?.kind === "detail" ? "编辑并确认" :
               drawerOpen?.kind === "context" ? "本轮上下文" :
               drawerOpen?.kind === "pending" ? `待处理建议 · ${pendingItems.length}` :
               drawerOpen?.kind === "issues" ? `一致性问题 · ${savedIssues.length}` : ""
             }
             subtitle={
+              drawerOpen?.kind === "asset-editor" ? "直接创建或更新世界资产" :
+              drawerOpen?.kind === "asset-relation" ? "选择一个目标资产建立关联" :
               drawerOpen?.kind === "detail" ? "确认后会成为世界资产" :
               drawerOpen?.kind === "context" ? "Agent 本轮使用了哪些已确认资料" :
               drawerOpen?.kind === "pending" ? "保存有价值的，丢弃无关的" :
               drawerOpen?.kind === "issues" ? "Agent 发现的待修矛盾 · 三选一：修 / 留为冲突 / 弃" : ""
             }
           >
+            {drawerOpen?.kind === "asset-editor" && drawerOpen.item && (
+              <AssetEditor
+                asset={drawerOpen.item}
+                saving={assetSaving}
+                onChange={(item) => setDrawerOpen({ kind: "asset-editor", item })}
+                onSubmit={() => saveEditedAsset(drawerOpen.item)}
+                onDelete={drawerOpen.item.id ? () => removeEditedAsset(drawerOpen.item) : undefined}
+              />
+            )}
+            {drawerOpen?.kind === "asset-relation" && drawerOpen.item && (
+              <div className="col gap-3">
+                <div className="card" style={{ padding: 12 }}>
+                  <div className="mono" style={{ fontSize: 10.5, color: "var(--fg-3)", marginBottom: 6 }}>
+                    来源资产
+                  </div>
+                  <div className="title-font" style={{ fontSize: "var(--t-15)", fontWeight: 600 }}>
+                    {drawerOpen.item.title}
+                  </div>
+                  <p className="prose" style={{ fontSize: "var(--t-12)", color: "var(--fg-2)", marginTop: 6 }}>
+                    {drawerOpen.item.summary}
+                  </p>
+                </div>
+                {drawerRelationTargets.length > 0 && (
+                  <div className="col gap-2">
+                    <div className="mono" style={{ fontSize: 10.5, color: "var(--fg-3)" }}>
+                      当前关联
+                    </div>
+                    <div className="row gap-2" style={{ flexWrap: "wrap" }}>
+                      {drawerRelationTargets.map((target: any) => (
+                        <button
+                          key={target.targetAssetId}
+                          className="tag plain"
+                          type="button"
+                          aria-label={`解除关联 ${target.label}`}
+                          title="解除关联"
+                          onClick={() => unrelateAssets(drawerOpen.item, target.targetAssetId, target.label)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          ↳ {target.label} ×
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <AssetSearch
+                  assets={allSavedAssets.filter((asset: any) => asset.id !== drawerOpen.item.id)}
+                  query={assetRelationQuery}
+                  onQueryChange={setAssetRelationQuery}
+                  onPick={async (target: any) => {
+                    const related = await relateAssets(drawerOpen.item, target);
+                    if (!related) return;
+                    setAssetRelationQuery("");
+                    setDrawerOpen(null);
+                  }}
+                />
+              </div>
+            )}
             {drawerOpen?.kind === "detail" && drawerOpen.item && (
               <SuggestionDetail
                 item={drawerOpen.item}
@@ -760,7 +1036,7 @@ const Workbench = ({
               </span>
             </div>
             {messages.map((m: any) => (
-              <Message key={m.id} msg={m} savedIds={savedIds}
+              <Message key={m.id} msg={m} savedIds={getMessageSavedSuggestionIds(m, savedIds)}
                 onSave={onSave} onOpenDetail={onOpenDetail} onOpenContext={onOpenContext}/>
             ))}
           </>
@@ -857,45 +1133,260 @@ function isCloudPersistedWorldId(id: string) {
   return !id.startsWith("new_") && !id.startsWith("copy_") && !id.startsWith("fork_");
 }
 
+function getSuggestionKey(item: any) {
+  return item.agentSuggestionId ?? item.id;
+}
+
+function getAssetRelationOverlayKey(worldId: string, assetId: string) {
+  return `${worldId}:${assetId}`;
+}
+
+function getMessageSavedSuggestionIds(message: any, savedSuggestionKeys: any[]) {
+  if (!message.suggestions) return [];
+  return message.suggestions
+    .filter((suggestion: any) => savedSuggestionKeys.includes(getSuggestionKey(suggestion)))
+    .map((suggestion: any) => suggestion.id);
+}
+
+const MAX_WORLD_ASSET_PAGES = 100;
+
+async function listAllWorldAssets(worldId: string, options: Parameters<typeof listWorldAssets>[1]) {
+  const assets: any[] = [];
+  const seenCursors = new Set<string>();
+  let cursor = options.cursor;
+
+  for (let pageCount = 0; pageCount < MAX_WORLD_ASSET_PAGES; pageCount++) {
+    if (cursor) {
+      if (seenCursors.has(cursor)) {
+        throw new Error("World assets pagination returned a repeated cursor.");
+      }
+      seenCursors.add(cursor);
+    }
+
+    const page = await listWorldAssets(worldId, { ...options, cursor });
+    assets.push(...page.assets);
+    cursor = page.nextCursor ?? undefined;
+    if (!cursor) return { assets, nextCursor: null };
+  }
+
+  throw new Error("World assets pagination exceeded 100 pages.");
+}
+
+function fromWorldAsset(asset: any) {
+  const relationLabels = readStringArray(asset.payload?.relationLabels);
+  const relationTargets = readRelationTargets(asset.payload?.relationTargets);
+  if (asset.kind === "seed") {
+    return {
+      ...asset,
+      hook: asset.payload?.hook ?? asset.summary,
+      trigger: asset.payload?.trigger,
+      conflict: asset.payload?.conflict ?? asset.body,
+      protagonists: asset.payload?.protagonists,
+      questions: asset.payload?.questions ?? [],
+      relations: appendUniqueRelations(asset.payload?.relations ?? [], relationLabels),
+      relationTargets,
+    };
+  }
+  if (asset.kind === "conflict") {
+    return {
+      ...asset,
+      related: appendUniqueRelations(asset.payload?.related ?? [], relationLabels),
+      relationTargets,
+      derivedSeeds: asset.payload?.derivedSeeds ?? [],
+    };
+  }
+  return {
+    ...asset,
+    relations: appendUniqueRelations(asset.payload?.relations ?? [], relationLabels),
+    relationTargets,
+  };
+}
+
+function appendUniqueRelations(current: any, labels: any[]) {
+  const next = Array.isArray(current) ? current.filter(Boolean) : [];
+  for (const rawLabel of labels) {
+    const label = String(rawLabel ?? "").trim();
+    if (label && !next.includes(label)) next.push(label);
+  }
+  return next;
+}
+
+function appendUniqueRelationTargets(current: any, targets: Array<{ targetAssetId: string; label: string }>) {
+  const next = readRelationTargets(current);
+  for (const target of targets) {
+    const targetAssetId = String(target?.targetAssetId ?? "").trim();
+    const label = String(target?.label ?? "").trim();
+    if (!targetAssetId || !label) continue;
+    if (!next.some((item) => item.targetAssetId === targetAssetId)) next.push({ targetAssetId, label });
+  }
+  return next;
+}
+
+function applyLocalRelationLabels(asset: any, labels: string[], targets: Array<{ targetAssetId: string; label: string }> = []) {
+  if (labels.length === 0) return asset;
+  const relationTargets = appendUniqueRelationTargets(asset.relationTargets ?? asset.payload?.relationTargets, targets);
+  if (asset.kind === "conflict") {
+    const related = appendUniqueRelations(asset.related, labels);
+    return {
+      ...asset,
+      related,
+      relationTargets,
+      payload: {
+        ...(asset.payload ?? {}),
+        relationLabels: appendUniqueRelations(asset.payload?.relationLabels, labels),
+        relationTargets,
+      },
+    };
+  }
+
+  const relations = appendUniqueRelations(asset.relations, labels);
+  return {
+    ...asset,
+    relations,
+    relationTargets,
+    payload: {
+      ...(asset.payload ?? {}),
+      relationLabels: appendUniqueRelations(asset.payload?.relationLabels, labels),
+      relationTargets,
+    },
+  };
+}
+
+function removeRelations(current: any, labels: string[]) {
+  const removeSet = new Set(labels.map((label) => String(label ?? "").trim()).filter(Boolean));
+  return readStringArray(current).filter((item) => !removeSet.has(item));
+}
+
+function removeRelationTargets(current: any, targetAssetIds: string[]) {
+  const removeSet = new Set(targetAssetIds.map((id) => String(id ?? "").trim()).filter(Boolean));
+  return readRelationTargets(current).filter((item) => !removeSet.has(item.targetAssetId));
+}
+
+function removeLocalRelationLabels(asset: any, labels: string[], targetAssetIds: string[]) {
+  const relationTargets = removeRelationTargets(asset.relationTargets ?? asset.payload?.relationTargets, targetAssetIds);
+  const relationLabels = removeRelations(asset.payload?.relationLabels, labels);
+  if (asset.kind === "conflict") {
+    return {
+      ...asset,
+      related: removeRelations(asset.related, labels),
+      relationTargets,
+      payload: {
+        ...(asset.payload ?? {}),
+        relationLabels,
+        relationTargets,
+      },
+    };
+  }
+
+  return {
+    ...asset,
+    relations: removeRelations(asset.relations, labels),
+    relationTargets,
+    payload: {
+      ...(asset.payload ?? {}),
+      relationLabels,
+      relationTargets,
+    },
+  };
+}
+
+function readStringArray(value: any) {
+  return Array.isArray(value) ? value.filter((item: any): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function readRelationTargets(value: any) {
+  return Array.isArray(value)
+    ? value
+      .map((item: any) => ({
+        targetAssetId: String(item?.targetAssetId ?? "").trim(),
+        label: String(item?.label ?? "").trim(),
+      }))
+      .filter((item: any) => item.targetAssetId && item.label)
+    : [];
+}
+
+function readNonEmptyText(value: any, ...fallbacks: any[]) {
+  const values = [value, ...fallbacks];
+  for (const item of values) {
+    if (item === null || item === undefined) continue;
+    const text = String(item).trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function readOptionalText(value: any) {
+  return readNonEmptyText(value) || undefined;
+}
+
 function toWorldAssetInput(item: any) {
   if (item.kind === "seed") {
+    const title = readNonEmptyText(item.title);
+    const category = readOptionalText(item.category);
+    const summary = readNonEmptyText(item.summary, item.hook);
+    const body = readNonEmptyText(item.body, item.conflict, summary);
     return {
       kind: "seed" as const,
-      title: item.title,
-      category: item.category,
-      summary: item.hook ?? item.summary,
-      body: item.conflict ?? item.body ?? item.summary,
+      title,
+      category,
+      summary,
+      body,
       payload: {
-        hook: item.hook ?? item.summary,
+        hook: summary,
         trigger: item.trigger,
-        conflict: item.conflict ?? item.body,
+        conflict: body,
         protagonists: item.protagonists,
         questions: item.questions ?? [],
+        relations: readStoredRelationStrings(item, "relations", item.relations),
       },
     };
   }
   if (item.kind === "conflict") {
+    const title = readNonEmptyText(item.title);
+    const category = readOptionalText(item.category);
+    const summary = readNonEmptyText(item.summary);
+    const body = readNonEmptyText(item.body, summary);
     return {
       kind: "conflict" as const,
-      title: item.title,
-      category: item.category,
-      summary: item.summary,
-      body: item.body ?? item.summary,
+      title,
+      category,
+      summary,
+      body,
       payload: {
-        related: item.related ?? [],
+        related: readStoredRelationStrings(item, "related", item.related),
         derivedSeeds: item.derivedSeeds ?? [],
       },
     };
   }
+  const title = readNonEmptyText(item.title);
+  const category = readOptionalText(item.category);
+  const summary = readNonEmptyText(item.summary);
+  const body = readNonEmptyText(item.body, summary);
   return {
     kind: "setting" as const,
-    title: item.title,
-    category: item.category,
-    summary: item.summary,
-    body: item.body ?? item.summary,
+    title,
+    category,
+    summary,
+    body,
     payload: {
-      relations: item.relations ?? [],
+      relations: readStoredRelationStrings(item, "relations", item.relations),
     },
+  };
+}
+
+function readStoredRelationStrings(item: any, payloadKey: string, fallback: any) {
+  if (Array.isArray(item.payload?.[payloadKey])) return readStringArray(item.payload[payloadKey]);
+  return readStringArray(fallback);
+}
+
+function toWorldAssetUpdateInput(item: any) {
+  const input = toWorldAssetInput(item);
+  return {
+    title: input.title,
+    category: input.category,
+    summary: input.summary,
+    body: input.body,
+    payload: input.payload,
   };
 }
 

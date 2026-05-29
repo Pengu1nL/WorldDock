@@ -45,7 +45,11 @@ export class WorldAssetsService implements OnModuleDestroy {
       if (cursorIndex >= 0) assets = assets.slice(cursorIndex + 1);
     }
 
-    return { assets: assets.slice(0, 50), nextCursor: assets.length > 50 ? assets[49]?.id ?? null : null };
+    const pageAssets = assets.slice(0, 50);
+    return {
+      assets: await this.enrichAssetsWithRelations(worldId, pageAssets),
+      nextCursor: assets.length > 50 ? assets[49]?.id ?? null : null,
+    };
   }
 
   async createAsset(worldId: string, input: CreateWorldAssetInput) {
@@ -91,7 +95,9 @@ export class WorldAssetsService implements OnModuleDestroy {
 
   async getAsset(worldId: string, assetId: string) {
     const raw = await this.findRawAsset(worldId, assetId);
-    return raw ? mapRawAsset(raw) : null;
+    if (!raw) return null;
+    const [asset] = await this.enrichAssetsWithRelations(worldId, [mapRawAsset(raw)]);
+    return asset ?? null;
   }
 
   async updateAsset(worldId: string, assetId: string, input: UpdateWorldAssetInput) {
@@ -178,7 +184,13 @@ export class WorldAssetsService implements OnModuleDestroy {
   }
 
   async deleteRelation(worldId: string, sourceAssetId: string, targetAssetId: string) {
+    const [source, target] = await Promise.all([
+      this.findRawAsset(worldId, sourceAssetId),
+      this.findRawAsset(worldId, targetAssetId),
+    ]);
     await this.prisma.worldAssetRelation.deleteMany({ where: { worldId, sourceAssetId, targetAssetId } });
+    const targetTitle = target ? getRawAssetTitle(target) : undefined;
+    if (source && targetTitle) await this.removeLegacyRelationLabel(source, targetTitle);
     return { worldId, sourceAssetId, targetAssetId };
   }
 
@@ -196,6 +208,73 @@ export class WorldAssetsService implements OnModuleDestroy {
     if (seed) return { kind: "seed" as const, record: seed };
     if (conflict) return { kind: "conflict" as const, record: conflict };
     return null;
+  }
+
+  private async enrichAssetsWithRelations(worldId: string, assets: WorldAssetRecord[]) {
+    if (assets.length === 0) return assets;
+
+    const sourceAssetIds = assets.map((asset) => asset.id);
+    const relations = await this.prisma.worldAssetRelation.findMany({
+      where: { worldId, sourceAssetId: { in: sourceAssetIds } },
+      orderBy: { createdAt: "asc" },
+    });
+    if (relations.length === 0) return assets;
+
+    const titleByAssetId = new Map(assets.map((asset) => [asset.id, asset.title]));
+    const missingTargetIds = [...new Set(
+      relations
+        .map((relation) => relation.targetAssetId)
+        .filter((assetId) => !titleByAssetId.has(assetId)),
+    )];
+
+    if (missingTargetIds.length > 0) {
+      const [archiveTargets, seedTargets, conflictTargets] = await Promise.all([
+        this.prisma.archiveEntry.findMany({
+          where: { worldId, id: { in: missingTargetIds } },
+          select: { id: true, title: true },
+        }),
+        this.prisma.storySeed.findMany({
+          where: { worldId, id: { in: missingTargetIds } },
+          select: { id: true, title: true },
+        }),
+        this.prisma.conflict.findMany({
+          where: { worldId, id: { in: missingTargetIds } },
+          select: { id: true, title: true },
+        }),
+      ]);
+      for (const target of [...archiveTargets, ...seedTargets, ...conflictTargets]) {
+        titleByAssetId.set(target.id, target.title);
+      }
+    }
+
+    const targetsBySourceId = new Map<string, Array<{ targetAssetId: string; label: string }>>();
+    for (const relation of relations) {
+      const label = titleByAssetId.get(relation.targetAssetId) ?? relation.targetAssetId;
+      targetsBySourceId.set(
+        relation.sourceAssetId,
+        appendUniqueRelationTargets(targetsBySourceId.get(relation.sourceAssetId), [{
+          targetAssetId: relation.targetAssetId,
+          label,
+        }]),
+      );
+    }
+
+    return assets.map((asset) => appendRelationLabels(asset, targetsBySourceId.get(asset.id) ?? []));
+  }
+
+  private async removeLegacyRelationLabel(raw: { kind: "setting" | "seed" | "conflict"; record: any }, label: string) {
+    if (raw.kind === "setting") {
+      const relations = removeString(raw.record.relations, label);
+      if (relations.length !== raw.record.relations.length) {
+        await this.prisma.archiveEntry.update({ where: { id: raw.record.id }, data: { relations } });
+      }
+    }
+    if (raw.kind === "conflict") {
+      const related = removeString(raw.record.related, label);
+      if (related.length !== raw.record.related.length) {
+        await this.prisma.conflict.update({ where: { id: raw.record.id }, data: { related } });
+      }
+    }
   }
 }
 
@@ -302,10 +381,66 @@ function mapRelation(relation: { worldId: string; sourceAssetId: string; targetA
   };
 }
 
+function appendRelationLabels(asset: WorldAssetRecord, targets: Array<{ targetAssetId: string; label: string }>): WorldAssetRecord {
+  if (targets.length === 0) return asset;
+  const labels = targets.map((target) => target.label);
+  const relationLabels = appendUniqueStrings(asset.payload?.relationLabels, labels);
+  const relationTargets = appendUniqueRelationTargets(asset.payload?.relationTargets, targets);
+
+  if (asset.kind === "conflict") {
+    return {
+      ...asset,
+      payload: {
+        ...asset.payload,
+        relationLabels,
+        relationTargets,
+      },
+    };
+  }
+
+  return {
+    ...asset,
+    payload: {
+      ...asset.payload,
+      relationLabels,
+      relationTargets,
+    },
+  };
+}
+
+function appendUniqueStrings(current: unknown, labels: string[]) {
+  const next = readStringArray(current);
+  for (const label of labels) {
+    if (label && !next.includes(label)) next.push(label);
+  }
+  return next;
+}
+
+function appendUniqueRelationTargets(current: unknown, targets: Array<{ targetAssetId: string; label: string }>) {
+  const next = Array.isArray(current)
+    ? current.filter((item): item is { targetAssetId: string; label: string } =>
+      typeof item?.targetAssetId === "string" && typeof item?.label === "string",
+    )
+    : [];
+  for (const target of targets) {
+    if (!target.targetAssetId || !target.label) continue;
+    if (!next.some((item) => item.targetAssetId === target.targetAssetId)) next.push(target);
+  }
+  return next;
+}
+
 function readString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function removeString(value: unknown, label: string) {
+  return readStringArray(value).filter((item) => item !== label);
+}
+
+function getRawAssetTitle(raw: { kind: "setting" | "seed" | "conflict"; record: any }) {
+  return typeof raw.record.title === "string" ? raw.record.title : undefined;
 }

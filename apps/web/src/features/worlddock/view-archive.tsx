@@ -25,7 +25,127 @@ const baseCat = (s: any) => {
   return cat.split("·")[0].trim();
 };
 
-export const ArchiveView = ({ world, savedSettings, savedIssues = [], onOpenDetail, onOpenIssues, onBackToWorkbench }: any) => {
+const moveAsset = (assets: any[], asset: any, direction: number, onReorderAssets?: (assetIds: string[]) => void) => {
+  if (!asset?.id || !onReorderAssets) return;
+  const index = assets.findIndex((item: any) => item.id === asset.id);
+  const targetIndex = index + direction;
+  if (index < 0 || targetIndex < 0 || targetIndex >= assets.length) return;
+  const next = [...assets];
+  [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  onReorderAssets(next.map((item: any) => item.id).filter(Boolean));
+};
+
+const openCardFromKeyboard = (event: any, item: any, onOpenDetail: (item: any) => void) => {
+  if (event.target !== event.currentTarget) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  onOpenDetail(item);
+};
+
+const AssetCardActions = ({
+  asset,
+  assets,
+  onEditAsset,
+  onDeleteAsset,
+  onReorderAssets,
+  onRelateAssets,
+}: any) => {
+  const index = assets.findIndex((item: any) => item.id === asset.id);
+  const canMoveUp = index > 0;
+  const canMoveDown = index >= 0 && index < assets.length - 1;
+
+  return (
+    <div className="row gap-2" style={{ alignItems: "center", flexWrap: "wrap" }}>
+      {onReorderAssets && (
+        <>
+          <button
+            aria-label={`上移 ${asset.title ?? "资产"}`}
+            className="btn ghost sm"
+            type="button"
+            title="上移"
+            onClick={(event: any) => {
+              event.stopPropagation();
+              moveAsset(assets, asset, -1, onReorderAssets);
+            }}
+            disabled={!canMoveUp}
+            style={{ width: 24, padding: 0 }}
+          >
+            <Icon name="chevup" size={11}/>
+          </button>
+          <button
+            aria-label={`下移 ${asset.title ?? "资产"}`}
+            className="btn ghost sm"
+            type="button"
+            title="下移"
+            onClick={(event: any) => {
+              event.stopPropagation();
+              moveAsset(assets, asset, 1, onReorderAssets);
+            }}
+            disabled={!canMoveDown}
+            style={{ width: 24, padding: 0 }}
+          >
+            <Icon name="chevdown" size={11}/>
+          </button>
+        </>
+      )}
+      {onRelateAssets && asset.id && (
+        <button
+          aria-label={`关联 ${asset.title ?? "资产"}`}
+          className="btn ghost sm"
+          type="button"
+          title="关联资产"
+          onClick={(event: any) => {
+            event.stopPropagation();
+            onRelateAssets(asset);
+          }}
+        >
+          <Icon name="branch" size={11}/>
+        </button>
+      )}
+      <button
+        aria-label={`编辑 ${asset.title ?? "资产"}`}
+        className="btn ghost sm"
+        type="button"
+        title="编辑资产"
+        onClick={(event: any) => {
+          event.stopPropagation();
+          onEditAsset?.(asset);
+        }}
+      >
+        <Icon name="eye" size={11}/>
+      </button>
+      {onDeleteAsset && asset.id && (
+        <button
+          aria-label={`删除 ${asset.title ?? "资产"}`}
+          className="btn ghost danger sm"
+          type="button"
+          title="删除资产"
+          onClick={(event: any) => {
+            event.stopPropagation();
+            onDeleteAsset(asset);
+          }}
+          style={{ width: 24, padding: 0 }}
+        >
+          <Icon name="trash" size={11}/>
+        </button>
+      )}
+    </div>
+  );
+};
+
+export const ArchiveView = ({
+  world,
+  savedSettings,
+  savedIssues = [],
+  onOpenDetail,
+  onOpenIssues,
+  onBackToWorkbench,
+  onCreateAsset,
+  onEditAsset,
+  onDeleteAsset,
+  onReorderAssets,
+  onRelateAssets,
+}: any) => {
   const [cat, setCat] = useStateA("all");
   const [q, setQ] = useStateA("");
 
@@ -71,7 +191,7 @@ export const ArchiveView = ({ world, savedSettings, savedIssues = [], onOpenDeta
           <button className="btn ghost" onClick={onBackToWorkbench}>
             <Icon name="spark" size={12}/><span>返回工作台</span>
           </button>
-          <button className="btn">
+          <button className="btn" onClick={() => onCreateAsset?.("setting")}>
             <Icon name="plus" size={12}/><span>新建设定</span>
           </button>
         </div>
@@ -122,20 +242,23 @@ export const ArchiveView = ({ world, savedSettings, savedIssues = [], onOpenDeta
         ) : (
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
             gap: 12,
           }}>
             {filtered.map((s: any) => {
               const issueCount = issueCountById[s.id] || 0;
               return (
-                <button key={s.id} className="card hover" onClick={() => onOpenDetail(s)}
+                <div key={s.id} className="card hover" onClick={() => onOpenDetail(s)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event: any) => openCardFromKeyboard(event, s, onOpenDetail)}
                   style={{
                     textAlign: "left", padding: 14, cursor: "pointer",
                     display: "flex", flexDirection: "column", gap: 8, minHeight: 140,
                     borderColor: issueCount > 0 ? "var(--amber-dim)" : undefined,
                     position: "relative",
                   }}>
-                  <div className="row gap-2" style={{ alignItems: "flex-start" }}>
+                  <div className="row gap-2" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
                     <span className={"tag " + (s.kind === "setting" ? "sage" : "brick")}>{s.category}</span>
                     <div className="flex"/>
                     {issueCount > 0 && (
@@ -153,6 +276,14 @@ export const ArchiveView = ({ world, savedSettings, savedIssues = [], onOpenDeta
                       </span>
                     )}
                     <span className="mono" style={{ fontSize: 10.5, color: "var(--fg-3)" }}>v1</span>
+                    <AssetCardActions
+                      asset={s}
+                      assets={savedSettings}
+                      onEditAsset={onEditAsset}
+                      onDeleteAsset={onDeleteAsset}
+                      onReorderAssets={onReorderAssets}
+                      onRelateAssets={onRelateAssets}
+                    />
                   </div>
                   <div className="title-font" style={{ fontSize: "var(--t-15)", fontWeight: 600 }}>{s.title}</div>
                   <p className="prose" style={{ fontSize: "var(--t-12)", color: "var(--fg-1)", lineHeight: 1.55, flex: 1 }}>
@@ -171,7 +302,7 @@ export const ArchiveView = ({ world, savedSettings, savedIssues = [], onOpenDeta
                     <div className="flex"/>
                     <Icon name="chevron" size={11}/>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -200,7 +331,19 @@ const ArchiveEmpty = ({ hasAny, onBackToWorkbench }: any) => (
 );
 
 // ────────── Story Seeds Pool ──────────
-export const SeedsView = ({ world, savedSeeds, savedConflicts = [], onOpenDetail, onBackToWorkbench, onJumpToConflict }: any) => {
+export const SeedsView = ({
+  world,
+  savedSeeds,
+  savedConflicts = [],
+  onOpenDetail,
+  onBackToWorkbench,
+  onJumpToConflict,
+  onCreateAsset,
+  onEditAsset,
+  onDeleteAsset,
+  onReorderAssets,
+  onRelateAssets,
+}: any) => {
   const [filter, setFilter] = useStateA("all");
   const [q, setQ] = useStateA("");
 
@@ -235,12 +378,15 @@ export const SeedsView = ({ world, savedSeeds, savedConflicts = [], onOpenDetail
           <button className="btn ghost" onClick={onBackToWorkbench}>
             <Icon name="spark" size={12}/><span>返回工作台</span>
           </button>
+          <button className="btn" onClick={() => onCreateAsset?.("seed")}>
+            <Icon name="plus" size={12}/><span>新建种子</span>
+          </button>
         </div>
       </div>
 
       <div style={{
         padding: "12px 32px", borderBottom: "1px solid var(--hairline)",
-        display: "flex", gap: 8, alignItems: "center",
+        display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
       }}>
         {[
           { id: "all",   label: "全部" },
@@ -272,12 +418,15 @@ export const SeedsView = ({ world, savedSeeds, savedConflicts = [], onOpenDetail
             {filtered.map((s: any) => {
               const parent = s.parentConflict ? savedConflicts.find((c: any) => c.id === s.parentConflict) : null;
               return (
-                <button key={s.id} className="card hover" onClick={() => onOpenDetail(s)}
+                <div key={s.id} className="card hover" onClick={() => onOpenDetail(s)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event: any) => openCardFromKeyboard(event, s, onOpenDetail)}
                   style={{
                     textAlign: "left", padding: 0, cursor: "pointer",
-                    display: "flex", borderLeft: "2px solid var(--violet)",
+                    display: "flex", flexWrap: "wrap", borderLeft: "2px solid var(--violet)",
                   }}>
-                  <div style={{ flex: 1, padding: "14px 18px" }}>
+                  <div style={{ flex: "1 1 280px", padding: "14px 18px" }}>
                     <div className="row gap-2" style={{ marginBottom: 6, flexWrap: "wrap" }}>
                       <span className="mono" style={{ fontSize: 11, color: "var(--violet)" }}>SEED-{String(savedSeeds.indexOf(s) + 1).padStart(3, "0")}</span>
                       <span className="badge violet">{s.questions ? s.questions.length : 0} 未解问题</span>
@@ -295,6 +444,15 @@ export const SeedsView = ({ world, savedSeeds, savedConflicts = [], onOpenDetail
                           <span>来自冲突 · {parent.title}</span>
                         </span>
                       )}
+                      <div className="flex"/>
+                      <AssetCardActions
+                        asset={s}
+                        assets={savedSeeds}
+                        onEditAsset={onEditAsset}
+                        onDeleteAsset={onDeleteAsset}
+                        onReorderAssets={onReorderAssets}
+                        onRelateAssets={onRelateAssets}
+                      />
                     </div>
                     <div className="title-font" style={{ fontSize: "var(--t-16)", fontWeight: 600, marginBottom: 6 }}>
                       {s.title}
@@ -312,9 +470,14 @@ export const SeedsView = ({ world, savedSeeds, savedConflicts = [], onOpenDetail
                         <span style={{ fontSize: 12, color: "var(--fg-1)" }}>{s.conflict}</span>
                       </div>
                     </div>
+                    {s.relations && (
+                      <div className="row gap-2" style={{ flexWrap: "wrap", marginTop: 10 }}>
+                        {s.relations.slice(0, 3).map((r: any) => <span key={r} className="tag plain" style={{ fontSize: 10 }}>↳ {r}</span>)}
+                      </div>
+                    )}
                   </div>
                   <div style={{
-                    width: 200, padding: "14px 18px",
+                    flex: "0 1 200px", minWidth: 180, padding: "14px 18px",
                     borderLeft: "1px solid var(--hairline)",
                     background: "var(--bg-1)",
                     display: "flex", flexDirection: "column", gap: 8,
@@ -322,11 +485,11 @@ export const SeedsView = ({ world, savedSeeds, savedConflicts = [], onOpenDetail
                     <span className="mono" style={{ fontSize: 10.5, color: "var(--fg-3)" }}>潜在主角</span>
                     <span style={{ fontSize: 12, color: "var(--fg-1)", lineHeight: 1.5 }}>{s.protagonists}</span>
                     <div className="flex"/>
-                    <div className="row gap-2">
+                    <div className="row gap-2" style={{ flexWrap: "wrap" }}>
                       <span className="badge sage" style={{ height: 16 }}>已归档</span>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -354,7 +517,18 @@ const SeedsEmpty = ({ onBackToWorkbench }: any) => (
 );
 
 // ────────── Conflicts pool (slimmer) ──────────
-export const ConflictsView = ({ world, savedConflicts, savedSeeds = [], onOpenDetail, onBackToWorkbench }: any) => {
+export const ConflictsView = ({
+  world,
+  savedConflicts,
+  savedSeeds = [],
+  onOpenDetail,
+  onBackToWorkbench,
+  onCreateAsset,
+  onEditAsset,
+  onDeleteAsset,
+  onReorderAssets,
+  onRelateAssets,
+}: any) => {
   const [cat, setCat] = useStateA("all");
   const [q, setQ] = useStateA("");
 
@@ -395,9 +569,14 @@ export const ConflictsView = ({ world, savedConflicts, savedSeeds = [], onOpenDe
           <h1>冲突池</h1>
           <div className="sub">{savedConflicts.length} 个戏剧张力 · 世界的戏剧引擎，作者主动留下的核心矛盾</div>
         </div>
-        <button className="btn ghost" onClick={onBackToWorkbench}>
-          <Icon name="spark" size={12}/><span>返回工作台</span>
-        </button>
+        <div className="row gap-2">
+          <button className="btn ghost" onClick={onBackToWorkbench}>
+            <Icon name="spark" size={12}/><span>返回工作台</span>
+          </button>
+          <button className="btn" onClick={() => onCreateAsset?.("conflict")}>
+            <Icon name="plus" size={12}/><span>新建冲突</span>
+          </button>
+        </div>
       </div>
 
       {savedConflicts.length > 0 && (
@@ -446,16 +625,28 @@ export const ConflictsView = ({ world, savedConflicts, savedSeeds = [], onOpenDe
               const derivedCount = savedSeeds.filter((s: any) => s.parentConflict === c.id).length;
               const totalDerivable = (c.derivedSeeds || []).length;
               return (
-                <button key={c.id} className="card hover" onClick={() => onOpenDetail(c)}
+                <div key={c.id} className="card hover" onClick={() => onOpenDetail(c)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event: any) => openCardFromKeyboard(event, c, onOpenDetail)}
                   style={{
                     textAlign: "left", padding: 0, cursor: "pointer",
                     display: "flex", flexDirection: "column",
                     borderLeft: "2px solid var(--brick)",
                   }}>
                   <div style={{ padding: "16px 18px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-                    <div className="row gap-2">
+                    <div className="row gap-2" style={{ flexWrap: "wrap" }}>
                       <span className="tag brick">{c.category}</span>
                       <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>戏剧引擎</span>
+                      <div className="flex"/>
+                      <AssetCardActions
+                        asset={c}
+                        assets={savedConflicts}
+                        onEditAsset={onEditAsset}
+                        onDeleteAsset={onDeleteAsset}
+                        onReorderAssets={onReorderAssets}
+                        onRelateAssets={onRelateAssets}
+                      />
                     </div>
                     <div className="title-font" style={{ fontSize: "var(--t-15)", fontWeight: 600 }}>{c.title}</div>
                     <p className="prose" style={{ fontSize: "var(--t-13)", color: "var(--fg-1)", lineHeight: 1.6 }}>
@@ -484,7 +675,7 @@ export const ConflictsView = ({ world, savedConflicts, savedSeeds = [], onOpenDe
                     <span>查看详情</span>
                     <Icon name="chevron" size={11} style={{ color: "var(--fg-3)" }}/>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

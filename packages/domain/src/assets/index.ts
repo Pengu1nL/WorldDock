@@ -16,5 +16,19 @@ export const worldAssetSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
+export const worldAssetRelationSchema = z.object({
+  worldId: z.string().min(1),
+  sourceAssetId: z.string().min(1),
+  targetAssetId: z.string().min(1),
+  createdAt: z.string().datetime().optional(),
+});
+
+export const worldAssetListSchema = z.object({
+  assets: z.array(worldAssetSchema),
+  nextCursor: z.string().min(1).nullable(),
+});
+
 export type WorldAssetKind = z.infer<typeof worldAssetKindSchema>;
 export type WorldAsset = z.infer<typeof worldAssetSchema>;
+export type WorldAssetRelation = z.infer<typeof worldAssetRelationSchema>;
+export type WorldAssetList = z.infer<typeof worldAssetListSchema>;

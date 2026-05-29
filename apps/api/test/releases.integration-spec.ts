@@ -234,14 +234,16 @@ function createInMemoryWorldRepository() {
         coverObjectId: null,
         createdAt: now,
         updatedAt: now,
+        deletedAt: null,
       };
       worlds.set(world.id, world);
       return world;
     },
-    async listWorlds(ownerId) { return [...worlds.values()].filter((world) => world.ownerId === ownerId); },
-    async findWorldById(id) { return worlds.get(id) ?? null; },
-    async updateWorld(id, input) { const world = worlds.get(id); if (!world) return null; const next = { ...world, ...input, updatedAt: new Date() }; worlds.set(id, next); return next; },
-    async archiveWorld(id) { const world = worlds.get(id); if (!world) return null; const next = { ...world, status: "unpublished" as const, updatedAt: new Date() }; worlds.set(id, next); return next; },
+    async listWorlds(ownerId) { return [...worlds.values()].filter((world) => world.ownerId === ownerId && !world.deletedAt); },
+    async findWorldById(id) { const world = worlds.get(id); return world && !world.deletedAt ? world : null; },
+    async updateWorld(id, input) { const world = worlds.get(id); if (!world || world.deletedAt) return null; const next = { ...world, ...input, updatedAt: new Date() }; worlds.set(id, next); return next; },
+    async deleteWorld(id) { const world = worlds.get(id); if (!world || world.deletedAt) return null; const next = { ...world, status: "unpublished" as const, deletedAt: new Date(), updatedAt: new Date() }; worlds.set(id, next); return next; },
+    async duplicateWorldAssets() { return; },
     async listArchiveEntries(worldId) { return [...archiveEntries.values()].filter((entry) => entry.worldId === worldId); },
     async createArchiveEntry(input) { const entry = { id: `archive_${archiveEntries.size + 1}`, ...input, relations: input.relations ?? [], createdAt: new Date(), updatedAt: new Date() }; archiveEntries.set(entry.id, entry); return entry; },
     async listStorySeeds(worldId) { return [...storySeeds.values()].filter((seed) => seed.worldId === worldId); },

@@ -14,6 +14,7 @@ export type WorldRecord = {
   coverObjectId?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date | null;
 };
 
 export type ArchiveEntryRecord = {
@@ -24,6 +25,7 @@ export type ArchiveEntryRecord = {
   summary: string;
   body: string;
   relations?: string[];
+  position?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -37,6 +39,7 @@ export type StorySeedRecord = {
   conflict: string;
   protagonists?: string | null;
   questions?: string[];
+  position?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -49,6 +52,7 @@ export type ConflictRecord = {
   body: string;
   related?: string[];
   derivedSeeds?: string[];
+  position?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -71,8 +75,17 @@ export type WorldRepository = {
   }): Promise<WorldRecord>;
   listWorlds(ownerId: string): Promise<WorldRecord[]>;
   findWorldById(id: string): Promise<WorldRecord | null>;
-  updateWorld(id: string, input: Partial<Pick<WorldRecord, "name" | "type" | "summary" | "tags" | "status" | "visibility" | "mode" | "maturity" | "coverObjectId">>): Promise<WorldRecord | null>;
-  archiveWorld(id: string): Promise<WorldRecord | null>;
+  updateWorld(
+    id: string,
+    input: Partial<
+      Pick<
+        WorldRecord,
+        "name" | "type" | "summary" | "tags" | "status" | "visibility" | "mode" | "maturity" | "coverObjectId" | "deletedAt"
+      >
+    >,
+  ): Promise<WorldRecord | null>;
+  deleteWorld(id: string): Promise<WorldRecord | null>;
+  duplicateWorldAssets(input: { sourceWorldId: string; targetWorldId: string }): Promise<void>;
   listArchiveEntries(worldId: string): Promise<ArchiveEntryRecord[]>;
   createArchiveEntry(input: Omit<ArchiveEntryRecord, "id" | "createdAt" | "updatedAt">): Promise<ArchiveEntryRecord>;
   listStorySeeds(worldId: string): Promise<StorySeedRecord[]>;

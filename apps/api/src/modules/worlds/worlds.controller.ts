@@ -92,7 +92,16 @@ export class WorldsController {
       mode: original.mode,
       maturity: original.maturity,
     });
-
+    try {
+      await this.worlds.duplicateWorldAssets({ sourceWorldId: original.id, targetWorldId: record.id });
+    } catch (error) {
+      try {
+        await this.worlds.deleteWorld(record.id);
+      } catch {
+        // Keep the original duplication failure as the response error.
+      }
+      throw error;
+    }
     return { world: await this.toWorld(record) };
   }
 
@@ -115,9 +124,9 @@ export class WorldsController {
   @RequireScopes("world:write")
   async archive(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
     await this.requireOwnedWorld(subject, worldId);
-    const record = await this.worlds.archiveWorld(worldId);
+    const record = await this.worlds.deleteWorld(worldId);
     if (!record) throw this.notFound();
-    return { world: await this.toWorld(record) };
+    return { world: mapWorld(record, { archive: 0, seeds: 0, conflicts: 0 }) };
   }
 
   @Get(":worldId/archive")

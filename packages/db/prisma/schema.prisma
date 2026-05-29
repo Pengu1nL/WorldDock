@@ -131,6 +131,7 @@ model World {
   coverObjectId     String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
   owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   archiveEntries    ArchiveEntry[]
   storySeeds        StorySeed[]
@@ -145,6 +146,7 @@ model World {
   assetRelations    WorldAssetRelation[]
 
   @@index([ownerId])
+  @@index([ownerId, deletedAt])
   @@index([coverObjectId])
   @@map("worlds")
 }
