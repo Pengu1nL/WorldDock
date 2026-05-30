@@ -173,21 +173,37 @@
 
 ## Phase 7: 真实模型、创作点账本和支付 UI 占位
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `packages/domain/src/billing/price-book.ts`。
-- 缺少 `apps/api/src/modules/billing/entitlements.service.ts`。
-- 缺少 `apps/web/src/features/billing/billing-page.tsx` 和 `pricing-page.tsx`。
-- 缺少 `docs/product/beta-payments.md`。
-- `BillingPlaceholderIntent` 未加入 Prisma schema。
-- Agent Run 成本仍使用 `totalTokens / 10` 的简化计算，不是计划中的真实 price book。
-- 支付 UI 占位未形成独立页面和完整 Beta 开放说明。
-- 缺少 `billing-price-book.spec.ts`、`billing-alpha.integration-spec.ts`、`billing-flow.spec.ts`。
+完成依据：
 
-已有但不足：
+- `packages/domain/src/billing/price-book.ts` 已定义 Alpha 模型 price book，并按 provider、model、input tokens 和 output tokens 计算 Agent Run 成本；未知模型和非法 token usage 会显式失败。
+- `apps/api/src/modules/billing/billing.service.ts` 已用 price book 替代 `totalTokens / 10` 简化计价，并保留 reserve、settle、refund 和低余额拦截语义。
+- `apps/api/src/modules/billing/billing.repository.ts`、`prisma-billing.repository.ts` 与 usage ledger terminal unique migration 已确保同一 Agent Run 只能出现一个 settled/refunded 终态账本条目，避免并发结算/退款双写。
+- `apps/api/src/modules/agent/agent.service.ts` 已把 Agent Run 的 provider/model 传入 billing settlement；失败和取消路径会退回 reserve。
+- `packages/db/prisma/schema.prisma` 与 `packages/db/prisma/migrations/20260527211500_billing_placeholder_intents/migration.sql` 已包含 `BillingPlaceholderIntent`。
+- `apps/api/src/modules/billing/entitlements.service.ts`、`billing.controller.ts` 和 `prisma-billing.repository.ts` 已提供 Alpha entitlement、支付占位意向捕获和 usage 返回。
+- `apps/api/vitest.config.ts` 已纳入 `test/**/*.spec.ts`，`billing-price-book.spec.ts` 不再被 unit 验收命令漏跑。
+- `apps/web/src/features/billing/billing-page.tsx` 与 `pricing-page.tsx` 已展示 Alpha 余额、最近 Agent Run、账本条目、Beta 即将开放套餐和禁用支付按钮。
+- `apps/web/src/features/worlddock/view-settings.tsx` 已在设置页接入 billing usage 刷新和 Beta 候补登记，并处理未登录反馈和候补重复点击防护。
+- `apps/web/src/app/(marketing)/pricing/page.tsx` 与 `docs/product/beta-payments.md` 已明确 Alpha 不处理真实付款，Stripe checkout、customer portal、webhook、订阅和发票推迟到 Beta。
 
-- 已有 `BillingAccount`、`UsageLedgerEntry`、初始额度、低余额拦截、reserve/settle/refund。
-- 设置页能显示余额、最近 Agent Run 和账本条目。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test -- billing-price-book.spec.ts`：通过。
+- `pnpm --filter @worlddock/api test:integration -- billing-alpha.integration-spec.ts agent.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- billing-flow.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+- `rg -n "Stripe|stripe|checkout|customer portal|webhook|subscription|invoice|billingPortal|createCheckout" apps packages docs/product/beta-payments.md`：通过，仅命中 Alpha/Beta 说明、关闭的 entitlement 字段和测试断言，未发现真实支付集成。
+
+剩余说明：
+
+- Phase 7 不包含真实 Stripe checkout、customer portal、webhook、订阅状态同步、发票、收据、税务、退款或支付失败催缴。
+- 当前套餐按钮只用于 Beta 候补或产品反馈，不能创建真实支付会话。
 
 ## Phase 8: 社区发现、创作者主页和完整 Repository Detail
 
