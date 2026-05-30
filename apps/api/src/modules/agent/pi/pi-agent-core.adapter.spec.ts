@@ -8,6 +8,12 @@ import {
 import type { PiRuntimeEvent } from "@worlddock/domain/agent/pi";
 import { createPiAgentCoreAdapter } from "./pi-agent-core.adapter";
 
+type WorldDockToolCall = {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+};
+
 describe("createPiAgentCoreAdapter", () => {
   it("runs a real pi Agent loop and bridges WorldDock tool results back into the loop", async () => {
     const faux = registerFauxProvider({
@@ -32,11 +38,14 @@ describe("createPiAgentCoreAdapter", () => {
         fauxAssistantMessage("检索结果显示，《记忆交易法》是核心制度。"),
       ]);
 
+      const model = faux.getModel("phase5-test-model");
+      expect(model).toBeDefined();
+
       const adapter = createPiAgentCoreAdapter({
         modelProvider: "worlddock-test",
         modelId: "phase5-test-model",
         providerApiKey: "test-key",
-        modelOverride: faux.getModel("phase5-test-model"),
+        modelOverride: model!,
       });
 
       const events: PiRuntimeEvent[] = [];
@@ -73,7 +82,7 @@ describe("createPiAgentCoreAdapter", () => {
           skills: [],
         },
         (event) => events.push(event),
-        async (toolCall) => {
+        async (toolCall: WorldDockToolCall) => {
           expect(toolCall).toMatchObject({
             id: "call_search_1",
             name: "search_world_assets",
@@ -104,6 +113,15 @@ describe("createPiAgentCoreAdapter", () => {
           };
         },
       );
+
+      const indexOf = (
+        label: string,
+        predicate: (event: PiRuntimeEvent) => boolean,
+      ) => {
+        const index = events.findIndex(predicate);
+        expect(index, `${label} event`).toBeGreaterThanOrEqual(0);
+        return index;
+      };
 
       expect(events).toContainEqual({
         type: "session.started",
@@ -152,6 +170,56 @@ describe("createPiAgentCoreAdapter", () => {
         ),
       ).toBe(true);
       expect(events).toContainEqual({ type: "session.completed" });
+
+      expect(events.some((event) => event.type === "session.failed")).toBe(
+        false,
+      );
+
+      const sessionStartedIndex = indexOf(
+        "session.started",
+        (event) => event.type === "session.started",
+      );
+      const toolRequestedIndex = indexOf(
+        "tool.requested",
+        (event) =>
+          event.type === "tool.requested" &&
+          event.toolCall.id === "call_search_1",
+      );
+      const toolCompletedIndex = indexOf(
+        "tool.completed",
+        (event) =>
+          event.type === "tool.completed" &&
+          event.toolCallId === "call_search_1",
+      );
+      const toolContextUsedIndex = indexOf(
+        "tool context.used",
+        (event) =>
+          event.type === "context.used" &&
+          event.source === "tool" &&
+          event.targetId === "asset_1",
+      );
+      const finalMessageDeltaIndex = indexOf(
+        "final message.delta",
+        (event) =>
+          event.type === "message.delta" && event.text.includes("核心制度"),
+      );
+      const usageIndex = indexOf(
+        "usage",
+        (event) =>
+          event.type === "usage" && event.tokenUsage.totalTokens > 0,
+      );
+      const sessionCompletedIndex = indexOf(
+        "session.completed",
+        (event) => event.type === "session.completed",
+      );
+
+      expect(sessionStartedIndex).toBeLessThan(toolRequestedIndex);
+      expect(toolRequestedIndex).toBeLessThan(toolCompletedIndex);
+      expect(toolCompletedIndex).toBeLessThan(toolContextUsedIndex);
+      expect(toolContextUsedIndex).toBeLessThan(finalMessageDeltaIndex);
+      expect(finalMessageDeltaIndex).toBeLessThan(usageIndex);
+      expect(usageIndex).toBeLessThan(sessionCompletedIndex);
+      expect(sessionCompletedIndex).toBe(events.length - 1);
     } finally {
       faux.unregister();
     }
