@@ -25,8 +25,11 @@ import {
   unrelateWorldAssets,
   updateWorldAsset,
   WorldDockApiError,
+  type AgentContextRef,
   type CreateWorldInput,
 } from "./api";
+import { AgentRunPanel } from "../agent/agent-run-panel";
+import { ContextInspector } from "../agent/context-inspector";
 import { AssetEditor } from "../world-assets/asset-editor";
 import { AssetSearch } from "../world-assets/asset-search";
 import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
@@ -40,7 +43,6 @@ import {
 import { ArchiveView, ConflictsView, SeedsView } from "./view-archive";
 import {
   Composer,
-  ContextDrawer,
   IssuesDrawer,
   Message,
   PendingDrawer,
@@ -58,6 +60,12 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const worldDockQueryClient = new QueryClient();
+
+type AgentToolEvent = {
+  id: string;
+  label: string;
+  status: "requested" | "completed";
+};
 
 export function WorldDockApp() {
   return (
@@ -99,6 +107,8 @@ function WorldDockRuntime() {
   const [communityConnected, setCommunityConnected] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
+  const [agentContextRefs, setAgentContextRefs] = useState<AgentContextRef[]>([]);
+  const [agentToolEvents, setAgentToolEvents] = useState<AgentToolEvent[]>([]);
   const [assetSaving, setAssetSaving] = useState(false);
   const [assetRelationQuery, setAssetRelationQuery] = useState("");
   const [localAssetRelationLabels, setLocalAssetRelationLabels] = useState<Record<string, {
@@ -203,9 +213,9 @@ function WorldDockRuntime() {
   useEffect(() => {
     if (!currentWorld) return;
     worldStatesRef.current[currentWorld.id] = {
-      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode,
+      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode, agentContextRefs, agentToolEvents,
     };
-  }, [currentWorld, messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode]);
+  }, [currentWorld, messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode, agentContextRefs, agentToolEvents]);
 
   const pushToast = useCallback((toast: any) => {
     const id = Math.random().toString(36).slice(2);
@@ -229,6 +239,8 @@ function WorldDockRuntime() {
     }
     setAgentBusy(true);
     setRunTokens(0);
+    setAgentContextRefs([]);
+    setAgentToolEvents([]);
 
     const agentMsg = {
       id: "m_" + Date.now(),
@@ -256,12 +268,34 @@ function WorldDockRuntime() {
       const suggestions: any[] = [];
 
       await streamAgentEvents(created.run.id, { sessionToken, signal: abortController.signal }, (event) => {
+        if (event.type === "pi.session.started") {
+          setAgentToolEvents((prev) => [...prev, { id: event.payload.piSessionId, label: "pi session", status: "completed" }]);
+        }
         if (event.type === "message.delta") {
           currentText += event.payload.text;
           setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id ? { ...m, text: currentText } : m));
           setRunTokens((tk: number) => tk + Math.max(1, Math.ceil(event.payload.text.length / 2)));
         }
-        if (event.type === "context.used") contextRefs++;
+        if (event.type === "context.used") {
+          contextRefs++;
+          setAgentContextRefs((prev) => [...prev, event.payload.contextRef]);
+        }
+        if (event.type === "tool.requested") {
+          setAgentToolEvents((prev) => [
+            ...prev,
+            { id: event.payload.toolCall.id, label: event.payload.toolCall.name, status: "requested" },
+          ]);
+        }
+        if (event.type === "tool.completed") {
+          setAgentToolEvents((prev) => {
+            if (!prev.some((item) => item.id === event.payload.toolCallId)) {
+              return [...prev, { id: event.payload.toolCallId, label: event.payload.toolCallId, status: "completed" }];
+            }
+            return prev.map((item) =>
+              item.id === event.payload.toolCallId ? { ...item, status: "completed" } : item,
+            );
+          });
+        }
         if (event.type === "suggestion.created") {
           suggestions.push({ ...event.payload.suggestion, agentSuggestionId: event.payload.suggestionId });
         }
@@ -326,6 +360,8 @@ function WorldDockRuntime() {
       setSavedIssues(saved.savedIssues || []);
       setSavedIds(saved.savedIds || []);
       setAgentMode(saved.agentMode || "expand");
+      setAgentContextRefs(saved.agentContextRefs || []);
+      setAgentToolEvents(saved.agentToolEvents || []);
     } else {
       setMessages([]);
       setSavedSettings([]);
@@ -334,6 +370,8 @@ function WorldDockRuntime() {
       setSavedIssues([]);
       setSavedIds([]);
       setAgentMode("expand");
+      setAgentContextRefs([]);
+      setAgentToolEvents([]);
     }
     setRunTokens(0);
   };
@@ -403,6 +441,8 @@ function WorldDockRuntime() {
       setSavedConflicts([]);
       setSavedIssues([]);
       setSavedIds([]);
+      setAgentContextRefs([]);
+      setAgentToolEvents([]);
       setView("workbench");
       setTimeout(() => startAgentRun(inspiration, newWorld), 200);
     } catch {
@@ -966,7 +1006,14 @@ function WorldDockRuntime() {
                 }}
               />
             )}
-            {drawerOpen?.kind === "context" && <ContextDrawer/>}
+            {drawerOpen?.kind === "context" && (
+              <AgentContextDrawer
+                refs={agentContextRefs}
+                toolEvents={agentToolEvents}
+                status={agentBusy ? "running" : "completed"}
+                tokens={runTokens}
+              />
+            )}
             {drawerOpen?.kind === "pending" && (
               <PendingDrawer pendingItems={pendingItems}
                 onSave={handleSave}
@@ -1006,6 +1053,35 @@ function WorldDockRuntime() {
     </div>
   );
 }
+
+const AgentContextDrawer = ({
+  refs,
+  toolEvents,
+  status,
+  tokens,
+}: {
+  refs: AgentContextRef[];
+  toolEvents: AgentToolEvent[];
+  status: "running" | "completed";
+  tokens: number;
+}) => (
+  <div className="col gap-4">
+    <AgentRunPanel status={status} tokens={tokens}>
+      <div className="col gap-2" style={{ marginTop: 12 }}>
+        {toolEvents.length === 0 ? (
+          <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>本轮暂无工具事件</span>
+        ) : (
+          toolEvents.map((tool) => (
+            <span key={tool.id} className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
+              {tool.label} · {tool.status}
+            </span>
+          ))
+        )}
+      </div>
+    </AgentRunPanel>
+    <ContextInspector refs={refs} />
+  </div>
+);
 
 // ────────── Workbench (composes Message + Composer) ──────────
 const Workbench = ({

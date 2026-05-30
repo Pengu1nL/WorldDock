@@ -782,7 +782,7 @@ git log -1 --format=fuller
 - Modify: `apps/web/src/features/agent/context-inspector.tsx`
 - Modify: `apps/web/tests/e2e/pi-agent.spec.ts`
 
-- [ ] **Step 1: Type agent events in Web API client**
+- [x] **Step 1: Type agent events in Web API client**
 
 Replace the loose `AgentEvent` type in `apps/web/src/features/worlddock/api.ts` with:
 
@@ -810,7 +810,7 @@ export type AgentEvent =
   | { type: "run.cancelled"; payload: { reason?: string } };
 ```
 
-- [ ] **Step 2: Store streamed context refs in `world-dock-app.tsx`**
+- [x] **Step 2: Store streamed context refs in `world-dock-app.tsx`**
 
 Near existing agent state, add:
 
@@ -875,7 +875,7 @@ const AgentContextDrawer = ({ refs, toolEvents }: { refs: AgentContextRef[]; too
 
 Then render `AgentContextDrawer`.
 
-- [ ] **Step 3: Add robust empty state to `ContextInspector`**
+- [x] **Step 3: Add robust empty state to `ContextInspector`**
 
 Update `apps/web/src/features/agent/context-inspector.tsx`:
 
@@ -922,7 +922,7 @@ export function ContextInspector({ refs }: ContextInspectorProps) {
 }
 ```
 
-- [ ] **Step 4: Upgrade Playwright smoke**
+- [x] **Step 4: Upgrade Playwright smoke**
 
 In `apps/web/tests/e2e/pi-agent.spec.ts`, after the existing context button assertion, add:
 
@@ -933,7 +933,7 @@ await expect(page.getByText("回忆所").or(page.getByText("记忆可以被买�
 await expect(page.getByText(/pi session|search_world_assets|propose_/)).toBeVisible();
 ```
 
-- [ ] **Step 5: Run web tests**
+- [x] **Step 5: Run web tests**
 
 Run:
 
@@ -944,7 +944,7 @@ pnpm --filter @worlddock/web test:e2e -- pi-agent.spec.ts
 
 Expected: PASS. The context drawer shows real streamed context refs rather than the previous static drawer copy.
 
-- [ ] **Step 6: Commit frontend inspector**
+- [x] **Step 6: Commit frontend inspector**
 
 ```bash
 git add apps/web/src/features/worlddock/api.ts apps/web/src/features/worlddock/world-dock-app.tsx apps/web/src/features/agent/context-inspector.tsx apps/web/tests/e2e/pi-agent.spec.ts

@@ -139,8 +139,29 @@ async function installApiMocks(page: Page) {
         status: 200,
         contentType: "text/event-stream",
         body: [
+          sse("pi.session.started", { type: "pi.session.started", payload: { piSessionId: "pi_session_e2e" } }),
+          sse("tool.requested", {
+            type: "tool.requested",
+            payload: { toolCall: { id: "call_search_world_assets", name: "search_world_assets", arguments: { query: "记忆交易" } } },
+          }),
+          sse("tool.completed", {
+            type: "tool.completed",
+            payload: { toolCallId: "call_search_world_assets", result: { assets: [] } },
+          }),
           sse("message.delta", { type: "message.delta", payload: { text: "雏形已生成，已整理出一条核心规则。" } }),
-          sse("context.used", { type: "context.used", payload: { count: 1 } }),
+          sse("context.used", {
+            type: "context.used",
+            payload: {
+              contextRef: {
+                kind: "world",
+                title: "回忆所",
+                excerpt: "记忆可以被买卖，但交易必须经过认证机构托管。",
+                targetId: "world_created",
+                level: "manifest",
+                source: "tool",
+              },
+            },
+          }),
           sse("suggestion.created", {
             type: "suggestion.created",
             payload: {

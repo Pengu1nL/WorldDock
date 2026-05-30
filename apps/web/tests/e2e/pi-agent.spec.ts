@@ -11,4 +11,9 @@ test("pi agent smoke keeps the creation run inspectable", async ({ page }) => {
 
   await expect(page.getByText("可保存设定", { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("button", { name: "上下文 1" })).toBeVisible();
+  await page.getByRole("button", { name: "上下文 1" }).click();
+  const drawer = page.getByRole("dialog", { name: "本轮上下文" });
+  await expect(drawer.getByText("manifest")).toBeVisible();
+  await expect(drawer.getByText("回忆所", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("pi session · completed")).toBeVisible();
 });
