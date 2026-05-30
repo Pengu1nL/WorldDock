@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
 import { DataRightsPage } from "../account/data-rights-page";
 import { BillingPage } from "../billing/billing-page";
@@ -42,12 +42,19 @@ export function SettingsView({
   const [cloudTokenBusy, setCloudTokenBusy] = useState(false);
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [billingWaitlistPendingPlan, setBillingWaitlistPendingPlan] = useState<"creator" | "studio" | "team" | null>(null);
+  const billingWaitlistPendingRef = useRef(false);
 
   const sessionToken = useCallback(() => readStoredSessionToken(), []);
 
-  const refreshBilling = useCallback(async () => {
+  const refreshBilling = useCallback(async (options?: { silentWhenSignedOut?: boolean }) => {
     const session = sessionToken();
-    if (!session) return;
+    if (!session) {
+      if (!options?.silentWhenSignedOut) {
+        onToast({ kind: "info", text: "请先登录后同步云端用量" });
+      }
+      return;
+    }
 
     setBillingBusy(true);
     try {
@@ -63,21 +70,27 @@ export function SettingsView({
   const joinBillingWaitlist = async (plan: "creator" | "studio" | "team") => {
     const session = sessionToken();
     if (!session) {
-      onToast({ kind: "info", text: "已记录本地候补意向 · 登录后可同步" });
+      onToast({ kind: "info", text: "请先登录后加入 Beta 支付候补" });
       return;
     }
+    if (billingWaitlistPendingRef.current) return;
 
+    billingWaitlistPendingRef.current = true;
+    setBillingWaitlistPendingPlan(plan);
     try {
       await captureBillingPlaceholderIntent({ plan }, { sessionToken: session });
       onToast({ kind: "save", text: "已加入 Beta 支付候补" });
       await refreshBilling();
     } catch {
       onToast({ kind: "warn", text: "候补登记失败 · 请稍后重试" });
+    } finally {
+      billingWaitlistPendingRef.current = false;
+      setBillingWaitlistPendingPlan(null);
     }
   };
 
   useEffect(() => {
-    if (tab === "billing") void refreshBilling();
+    if (tab === "billing") void refreshBilling({ silentWhenSignedOut: true });
   }, [refreshBilling, tab]);
 
   const refreshCloudTokens = async () => {
@@ -177,6 +190,7 @@ export function SettingsView({
             balanceCents={Math.round(balance * 100)}
             usage={billingUsage}
             busy={billingBusy}
+            waitlistPendingPlan={billingWaitlistPendingPlan}
             onRefresh={refreshBilling}
             onWaitlist={joinBillingWaitlist}
           />

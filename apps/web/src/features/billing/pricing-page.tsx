@@ -7,10 +7,11 @@ const PLANS = [
 ] as const;
 
 type PricingPageProps = {
+  waitlistPendingPlan: typeof PLANS[number]["id"] | null;
   onWaitlist: (plan: typeof PLANS[number]["id"]) => void;
 };
 
-export function PricingPage({ onWaitlist }: PricingPageProps) {
+export function PricingPage({ waitlistPendingPlan, onWaitlist }: PricingPageProps) {
   return (
     <div style={{ display: "grid", gap: 10 }}>
       <div className="badge amber" style={{ justifyContent: "flex-start", height: 24 }}>
@@ -29,9 +30,14 @@ export function PricingPage({ onWaitlist }: PricingPageProps) {
               <Icon name="bolt" size={12} />
               <span>支付暂未开放</span>
             </button>
-            <button className="btn ghost" style={{ width: "100%", marginTop: 8 }} onClick={() => onWaitlist(plan.id)}>
+            <button
+              className="btn ghost"
+              disabled={waitlistPendingPlan !== null}
+              style={{ width: "100%", marginTop: 8 }}
+              onClick={() => onWaitlist(plan.id)}
+            >
               <Icon name="bell" size={12} />
-              <span>加入候补</span>
+              <span>{waitlistPendingPlan === plan.id ? "登记中" : "加入候补"}</span>
             </button>
           </section>
         ))}

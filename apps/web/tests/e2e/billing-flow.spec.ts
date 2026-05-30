@@ -53,3 +53,68 @@ test("billing page shows alpha usage and waitlist-only payment actions", async (
   await expect.poll(() => placeholderRequests.length).toBe(1);
   expect(placeholderRequests[0]).toEqual({ plan: "creator" });
 });
+
+test("billing waitlist ignores repeated clicks while request is pending", async ({ page }) => {
+  const placeholderRequests: any[] = [];
+
+  await page.addInitScript(() => {
+    window.localStorage.setItem("worlddock.sessionToken", "session_billing_flow");
+  });
+  await page.route("**/v1/worlds", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ worlds: [] }) });
+  });
+  await page.route("**/v1/billing/usage", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        usage: {
+          balance: { userId: "user_1", currency: "CNY", balanceCents: 9876, lowBalanceThresholdCents: 500, updatedAt: new Date().toISOString() },
+          lastAgentRun: null,
+          entries: [],
+          placeholderIntents: [],
+        },
+      }),
+    });
+  });
+  await page.route("**/v1/billing/placeholder-intents", async (route) => {
+    placeholderRequests.push(route.request().postDataJSON());
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ intent: { id: "bpi_1", userId: "user_1", accountId: "ba_1", plan: "creator", source: "alpha_ui", status: "captured", createdAt: new Date().toISOString() } }),
+    });
+  });
+
+  await gotoApp(page, { installMocks: false });
+  await page.getByLabel("设置").click();
+
+  await page.getByRole("button", { name: "加入候补" }).first().dblclick();
+  await expect(page.getByRole("button", { name: "登记中" }).first()).toBeDisabled();
+  await expect.poll(() => placeholderRequests.length).toBe(1);
+  await page.waitForTimeout(350);
+  expect(placeholderRequests).toHaveLength(1);
+  expect(placeholderRequests[0]).toEqual({ plan: "creator" });
+});
+
+test("billing actions ask anonymous users to sign in before syncing", async ({ page }) => {
+  let placeholderRequests = 0;
+
+  await page.route("**/v1/worlds", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ worlds: [] }) });
+  });
+  await page.route("**/v1/billing/placeholder-intents", async (route) => {
+    placeholderRequests += 1;
+    await route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: "unauthorized" }) });
+  });
+
+  await gotoApp(page, { installMocks: false });
+  await page.getByLabel("设置").click();
+
+  await page.getByRole("button", { name: "加入候补" }).first().click();
+  await expect(page.getByText("请先登录后加入 Beta 支付候补")).toBeVisible();
+  expect(placeholderRequests).toBe(0);
+
+  await page.getByRole("button", { name: "刷新用量" }).click();
+  await expect(page.getByText("请先登录后同步云端用量")).toBeVisible();
+});

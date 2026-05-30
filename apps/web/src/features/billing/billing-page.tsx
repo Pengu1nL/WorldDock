@@ -6,11 +6,12 @@ type BillingPageProps = {
   balanceCents: number;
   usage: BillingUsage | null;
   busy: boolean;
+  waitlistPendingPlan: "creator" | "studio" | "team" | null;
   onRefresh: () => void;
   onWaitlist: (plan: "creator" | "studio" | "team") => void;
 };
 
-export function BillingPage({ balanceCents, usage, busy, onRefresh, onWaitlist }: BillingPageProps) {
+export function BillingPage({ balanceCents, usage, busy, waitlistPendingPlan, onRefresh, onWaitlist }: BillingPageProps) {
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <section className="card" style={{ padding: 18 }}>
@@ -29,9 +30,9 @@ export function BillingPage({ balanceCents, usage, busy, onRefresh, onWaitlist }
         {usage && usage.entries.length > 0 && (
           <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
             {usage.entries.slice(0, 8).map((entry) => (
-              <div key={entry.id} className="row gap-2" style={{ justifyContent: "space-between", borderTop: "1px solid var(--hairline)", paddingTop: 8 }}>
-                <span className="mono">{entry.type}</span>
-                <span style={{ color: "var(--fg-2)" }}>{entry.reason ?? "账本记录"}</span>
+              <div key={entry.id} className="row gap-2" style={{ justifyContent: "space-between", flexWrap: "wrap", borderTop: "1px solid var(--hairline)", paddingTop: 8 }}>
+                <span className="mono" style={{ minWidth: 0 }}>{entry.type}</span>
+                <span style={{ minWidth: 0, overflowWrap: "anywhere", color: "var(--fg-2)" }}>{entry.reason ?? "账本记录"}</span>
                 <span className="mono">{formatSignedCents(entry.amountCents)}</span>
               </div>
             ))}
@@ -39,7 +40,7 @@ export function BillingPage({ balanceCents, usage, busy, onRefresh, onWaitlist }
         )}
       </section>
 
-      <PricingPage onWaitlist={onWaitlist} />
+      <PricingPage waitlistPendingPlan={waitlistPendingPlan} onWaitlist={onWaitlist} />
     </div>
   );
 }
