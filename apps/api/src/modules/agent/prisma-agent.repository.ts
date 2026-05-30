@@ -23,6 +23,16 @@ export class PrismaAgentRepository implements AgentRepository, OnModuleDestroy {
     return this.findRunById(id);
   }
 
+  async updateRunIfStatus(
+    id: string,
+    status: AgentRunRecord["status"],
+    input: Parameters<AgentRepository["updateRunIfStatus"]>[2],
+  ) {
+    const updated = await this.prisma.agentRun.updateMany({ where: { id, status }, data: input as never });
+    if (updated.count === 0) return null;
+    return this.findRunById(id);
+  }
+
   async appendEvent(input: Parameters<AgentRepository["appendEvent"]>[0]) {
     const created = await this.prisma.agentEvent.create({ data: input as never });
     return mapEvent(created);

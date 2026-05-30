@@ -170,6 +170,42 @@ describe("agent run endpoints", () => {
     expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
   });
 
+  it("does not complete a run that is cancelled and refunded before the provider stream ends", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const agent = createInMemoryAgentRepository();
+    const billing = createInMemoryBillingRepository();
+    addSession(auth, "session_user_1", "user_1");
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "中断世界",
+      type: "科幻",
+      summary: "流式结束前被取消。",
+      tags: [],
+      mode: "cloud",
+    });
+    app = await createTestApp(auth, worlds, agent, createCancellingAgentProvider(agent, billing), billing);
+
+    const createRun = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-runs`)
+      .set("authorization", "Bearer session_user_1")
+      .send({ prompt: "取消竞态", mode: "expand" })
+      .expect(201);
+
+    const sse = await request(app.getHttpServer())
+      .get(`/v1/agent-runs/${createRun.body.run.id}/events`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(200);
+
+    expect(sse.text).toContain("event: message.delta");
+    expect(sse.text).not.toContain("event: run.completed");
+    expect((await agent.findRunById(createRun.body.run.id))?.status).toBe("cancelled");
+    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual([
+      "model_run_reserved",
+      "model_run_refunded",
+    ]);
+  });
+
   it("blocks agent runs when balance cannot cover the reserve", async () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
@@ -256,6 +292,29 @@ function createFailingAgentProvider(): AgentProvider {
     async *stream() {
       throw new Error("model unavailable");
     }
+  };
+}
+
+function createCancellingAgentProvider(agent: AgentRepository, billing: BillingRepository): AgentProvider {
+  return {
+    async *stream(input) {
+      yield { type: "delta", text: "处理中。" };
+      yield { type: "usage", tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 } };
+      if (!input.runId || !input.userId) throw new Error("Expected run and user ids in agent provider input.");
+      await agent.updateRun(input.runId, { status: "cancelled", cancelledAt: new Date() });
+      const reserved = (await billing.listLedgerEntriesForRun(input.runId)).find((entry) => entry.type === "model_run_reserved");
+      if (reserved) {
+        await billing.createTerminalLedgerEntryOnce({
+          accountId: reserved.accountId,
+          userId: input.userId,
+          agentRunId: input.runId,
+          type: "model_run_refunded",
+          amountCents: -reserved.amountCents,
+          tokenUsage: null,
+          reason: "user_cancelled",
+        });
+      }
+    },
   };
 }
 
@@ -380,6 +439,13 @@ function createInMemoryAgentRepository() {
     },
     async findRunById(id) { return runs.get(id) ?? null; },
     async updateRun(id, input) { const run = runs.get(id); if (!run) return null; const next = { ...run, ...input, updatedAt: new Date() }; runs.set(id, next); return next; },
+    async updateRunIfStatus(id, status, input) {
+      const run = runs.get(id);
+      if (!run || run.status !== status) return null;
+      const next = { ...run, ...input, updatedAt: new Date() };
+      runs.set(id, next);
+      return next;
+    },
     async appendEvent(input) {
       const event = { id: `evt_${++eventCounter}`, createdAt: new Date(), ...input };
       events.set(input.runId, [...(events.get(input.runId) ?? []), event]);

@@ -4,7 +4,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { configureApiApp } from "../src/configure-api-app";
-import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import { AUTH_REPOSITORY, hashToken, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
 import {
   BILLING_REPOSITORY,
   type BillingAccountRecord,
@@ -58,6 +58,26 @@ describe("billing alpha endpoints", () => {
       status: "captured",
     }));
   });
+
+  it("requires a user session to capture placeholder payment intents", async () => {
+    const auth = createInMemoryAuthRepository();
+    const billing = createInMemoryBillingRepository();
+    addSession(auth, "session_user_1", "user_1");
+    addAccessToken(auth, "wdl_read_placeholder", "user_1", ["billing:read"]);
+    app = await createTestApp(auth, billing);
+
+    await request(app.getHttpServer())
+      .post("/v1/billing/placeholder-intents")
+      .set("authorization", "Bearer wdl_read_placeholder")
+      .send({ plan: "creator" })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post("/v1/billing/placeholder-intents")
+      .set("authorization", "Bearer session_user_1")
+      .send({ plan: "creator" })
+      .expect(201);
+  });
 });
 
 async function createTestApp(authRepository: AuthRepository, billingRepository: BillingRepository) {
@@ -80,6 +100,22 @@ async function createTestApp(authRepository: AuthRepository, billingRepository: 
 function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string) {
   repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name: userId, role: "user" });
   repository.sessions.set(token, { token, userId, expiresAt: new Date(Date.now() + 60_000) });
+}
+
+function addAccessToken(repository: ReturnType<typeof createInMemoryAuthRepository>, plaintextToken: string, userId: string, scopes: string[]) {
+  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name: userId, role: "user" });
+  repository.accessTokens.set("at_read", {
+    id: "at_read",
+    userId,
+    name: "Read billing",
+    tokenHash: hashToken(plaintextToken),
+    prefix: "read",
+    scopes,
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+    createdAt: new Date(),
+  });
 }
 
 function createInMemoryAuthRepository() {

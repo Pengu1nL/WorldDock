@@ -2,7 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
-import type { AuthSubject } from "../auth/auth.service";
+import { AuthService, type AuthSubject } from "../auth/auth.service";
 import { BillingService } from "./billing.service";
 import { EntitlementsService } from "./entitlements.service";
 
@@ -16,6 +16,7 @@ export class BillingController {
   constructor(
     private readonly billing: BillingService,
     private readonly entitlements: EntitlementsService,
+    private readonly auth: AuthService,
   ) {}
 
   @Get("balance")
@@ -39,6 +40,7 @@ export class BillingController {
   @Post("placeholder-intents")
   @RequireScopes("billing:read")
   async placeholderIntent(@CurrentSubject() subject: AuthSubject, @Body() body: unknown) {
+    this.auth.assertSessionSubject(subject);
     const input = placeholderIntentSchema.parse(body);
     return { intent: await this.billing.capturePlaceholderIntent(subject.user.id, input.plan) };
   }

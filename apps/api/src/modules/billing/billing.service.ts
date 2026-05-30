@@ -59,11 +59,12 @@ export class BillingService {
   ) {
     const account = await this.ensureAccount(userId);
     const entries = await this.billing.listLedgerEntriesForRun(agentRunId);
-    if (entries.some((entry) => entry.type === "model_run_settled")) return null;
+    const existingTerminal = entries.find(isTerminalEntry);
+    if (existingTerminal) return existingTerminal.type === "model_run_settled" ? existingTerminal : null;
 
     const reservedCents = this.reservedCents(entries);
     const costCents = calculateAgentRunCostCents(tokenUsage, priceInput);
-    return this.billing.createTerminalLedgerEntryOnce({
+    const terminalEntry = await this.billing.createTerminalLedgerEntryOnce({
       accountId: account.id,
       userId,
       agentRunId,
@@ -72,17 +73,18 @@ export class BillingService {
       tokenUsage,
       reason: "settle agent run",
     });
+    return terminalEntry.type === "model_run_settled" ? terminalEntry : null;
   }
 
   async refundAgentRun(userId: string, agentRunId: string, reason: string) {
     const account = await this.ensureAccount(userId);
     const entries = await this.billing.listLedgerEntriesForRun(agentRunId);
-    if (entries.some((entry) => entry.type === "model_run_refunded")) return null;
-    if (entries.some((entry) => entry.type === "model_run_settled")) return null;
+    const existingTerminal = entries.find(isTerminalEntry);
+    if (existingTerminal) return existingTerminal.type === "model_run_refunded" ? existingTerminal : null;
 
     const reservedCents = this.reservedCents(entries);
     if (reservedCents <= 0) return null;
-    return this.billing.createTerminalLedgerEntryOnce({
+    const terminalEntry = await this.billing.createTerminalLedgerEntryOnce({
       accountId: account.id,
       userId,
       agentRunId,
@@ -91,6 +93,7 @@ export class BillingService {
       tokenUsage: null,
       reason,
     });
+    return terminalEntry.type === "model_run_refunded" ? terminalEntry : null;
   }
 
   async capturePlaceholderIntent(userId: string, plan: string) {
@@ -187,4 +190,8 @@ function calculateSettledCostCents(entries: UsageLedgerEntryRecord[]) {
     .filter((entry) => entry.type === "model_run_settled")
     .reduce((total, entry) => total + entry.amountCents, 0);
   return Math.max(0, reserved - settlementAdjustment);
+}
+
+function isTerminalEntry(entry: UsageLedgerEntryRecord) {
+  return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
 }

@@ -50,6 +50,7 @@ export type AgentRepository = {
   createRun(input: Pick<AgentRunRecord, "worldId" | "userId" | "mode" | "prompt" | "model"> & Partial<Pick<AgentRunRecord, "provider" | "piSessionId">>): Promise<AgentRunRecord>;
   findRunById(id: string): Promise<AgentRunRecord | null>;
   updateRun(id: string, input: Partial<AgentRunRecord>): Promise<AgentRunRecord | null>;
+  updateRunIfStatus(id: string, status: AgentRunRecord["status"], input: Partial<AgentRunRecord>): Promise<AgentRunRecord | null>;
   appendEvent(input: Omit<AgentEventRecord, "id" | "createdAt">): Promise<AgentEventRecord>;
   listEvents(runId: string): Promise<AgentEventRecord[]>;
   createContextRef(input: Omit<ContextRefRecord, "id">): Promise<ContextRefRecord>;

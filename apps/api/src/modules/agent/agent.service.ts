@@ -125,22 +125,31 @@ export class AgentService {
         }
       }
 
-      await this.agents.updateRun(run.id, {
+      const latestRun = await this.agents.findRunById(run.id);
+      if (latestRun?.status !== "running") return;
+
+      const settlement = await this.billing.settleAgentRun(run.userId, run.id, tokenUsage, resolveBillingModel(run.provider, run.model));
+      if (!settlement) return;
+
+      const completed = await this.agents.updateRunIfStatus(run.id, "running", {
         status: "completed",
         tokenUsage,
         completedAt: new Date(),
       });
-      await this.billing.settleAgentRun(run.userId, run.id, tokenUsage, resolveBillingModel(run.provider, run.model));
+      if (!completed) return;
       yield await this.append(run.id, sequence++, "run.completed", { tokenUsage });
     } catch (error) {
       const failure = agentFailureFromError(error);
-      await this.agents.updateRun(run.id, {
+      const refund = await this.billing.refundAgentRun(run.userId, run.id, failure.reason);
+      if (!refund) return;
+
+      const failed = await this.agents.updateRunIfStatus(run.id, "running", {
         status: "failed",
         failedAt: new Date(),
         errorCode: failure.code,
         errorMessage: failure.message,
       });
-      await this.billing.refundAgentRun(run.userId, run.id, failure.reason);
+      if (!failed) return;
       yield await this.append(run.id, sequence++, "run.failed", { code: failure.code, message: failure.message });
     }
   }
@@ -151,13 +160,16 @@ export class AgentService {
 
     const events = await this.agents.listEvents(run.id);
     const nextSequence = events.length + 1;
-    const cancelled = await this.agents.updateRun(run.id, {
+    const refund = await this.billing.refundAgentRun(run.userId, run.id, "user_cancelled");
+    if (!refund) return await this.agents.findRunById(run.id) ?? run;
+
+    const cancelled = await this.agents.updateRunIfStatus(run.id, "running", {
       status: "cancelled",
       cancelledAt: new Date(),
     });
-    await this.billing.refundAgentRun(run.userId, run.id, "user_cancelled");
+    if (!cancelled) return await this.agents.findRunById(run.id) ?? run;
     await this.append(run.id, nextSequence, "run.cancelled", { reason: "user_cancelled" });
-    return cancelled ?? run;
+    return cancelled;
   }
 
   async saveSuggestion(subject: AuthSubject, suggestionId: string) {
