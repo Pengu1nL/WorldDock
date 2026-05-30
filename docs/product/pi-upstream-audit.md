@@ -56,12 +56,13 @@ WorldDock integrates pi through a TypeScript package adapter. It must not invent
 
 Confirmed implementation uses `Agent` from `@earendil-works/pi-agent-core`.
 
-WorldDock maps pi events as follows:
+WorldDock maps pi events and adapter lifecycle as follows:
 
-- `agent_start` -> `session.started`
+- adapter session bootstrap -> `session.started`
 - `message_update` with `text_delta` -> `message.delta`
 - `tool_execution_start` -> `tool.requested`
-- `tool_execution_end` -> `tool.completed`
+- successful `tool_execution_end` -> `tool.completed`
+- failed `tool_execution_end` -> `session.failed`
 - proposal tool result with `suggestion` -> `suggestion.created`
 - final assistant usage -> `usage`
 - normal `agent_end` -> `session.completed`
