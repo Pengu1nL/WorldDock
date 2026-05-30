@@ -18,7 +18,7 @@ export function createPiAgentCoreAdapter(options: PiAgentCoreAdapterOptions): Pi
     emit({ type: "session.started", piSessionId: `pi_${input.runId}` });
 
     let completed = false;
-    let failed = false;
+    let failure: { code: string; message: string } | null = null;
     let lastUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
     const pendingContextEvents = new Map<string, PiRuntimeEvent[]>();
 
@@ -40,11 +40,26 @@ export function createPiAgentCoreAdapter(options: PiAgentCoreAdapterOptions): Pi
       toolExecution: "sequential",
     });
 
+    const emitFailureOnce = (code: string, message: string) => {
+      if (failure) return;
+      failure = { code, message };
+      emit({ type: "session.failed", code, message });
+      agent.abort();
+    };
+
     agent.subscribe((event) => {
+      if (event.type === "agent_end") completed = true;
+      if (failure) return;
+
       for (const mapped of mapAgentEvent(event, pendingContextEvents)) {
-        if (mapped.type === "session.failed") failed = true;
+        if (mapped.type === "session.failed") {
+          emitFailureOnce(mapped.code, mapped.message);
+          return;
+        }
         emit(mapped);
       }
+
+      if (failure) return;
 
       if (event.type === "message_end" && event.message.role === "assistant") {
         lastUsage = {
@@ -54,23 +69,20 @@ export function createPiAgentCoreAdapter(options: PiAgentCoreAdapterOptions): Pi
         };
 
         if (event.message.stopReason === "error" || event.message.stopReason === "aborted") {
-          failed = true;
-          emit({
-            type: "session.failed",
-            code: event.message.stopReason === "aborted" ? "PI_SESSION_ABORTED" : "PI_SESSION_FAILED",
-            message: event.message.errorMessage ?? "pi session failed",
-          });
+          emitFailureOnce(
+            event.message.stopReason === "aborted" ? "PI_SESSION_ABORTED" : "PI_SESSION_FAILED",
+            event.message.errorMessage ?? "pi session failed",
+          );
         }
       }
-
-      if (event.type === "agent_end") completed = true;
     });
 
     await agent.prompt(input.prompt);
     await agent.waitForIdle();
 
+    if (failure) return;
     emit({ type: "usage", tokenUsage: lastUsage });
-    if (!failed && completed) emit({ type: "session.completed" });
+    if (completed) emit({ type: "session.completed" });
   };
 }
 
@@ -200,7 +212,7 @@ function mapAgentEvent(event: AgentEvent, pendingContextEvents: Map<string, PiRu
         {
           type: "session.failed",
           code: "PI_TOOL_EXECUTION_FAILED",
-          message: `WorldDock tool ${event.toolName} failed: ${toolErrorMessage(event.result)}`,
+          message: `WorldDock tool ${event.toolName} failed.`,
         },
       ];
     }
@@ -218,22 +230,6 @@ function mapAgentEvent(event: AgentEvent, pendingContextEvents: Map<string, PiRu
   }
 
   return [];
-}
-
-function toolErrorMessage(value: unknown) {
-  if (!value || typeof value !== "object") return "tool execution failed";
-  const content = (value as { content?: unknown }).content;
-  if (!Array.isArray(content)) return "tool execution failed";
-  const text = content
-    .map((item) => {
-      if (!item || typeof item !== "object") return "";
-      const record = item as { type?: unknown; text?: unknown };
-      return record.type === "text" && typeof record.text === "string" ? record.text : "";
-    })
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-  return text || "tool execution failed";
 }
 
 function normalizeToolResult(value: unknown): Record<string, unknown> {

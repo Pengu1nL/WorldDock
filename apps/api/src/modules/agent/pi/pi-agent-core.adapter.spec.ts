@@ -332,7 +332,13 @@ describe("createPiAgentCoreAdapter", () => {
         code: "PI_SESSION_FAILED",
         message: "upstream model failed",
       });
+      expect(events.at(-1)).toEqual({
+        type: "session.failed",
+        code: "PI_SESSION_FAILED",
+        message: "upstream model failed",
+      });
       expect(events.some((event) => event.type === "session.completed")).toBe(false);
+      expect(events.some((event) => event.type === "usage")).toBe(false);
     } finally {
       faux.unregister();
     }
@@ -390,9 +396,16 @@ describe("createPiAgentCoreAdapter", () => {
       expect(events).toContainEqual({
         type: "session.failed",
         code: "PI_TOOL_EXECUTION_FAILED",
-        message: "WorldDock tool search_world_assets failed: SafetyGate blocked asset detail",
+        message: "WorldDock tool search_world_assets failed.",
       });
+      expect(events.at(-1)).toEqual({
+        type: "session.failed",
+        code: "PI_TOOL_EXECUTION_FAILED",
+        message: "WorldDock tool search_world_assets failed.",
+      });
+      expect(events.some((event) => event.type === "message.delta" && event.text.includes("工具失败后不能完成"))).toBe(false);
       expect(events.some((event) => event.type === "tool.completed" && event.toolCallId === "call_search_error")).toBe(false);
+      expect(events.some((event) => event.type === "usage")).toBe(false);
       expect(events.some((event) => event.type === "session.completed")).toBe(false);
     } finally {
       faux.unregister();
