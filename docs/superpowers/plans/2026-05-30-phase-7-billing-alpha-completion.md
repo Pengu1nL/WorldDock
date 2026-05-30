@@ -143,7 +143,7 @@ Author 和 Committer 都不得包含真实姓名或个人邮箱。
 - Modify: `packages/domain/src/billing/index.ts`
 - Test: `apps/api/test/billing-price-book.spec.ts`
 
-- [ ] **Step 1: Write the failing price book test**
+- [x] **Step 1: Write the failing price book test**
 
 Replace or create `apps/api/test/billing-price-book.spec.ts` with:
 
@@ -186,7 +186,7 @@ describe("billing price book", () => {
 });
 ```
 
-- [ ] **Step 2: Run the price book test and confirm it fails before implementation**
+- [x] **Step 2: Run the price book test and confirm it fails before implementation**
 
 Run:
 
@@ -196,7 +196,7 @@ pnpm --filter @worlddock/api test -- billing-price-book.spec.ts
 
 Expected before implementation: FAIL because `calculateModelRunCostCents` or the unknown-model behavior is missing.
 
-- [ ] **Step 3: Implement the shared price book**
+- [x] **Step 3: Implement the shared price book**
 
 Create or replace `packages/domain/src/billing/price-book.ts` with:
 
@@ -237,7 +237,7 @@ In `packages/domain/src/billing/index.ts`, keep the export:
 export * from "./price-book";
 ```
 
-- [ ] **Step 4: Run the price book test again**
+- [x] **Step 4: Run the price book test again**
 
 Run:
 
@@ -247,7 +247,7 @@ pnpm --filter @worlddock/api test -- billing-price-book.spec.ts
 
 Expected: PASS with all `billing price book` cases passing.
 
-- [ ] **Step 5: Commit the price book increment**
+- [x] **Step 5: Commit the price book increment**
 
 Run the identity guard commands from this plan, then:
 
@@ -271,7 +271,7 @@ Expected: latest commit author and committer are anonymous-safe, and no real nam
 - Modify: `apps/api/src/modules/billing/billing.controller.ts`
 - Test: `apps/api/test/billing-alpha.integration-spec.ts`
 
-- [ ] **Step 1: Write the Alpha billing endpoint test**
+- [x] **Step 1: Write the Alpha billing endpoint test**
 
 Ensure `apps/api/test/billing-alpha.integration-spec.ts` includes this test case:
 
@@ -315,7 +315,7 @@ it("returns alpha entitlements and captures waitlist-only payment intents", asyn
 
 The same file must keep in-memory helpers for `createInMemoryAuthRepository()`, `createInMemoryBillingRepository()`, `addSession()`, and `createTestApp()` so the test is isolated from a real database.
 
-- [ ] **Step 2: Run the Alpha billing endpoint test and confirm it fails before implementation**
+- [x] **Step 2: Run the Alpha billing endpoint test and confirm it fails before implementation**
 
 Run:
 
@@ -325,7 +325,7 @@ pnpm --filter @worlddock/api test:integration -- billing-alpha.integration-spec.
 
 Expected before implementation: FAIL because `GET /v1/billing/entitlements`, `POST /v1/billing/placeholder-intents`, or placeholder persistence is missing.
 
-- [ ] **Step 3: Add the Prisma model and migration**
+- [x] **Step 3: Add the Prisma model and migration**
 
 In `packages/db/prisma/schema.prisma`, ensure `BillingAccount` contains:
 
@@ -383,7 +383,7 @@ CREATE INDEX "billing_placeholder_intents_accountId_idx" ON "billing_placeholder
 ALTER TABLE "billing_placeholder_intents" ADD CONSTRAINT "billing_placeholder_intents_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "billing_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ```
 
-- [ ] **Step 4: Extend the billing repository contract**
+- [x] **Step 4: Extend the billing repository contract**
 
 In `apps/api/src/modules/billing/billing.repository.ts`, add:
 
@@ -452,7 +452,7 @@ function parsePlaceholderStatus(value: string): BillingPlaceholderIntentRecord["
 }
 ```
 
-- [ ] **Step 5: Add Alpha entitlements and endpoint wiring**
+- [x] **Step 5: Add Alpha entitlements and endpoint wiring**
 
 Create or verify `apps/api/src/modules/billing/entitlements.service.ts`:
 
@@ -509,7 +509,7 @@ async placeholderIntent(@CurrentSubject() subject: AuthSubject, @Body() body: un
 }
 ```
 
-- [ ] **Step 6: Run Prisma validation and Alpha billing integration test**
+- [x] **Step 6: Run Prisma validation and Alpha billing integration test**
 
 Run:
 
@@ -520,7 +520,7 @@ pnpm --filter @worlddock/api test:integration -- billing-alpha.integration-spec.
 
 Expected: Prisma schema validates, and the Alpha billing endpoint test passes.
 
-- [ ] **Step 7: Commit billing placeholder and entitlement increment**
+- [x] **Step 7: Commit billing placeholder and entitlement increment**
 
 Run the identity guard commands from this plan, then:
 
@@ -539,7 +539,7 @@ Expected: latest commit author and committer are anonymous-safe.
 - Modify: `apps/api/src/modules/agent/agent.service.ts`
 - Modify: `apps/api/test/agent.integration-spec.ts`
 
-- [ ] **Step 1: Strengthen the Agent Run ledger assertion**
+- [x] **Step 1: Strengthen the Agent Run ledger assertion**
 
 In `apps/api/test/agent.integration-spec.ts`, replace the post-SSE ledger assertion in `creates a run, streams SSE events, and keeps suggestions pending until saved` with:
 
@@ -560,7 +560,7 @@ expect(ledgerEntries).toEqual([
 
 This assertion means the mock model maps to `openai-compatible/qwen3-32b`, costs 1 cent, and returns 99 cents from the 100-cent reserve.
 
-- [ ] **Step 2: Run the Agent integration test and confirm it fails if settlement still uses totalTokens / 10**
+- [x] **Step 2: Run the Agent integration test and confirm it fails if settlement still uses totalTokens / 10**
 
 Run:
 
@@ -570,7 +570,7 @@ pnpm --filter @worlddock/api test:integration -- agent.integration-spec.ts
 
 Expected before implementation: FAIL if the settled entry amount does not equal `99`.
 
-- [ ] **Step 3: Use price book settlement in BillingService**
+- [x] **Step 3: Use price book settlement in BillingService**
 
 In `apps/api/src/modules/billing/billing.service.ts`, import the domain calculator and types:
 
@@ -638,7 +638,7 @@ function normalizeModelName(model: string) {
 }
 ```
 
-- [ ] **Step 4: Pass Agent provider/model into billing settlement**
+- [x] **Step 4: Pass Agent provider/model into billing settlement**
 
 In `apps/api/src/modules/agent/agent.service.ts`, settle completed runs with provider/model:
 
@@ -666,7 +666,7 @@ await this.billing.refundAgentRun(run.userId, run.id, failure.reason);
 await this.billing.refundAgentRun(run.userId, run.id, "user_cancelled");
 ```
 
-- [ ] **Step 5: Run Agent and billing tests**
+- [x] **Step 5: Run Agent and billing tests**
 
 Run:
 
@@ -677,7 +677,7 @@ pnpm --filter @worlddock/api test:integration -- agent.integration-spec.ts billi
 
 Expected: price book tests pass, completed Agent Run settles to a 1-cent cost under the mock model, failed/cancelled runs refund reserve, and low-balance run creation returns `402` with `INSUFFICIENT_BALANCE`.
 
-- [ ] **Step 6: Commit Agent billing settlement increment**
+- [x] **Step 6: Commit Agent billing settlement increment**
 
 Run the identity guard commands from this plan, then:
 
@@ -699,7 +699,7 @@ Expected: latest commit author and committer are anonymous-safe.
 - Modify: `apps/web/src/app/(marketing)/pricing/page.tsx`
 - Test: `apps/web/tests/e2e/billing-flow.spec.ts`
 
-- [ ] **Step 1: Write the billing E2E flow**
+- [x] **Step 1: Write the billing E2E flow**
 
 Create or verify `apps/web/tests/e2e/billing-flow.spec.ts`:
 
@@ -761,7 +761,7 @@ test("billing page shows alpha usage and waitlist-only payment actions", async (
 });
 ```
 
-- [ ] **Step 2: Run the billing E2E and confirm it fails before UI wiring**
+- [x] **Step 2: Run the billing E2E and confirm it fails before UI wiring**
 
 Run:
 
@@ -771,7 +771,7 @@ pnpm --filter @worlddock/web test:e2e -- billing-flow.spec.ts
 
 Expected before implementation: FAIL if the Settings Billing page, usage copy, disabled payment buttons, or placeholder intent request is missing.
 
-- [ ] **Step 3: Add billing API client types**
+- [x] **Step 3: Add billing API client types**
 
 In `apps/web/src/features/worlddock/api.ts`, ensure these types exist:
 
@@ -827,7 +827,7 @@ export async function captureBillingPlaceholderIntent(
 }
 ```
 
-- [ ] **Step 4: Implement the billing page**
+- [x] **Step 4: Implement the billing page**
 
 Create or verify `apps/web/src/features/billing/billing-page.tsx`:
 
@@ -902,7 +902,7 @@ function formatLastAgentRun(usage: BillingUsage | null) {
 }
 ```
 
-- [ ] **Step 5: Implement the waitlist-only pricing cards**
+- [x] **Step 5: Implement the waitlist-only pricing cards**
 
 Create or verify `apps/web/src/features/billing/pricing-page.tsx`:
 
@@ -950,7 +950,7 @@ export function PricingPage({ onWaitlist }: PricingPageProps) {
 }
 ```
 
-- [ ] **Step 6: Wire BillingPage into SettingsView**
+- [x] **Step 6: Wire BillingPage into SettingsView**
 
 In `apps/web/src/features/worlddock/view-settings.tsx`, ensure imports include:
 
@@ -1016,7 +1016,7 @@ Ensure the billing tab renders:
 )}
 ```
 
-- [ ] **Step 7: Keep the marketing pricing route waitlist-only**
+- [x] **Step 7: Keep the marketing pricing route waitlist-only**
 
 In `apps/web/src/app/(marketing)/pricing/page.tsx`, keep public copy aligned with Alpha:
 
@@ -1031,7 +1031,7 @@ In `apps/web/src/app/(marketing)/pricing/page.tsx`, keep public copy aligned wit
 
 The page may track waitlist interest with product analytics, but it must not navigate to a checkout URL or customer portal.
 
-- [ ] **Step 8: Run Web verification**
+- [x] **Step 8: Run Web verification**
 
 Run:
 
@@ -1042,7 +1042,7 @@ pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts
 
 Expected: Billing E2E passes; API/runtime tests still pass.
 
-- [ ] **Step 9: Commit Billing UI increment**
+- [x] **Step 9: Commit Billing UI increment**
 
 Run the identity guard commands from this plan, then:
 
@@ -1060,7 +1060,7 @@ Expected: latest commit author and committer are anonymous-safe.
 - Create or modify: `docs/product/beta-payments.md`
 - Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Rewrite Beta payments documentation in Simplified Chinese**
+- [x] **Step 1: Rewrite Beta payments documentation in Simplified Chinese**
 
 Replace `docs/product/beta-payments.md` with:
 
@@ -1089,7 +1089,7 @@ Alpha 阶段已经保留的边界：
 Beta 启动真实支付前，必须先补充独立执行计划，覆盖支付 provider、checkout session、customer portal、webhook 验签、订阅状态映射、发票、退款和失败重试。
 ```
 
-- [ ] **Step 2: Verify no real payment integration exists in runtime code**
+- [x] **Step 2: Verify no real payment integration exists in runtime code**
 
 Run:
 
@@ -1099,7 +1099,7 @@ rg -n "stripe|checkout|customer portal|webhook|createCheckout|billingPortal" app
 
 Expected: matches are either user-facing Alpha/Beta explanatory copy or none; there must be no Stripe SDK import, checkout route, webhook route, customer portal route, or server-side payment session creation.
 
-- [ ] **Step 3: Update Phase 7 status after verification commands pass**
+- [x] **Step 3: Update Phase 7 status after verification commands pass**
 
 After Task 6 verification succeeds, replace the Phase 7 section in `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` with:
 
@@ -1136,7 +1136,7 @@ After Task 6 verification succeeds, replace the Phase 7 section in `docs/superpo
 - 当前套餐按钮只用于 Beta 候补或产品反馈，不能创建真实支付会话。
 ```
 
-- [ ] **Step 4: Commit docs and status increment**
+- [x] **Step 4: Commit docs and status increment**
 
 Run the identity guard commands from this plan, then:
 
@@ -1153,7 +1153,7 @@ Expected: latest commit author and committer are anonymous-safe.
 **Files:**
 - Verify: all Phase 7 files listed in this plan.
 
-- [ ] **Step 1: Run targeted verification**
+- [x] **Step 1: Run targeted verification**
 
 Run:
 
@@ -1175,7 +1175,7 @@ Expected:
 - Low balance returns `402` and `INSUFFICIENT_BALANCE`.
 - Web Billing page shows Alpha balance, last run usage, ledger rows, disabled payment buttons, and posts a placeholder intent.
 
-- [ ] **Step 2: Run repo-wide verification**
+- [x] **Step 2: Run repo-wide verification**
 
 Run:
 
@@ -1187,7 +1187,7 @@ pnpm build
 
 Expected: all repo lint, unit/integration test scripts under `pnpm test`, and builds pass.
 
-- [ ] **Step 3: Record exact command results**
+- [x] **Step 3: Record exact command results**
 
 Append the actual command results to the Phase 7 section of `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`. Use this wording only after the command has passed in the current execution run:
 
@@ -1197,7 +1197,7 @@ Append the actual command results to the Phase 7 section of `docs/superpowers/pl
 
 For any command that fails, keep Phase 7 as incomplete and add the failing command, failing test name, and error summary under a new “仍未完成” bullet in the Phase 7 section.
 
-- [ ] **Step 4: Final no-real-payment audit**
+- [x] **Step 4: Final no-real-payment audit**
 
 Run:
 
@@ -1211,7 +1211,7 @@ Expected:
 - User-facing copy may mention that Stripe checkout, customer portal, webhook, subscription, and invoices are deferred.
 - `docs/product/beta-payments.md` may mention deferred payment scope.
 
-- [ ] **Step 5: Commit final verification status if it changed docs**
+- [x] **Step 5: Commit final verification status if it changed docs**
 
 Run the identity guard commands from this plan, then:
 
