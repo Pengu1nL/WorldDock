@@ -39,6 +39,31 @@ describe("auth proxy route", () => {
     }));
     expect(response.status).toBe(200);
   });
+
+  it("returns a readable 503 when the API service is unavailable", async () => {
+    process.env.WORLD_DOCK_API_BASE_URL = "";
+    process.env.NEXT_PUBLIC_API_BASE_URL = "http://localhost:4000";
+    delete process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("fetch failed");
+    }));
+
+    const { POST } = await import("./route");
+    const response = await POST(
+      new Request("http://localhost/api/auth/sign-up/email", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "writer@example.com", password: "correct horse battery", name: "Writer" }),
+      }) as never,
+      { params: Promise.resolve({ all: ["sign-up", "email"] }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      code: "API_UNAVAILABLE",
+      message: "认证服务暂时不可用，请确认 API 服务已启动。",
+    });
+    expect(response.status).toBe(503);
+  });
 });
 
 function restoreEnv() {

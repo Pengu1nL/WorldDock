@@ -39,7 +39,14 @@ async function proxyAuth(path: string, body: unknown) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     cache: "no-store",
-  });
+  }).catch(() => null);
+  if (!response) {
+    return NextResponse.json({
+      code: "API_UNAVAILABLE",
+      message: "认证服务暂时不可用，请确认 API 服务已启动。",
+    }, { status: 503 });
+  }
+
   const payload = await response.json().catch(() => ({}));
   return NextResponse.json(payload, { status: response.status });
 }

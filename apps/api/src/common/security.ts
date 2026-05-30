@@ -31,6 +31,7 @@ export function configureSecurity(app: INestApplication) {
   app.enableCors({
     origin: trustedOrigins(),
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
   const fastify = app.getHttpAdapter().getInstance();
