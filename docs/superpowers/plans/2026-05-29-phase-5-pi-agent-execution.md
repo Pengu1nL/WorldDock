@@ -105,7 +105,7 @@ Author 和 Committer 都不得包含真实姓名或个人邮箱。
 - Create: `apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts`
 - Modify: `apps/api/src/modules/agent/pi/pi-agent-core.adapter.ts`
 
-- [ ] **Step 1: Write the failing adapter contract test**
+- [x] **Step 1: Write the failing adapter contract test**
 
 Create `apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts`:
 
@@ -247,7 +247,7 @@ describe("createPiAgentCoreAdapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails on the current stub**
+- [x] **Step 2: Run the test and confirm it fails on the current stub**
 
 Run:
 
@@ -257,7 +257,7 @@ pnpm --filter @worlddock/api test -- pi-agent-core.adapter.spec.ts
 
 Expected: FAIL because `PiAgentCoreAdapterOptions` has no `modelOverride`, `PiAgentCoreAdapter` accepts only two arguments, and the current adapter never emits `tool.requested` or real model text.
 
-- [ ] **Step 3: Commit the failing test**
+- [x] **Step 3: Commit the failing test**
 
 ```bash
 git add apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts docs/superpowers/plans/2026-05-29-phase-5-pi-agent-execution.md
@@ -276,7 +276,7 @@ Expected: commit succeeds and `git log -1 --format=fuller` does not expose perso
 - Modify: `apps/api/src/modules/agent/pi/pi-session-runner.ts`
 - Modify: `apps/api/test/pi-agent.integration-spec.ts`
 
-- [ ] **Step 1: Update runtime types**
+- [x] **Step 1: Update runtime types**
 
 In `apps/api/src/modules/agent/pi/pi-runtime.client.ts`, extend the types near the existing `PiRuntimeClient` definitions:
 
@@ -349,7 +349,7 @@ export class PiAgentCoreRuntimeClient implements PiRuntimeClient {
 }
 ```
 
-- [ ] **Step 2: Move safety-gated tool execution into `PiSessionRunner` executor**
+- [x] **Step 2: Move safety-gated tool execution into `PiSessionRunner` executor**
 
 In `apps/api/src/modules/agent/pi/pi-session-runner.ts`, keep `contextEventsFromToolResult` and replace `run` with:
 
@@ -373,7 +373,7 @@ async *run(input: PiSessionInput): AsyncIterable<PiRuntimeEvent> {
 }
 ```
 
-- [ ] **Step 3: Update existing runner test expectations**
+- [x] **Step 3: Update existing runner test expectations**
 
 In `apps/api/test/pi-agent.integration-spec.ts`, replace the first fake runtime with one that calls the provided executor:
 
@@ -400,7 +400,7 @@ Expected event order remains:
 expect(events.map((event) => event.type)).toEqual(["tool.requested", "tool.completed", "context.used", "session.completed"]);
 ```
 
-- [ ] **Step 4: Run bridge tests**
+- [x] **Step 4: Run bridge tests**
 
 Run:
 
@@ -410,7 +410,7 @@ pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts ag
 
 Expected: PASS, with no duplicate tool execution and no missing `context.used` events.
 
-- [ ] **Step 5: Commit runtime bridge**
+- [x] **Step 5: Commit runtime bridge**
 
 ```bash
 git add apps/api/src/modules/agent/pi/pi-runtime.client.ts apps/api/src/modules/agent/pi/pi-session-runner.ts apps/api/test/pi-agent.integration-spec.ts
@@ -427,7 +427,7 @@ git log -1 --format=fuller
 - Modify: `apps/api/src/modules/agent/pi/pi-event-adapter.ts`
 - Test: `apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts`
 
-- [ ] **Step 1: Replace the adapter stub with real Agent wiring**
+- [x] **Step 1: Replace the adapter stub with real Agent wiring**
 
 Replace `apps/api/src/modules/agent/pi/pi-agent-core.adapter.ts` with an implementation shaped like this:
 
@@ -622,7 +622,7 @@ function normalizeToolResult(value: unknown): Record<string, unknown> {
 }
 ```
 
-- [ ] **Step 2: Run adapter unit test**
+- [x] **Step 2: Run adapter unit test**
 
 Run:
 
@@ -632,7 +632,7 @@ pnpm --filter @worlddock/api test -- pi-agent-core.adapter.spec.ts
 
 Expected: PASS. The test must see `tool.requested`, `tool.completed`, `context.used`, streamed text, usage, and `session.completed`.
 
-- [ ] **Step 3: Run provider and integration tests**
+- [x] **Step 3: Run provider and integration tests**
 
 Run:
 
@@ -643,7 +643,7 @@ pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts ag
 
 Expected: PASS. Existing `new PiAgentProvider()` mock constructor can remain for unit smoke tests, but Nest production wiring with `AI_PROVIDER=pi` must use `createPiAgentCoreAdapter`.
 
-- [ ] **Step 4: Commit real adapter**
+- [x] **Step 4: Commit real adapter**
 
 ```bash
 git add apps/api/src/modules/agent/pi/pi-agent-core.adapter.ts apps/api/src/modules/agent/pi/pi-event-adapter.ts apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts
@@ -661,7 +661,7 @@ git log -1 --format=fuller
 - Modify: `apps/api/test/pi-agent.integration-spec.ts`
 - Modify: `apps/api/test/agent-context.integration-spec.ts`
 
-- [ ] **Step 1: Add a proposal tool integration test**
+- [x] **Step 1: Add a proposal tool integration test**
 
 Append this test to `apps/api/test/pi-agent.integration-spec.ts`:
 
@@ -728,7 +728,7 @@ it("turns proposal tool results into pending suggestions without writing product
 });
 ```
 
-- [ ] **Step 2: Strengthen safety gate tests**
+- [x] **Step 2: Strengthen safety gate tests**
 
 In `apps/api/test/agent-context.integration-spec.ts`, add:
 
@@ -754,7 +754,7 @@ it("allows proposal tools but blocks unknown tool names", () => {
 });
 ```
 
-- [ ] **Step 3: Confirm proposal tools do not call `worlds.createArchiveEntry`**
+- [x] **Step 3: Confirm proposal tools do not call `worlds.createArchiveEntry`**
 
 Run:
 
@@ -764,7 +764,7 @@ pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts ag
 
 Expected: PASS. The proposal test only observes runtime events; product asset persistence remains in `AgentService.saveSuggestion`.
 
-- [ ] **Step 4: Commit safety coverage**
+- [x] **Step 4: Commit safety coverage**
 
 ```bash
 git add apps/api/test/pi-agent.integration-spec.ts apps/api/test/agent-context.integration-spec.ts apps/api/src/modules/agent/pi/world-tools.ts apps/api/src/modules/agent/pi/safety-gate.ts
@@ -782,7 +782,7 @@ git log -1 --format=fuller
 - Modify: `apps/web/src/features/agent/context-inspector.tsx`
 - Modify: `apps/web/tests/e2e/pi-agent.spec.ts`
 
-- [ ] **Step 1: Type agent events in Web API client**
+- [x] **Step 1: Type agent events in Web API client**
 
 Replace the loose `AgentEvent` type in `apps/web/src/features/worlddock/api.ts` with:
 
@@ -810,7 +810,7 @@ export type AgentEvent =
   | { type: "run.cancelled"; payload: { reason?: string } };
 ```
 
-- [ ] **Step 2: Store streamed context refs in `world-dock-app.tsx`**
+- [x] **Step 2: Store streamed context refs in `world-dock-app.tsx`**
 
 Near existing agent state, add:
 
@@ -875,7 +875,7 @@ const AgentContextDrawer = ({ refs, toolEvents }: { refs: AgentContextRef[]; too
 
 Then render `AgentContextDrawer`.
 
-- [ ] **Step 3: Add robust empty state to `ContextInspector`**
+- [x] **Step 3: Add robust empty state to `ContextInspector`**
 
 Update `apps/web/src/features/agent/context-inspector.tsx`:
 
@@ -922,7 +922,7 @@ export function ContextInspector({ refs }: ContextInspectorProps) {
 }
 ```
 
-- [ ] **Step 4: Upgrade Playwright smoke**
+- [x] **Step 4: Upgrade Playwright smoke**
 
 In `apps/web/tests/e2e/pi-agent.spec.ts`, after the existing context button assertion, add:
 
@@ -933,7 +933,7 @@ await expect(page.getByText("回忆所").or(page.getByText("记忆可以被买�
 await expect(page.getByText(/pi session|search_world_assets|propose_/)).toBeVisible();
 ```
 
-- [ ] **Step 5: Run web tests**
+- [x] **Step 5: Run web tests**
 
 Run:
 
@@ -944,7 +944,7 @@ pnpm --filter @worlddock/web test:e2e -- pi-agent.spec.ts
 
 Expected: PASS. The context drawer shows real streamed context refs rather than the previous static drawer copy.
 
-- [ ] **Step 6: Commit frontend inspector**
+- [x] **Step 6: Commit frontend inspector**
 
 ```bash
 git add apps/web/src/features/worlddock/api.ts apps/web/src/features/worlddock/world-dock-app.tsx apps/web/src/features/agent/context-inspector.tsx apps/web/tests/e2e/pi-agent.spec.ts
@@ -960,7 +960,7 @@ git log -1 --format=fuller
 - Modify: `docs/product/pi-upstream-audit.md`
 - Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Append implementation evidence to pi upstream audit**
+- [x] **Step 1: Append implementation evidence to pi upstream audit**
 
 Append this section to `docs/product/pi-upstream-audit.md`:
 
@@ -983,7 +983,7 @@ WorldDock maps pi events as follows:
 WorldDock tool execution remains outside pi product writes. The adapter calls a WorldDock executor, the runner applies `SafetyGate`, and tool results return to pi as tool result messages.
 ```
 
-- [ ] **Step 2: Mark Phase 5 complete in incomplete task record**
+- [x] **Step 2: Mark Phase 5 complete in incomplete task record**
 
 Replace the Phase 5 section in `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` with:
 
@@ -1019,7 +1019,7 @@ Replace the Phase 5 section in `docs/superpowers/plans/2026-05-28-alpha-incomple
 - 真实模型调用依赖 `AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY`；本地 E2E 仍可使用测试 provider 或 mock runtime 保持稳定。
 ```
 
-- [ ] **Step 3: Run final verification**
+- [x] **Step 3: Run final verification**
 
 Run:
 
@@ -1036,7 +1036,7 @@ pnpm build
 
 Expected: all commands pass. Record any command that cannot run with the exact reason and the last failing output line.
 
-- [ ] **Step 4: Commit completion evidence**
+- [x] **Step 4: Commit completion evidence**
 
 ```bash
 git add docs/product/pi-upstream-audit.md docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md
@@ -1048,14 +1048,14 @@ git log -1 --format=fuller
 
 ## Acceptance Checklist
 
-- [ ] `AI_PROVIDER=pi` production wiring creates a `PiAgentProvider` backed by `PiAgentCoreRuntimeClient` and real `@earendil-works/pi-agent-core` `Agent`.
-- [ ] pi Agent tool calls execute through WorldDock `SafetyGate` and `WorldToolRegistry`.
-- [ ] `get_asset_detail` and `get_asset_source_fragments` still require prior Card or Brief disclosure in the same run.
-- [ ] Proposal tools produce pending suggestions only; product writes still happen through `saveAgentSuggestion`.
-- [ ] SSE includes `pi.session.started`, `context.used`, `tool.requested`, `tool.completed`, `message.delta`, `suggestion.created`, `run.completed`, and error/cancel events.
-- [ ] `AgentRun.piSessionId` and `AgentRun.provider` persist for pi runs.
-- [ ] Frontend context drawer shows real streamed context refs grouped by disclosure level.
-- [ ] Phase 5 section in `2026-05-28-alpha-incomplete-tasks.md` is updated only after tests pass.
+- [x] `AI_PROVIDER=pi` production wiring creates a `PiAgentProvider` backed by `PiAgentCoreRuntimeClient` and real `@earendil-works/pi-agent-core` `Agent`.
+- [x] pi Agent tool calls execute through WorldDock `SafetyGate` and `WorldToolRegistry`.
+- [x] `get_asset_detail` and `get_asset_source_fragments` still require prior Card or Brief disclosure in the same run.
+- [x] Proposal tools produce pending suggestions only; product writes still happen through `saveAgentSuggestion`.
+- [x] SSE includes `pi.session.started`, `context.used`, `tool.requested`, `tool.completed`, `message.delta`, `suggestion.created`, `run.completed`, and error/cancel events.
+- [x] `AgentRun.piSessionId` and `AgentRun.provider` persist for pi runs.
+- [x] Frontend context drawer shows real streamed context refs grouped by disclosure level.
+- [x] Phase 5 section in `2026-05-28-alpha-incomplete-tasks.md` is updated only after tests pass.
 
 ## Self-Review
 

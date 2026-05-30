@@ -119,6 +119,10 @@ export class AgentService {
         if (chunk.type === "usage") {
           tokenUsage = chunk.tokenUsage;
         }
+
+        if (chunk.type === "failed") {
+          throw new AgentProviderFailure(chunk.code, chunk.message);
+        }
       }
 
       await this.agents.updateRun(run.id, {
@@ -128,15 +132,16 @@ export class AgentService {
       });
       await this.billing.settleAgentRun(run.userId, run.id, tokenUsage, resolveBillingModel(run.provider, run.model));
       yield await this.append(run.id, sequence++, "run.completed", { tokenUsage });
-    } catch {
+    } catch (error) {
+      const failure = agentFailureFromError(error);
       await this.agents.updateRun(run.id, {
         status: "failed",
         failedAt: new Date(),
-        errorCode: "MODEL_UNAVAILABLE",
-        errorMessage: "Agent provider is unavailable.",
+        errorCode: failure.code,
+        errorMessage: failure.message,
       });
-      await this.billing.refundAgentRun(run.userId, run.id, "model_unavailable");
-      yield await this.append(run.id, sequence++, "run.failed", { code: "MODEL_UNAVAILABLE", message: "Agent provider is unavailable." });
+      await this.billing.refundAgentRun(run.userId, run.id, failure.reason);
+      yield await this.append(run.id, sequence++, "run.failed", { code: failure.code, message: failure.message });
     }
   }
 
@@ -252,6 +257,27 @@ export class AgentService {
   private notFound(message: string) {
     return new NotFoundException({ code: "NOT_FOUND", message });
   }
+}
+
+class AgentProviderFailure extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly reason = code.toLowerCase(),
+  ) {
+    super(message);
+  }
+}
+
+function agentFailureFromError(error: unknown) {
+  if (error instanceof AgentProviderFailure) {
+    return { code: error.code, message: error.message, reason: error.reason };
+  }
+  return {
+    code: "MODEL_UNAVAILABLE",
+    message: "Agent provider is unavailable.",
+    reason: "model_unavailable",
+  };
 }
 
 function parseAgentProvider(value: string | undefined): AgentRunRecord["provider"] {

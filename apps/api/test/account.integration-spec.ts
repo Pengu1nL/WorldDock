@@ -53,6 +53,23 @@ describe("account endpoints", () => {
     expect(completed.body.profile.onboardingCompletedAt).toEqual(expect.any(String));
   });
 
+  it("allows browser CORS preflight for onboarding PATCH requests", async () => {
+    const auth = createInMemoryAuthRepository();
+    const accounts = createInMemoryAccountRepository(auth.users);
+    app = await createTestApp(auth, accounts);
+
+    const response = await request(app.getHttpServer())
+      .options("/v1/account/onboarding/complete")
+      .set("origin", "http://localhost:3000")
+      .set("access-control-request-method", "PATCH")
+      .set("access-control-request-headers", "authorization")
+      .expect(204);
+
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:3000");
+    expect(response.headers["access-control-allow-methods"]).toContain("PATCH");
+    expect(response.headers["access-control-allow-headers"]).toContain("authorization");
+  });
+
   it("rejects duplicate handles", async () => {
     const auth = createInMemoryAuthRepository();
     const accounts = createInMemoryAccountRepository(auth.users);

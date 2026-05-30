@@ -51,3 +51,21 @@ An `AgentTool` extends the base `Tool` and includes `label`, optional `prepareAr
 ## Implementation Decision
 
 WorldDock integrates pi through a TypeScript package adapter. It must not invent an HTTP session endpoint. WorldDock owns product persistence and permissions; pi can only request registered WorldDock tools, with Safety Gate enforcing the progressive disclosure boundary before any tool executes.
+
+## WorldDock Adapter Mapping
+
+Confirmed implementation uses `Agent` from `@earendil-works/pi-agent-core`.
+
+WorldDock maps pi events and adapter lifecycle as follows:
+
+- adapter session bootstrap -> `session.started`
+- `message_update` with `text_delta` -> `message.delta`
+- `tool_execution_start` -> `tool.requested`
+- successful `tool_execution_end` -> `tool.completed`
+- failed `tool_execution_end` -> `session.failed`
+- proposal tool result with `suggestion` -> `suggestion.created`
+- final assistant usage -> `usage`
+- normal `agent_end` -> `session.completed`
+- assistant `stopReason=error|aborted` -> `session.failed`
+
+WorldDock tool execution remains outside pi product writes. The adapter calls a WorldDock executor, the runner applies `SafetyGate`, and tool results return to pi as tool result messages.

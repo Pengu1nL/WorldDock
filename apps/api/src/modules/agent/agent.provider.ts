@@ -46,7 +46,8 @@ export type AgentProviderChunk =
   | { type: "tool-requested"; toolCall: PiToolCall }
   | { type: "tool-completed"; toolCallId: string; result: Record<string, unknown> }
   | { type: "suggestion"; suggestion: WorldSuggestion }
-  | { type: "usage"; tokenUsage: TokenUsage };
+  | { type: "usage"; tokenUsage: TokenUsage }
+  | { type: "failed"; code: string; message: string };
 
 export type AgentProvider = {
   stream(input: AgentProviderInput): AsyncIterable<AgentProviderChunk>;

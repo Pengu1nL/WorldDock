@@ -139,26 +139,47 @@ async function installApiMocks(page: Page) {
         status: 200,
         contentType: "text/event-stream",
         body: [
-          sse("message.delta", { type: "message.delta", payload: { text: "雏形已生成，已整理出一条核心规则。" } }),
-          sse("context.used", { type: "context.used", payload: { count: 1 } }),
-          sse("suggestion.created", {
-            type: "suggestion.created",
-            payload: {
-              suggestionId: "ags_1",
-              suggestion: {
-                id: "s1",
-                kind: "setting",
-                category: "世界规则",
-                title: "《记忆交易法》",
-                summary: "认证机构可以托管、估价并转让记忆，但亲属记忆交易必须经过冷静期。",
-                body: "所有记忆交易都必须由认证机构托管，亲属关系内的交易需要七日冷静期和独立见证。",
-                relations: [],
-              },
+          agentSse(1, "run.started", { runId: "run_e2e", mode: "expand" }),
+          agentSse(2, "pi.session.started", { piSessionId: "pi_session_e2e" }),
+          agentSse(3, "tool.requested", { toolCall: { id: "call_search_world_assets", name: "search_world_assets", arguments: { query: "记忆交易" } } }),
+          agentSse(4, "tool.completed", { toolCallId: "call_search_world_assets", result: { assets: [] } }),
+          agentSse(5, "message.delta", { text: "雏形已生成，已整理出一条核心规则。" }),
+          agentSse(6, "context.used", {
+            contextRef: {
+              id: "ctx_world_manifest",
+              kind: "world",
+              title: "回忆所",
+              excerpt: "记忆可以被买卖，但交易必须经过认证机构托管。",
+              targetId: "world_created",
+              level: "manifest",
+              source: "tool",
             },
           }),
-          sse("run.completed", {
-            type: "run.completed",
-            payload: { tokenUsage: { inputTokens: 120, outputTokens: 260, totalTokens: 380 }, costCents: 42 },
+          agentSse(7, "context.used", {
+            contextRef: {
+              id: "ctx_archive_trade_law",
+              kind: "archive",
+              title: "《记忆交易法》",
+              excerpt: "认证机构可以托管、估价并转让记忆。",
+              targetId: "asset_memory_trade_law",
+              level: "card",
+              source: "tool",
+            },
+          }),
+          agentSse(8, "suggestion.created", {
+            suggestionId: "ags_1",
+            suggestion: {
+              id: "s1",
+              kind: "setting",
+              category: "世界规则",
+              title: "《记忆交易法》",
+              summary: "认证机构可以托管、估价并转让记忆，但亲属记忆交易必须经过冷静期。",
+              body: "所有记忆交易都必须由认证机构托管，亲属关系内的交易需要七日冷静期和独立见证。",
+              relations: [],
+            },
+          }),
+          agentSse(9, "run.completed", {
+            tokenUsage: { inputTokens: 120, outputTokens: 260, totalTokens: 380 },
           }),
         ].join(""),
       });
@@ -350,6 +371,17 @@ function json(route: Route, body: unknown, status = 200) {
 
 function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function agentSse(sequence: number, type: string, payload: unknown) {
+  return sse(type, {
+    id: `evt_run_e2e_${sequence}`,
+    runId: "run_e2e",
+    sequence,
+    createdAt: `2026-05-28T10:00:0${sequence}.000Z`,
+    type,
+    payload,
+  });
 }
 
 function toCommunityRepository(repository: typeof tideRepository) {

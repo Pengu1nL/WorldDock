@@ -184,7 +184,7 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
       )}
 
       {!isStreaming && msg.contextRefs && (
-        <button onClick={onOpenContext} className="row gap-2" style={{
+        <button onClick={() => onOpenContext(msg.contextSnapshot)} className="row gap-2" style={{
           marginTop: 12, background: "transparent", border: 0, color: "var(--fg-3)",
           fontSize: "var(--t-12)", cursor: "pointer", padding: 0,
         }}>
