@@ -25,6 +25,24 @@ describe("billing price book", () => {
     })).toBe(1);
   });
 
+  it("does not charge model runs without token usage", () => {
+    expect(calculateModelRunCostCents({
+      provider: "openai",
+      model: "gpt-5.4",
+      inputTokens: 0,
+      outputTokens: 0,
+    })).toBe(0);
+  });
+
+  it("rejects negative token usage", () => {
+    expect(() => calculateModelRunCostCents({
+      provider: "openai",
+      model: "gpt-5.4",
+      inputTokens: -1,
+      outputTokens: 1,
+    })).toThrow("Invalid token usage: token counts must be non-negative");
+  });
+
   it("rejects model runs without an explicit price", () => {
     expect(() => calculateModelRunCostCents({
       provider: "openai",
