@@ -21,5 +21,6 @@ export function piEventToAgentChunk(event: PiRuntimeEvent): AgentProviderChunk |
   if (event.type === "usage") return { type: "usage", tokenUsage: event.tokenUsage };
   if (event.type === "tool.requested") return { type: "tool-requested", toolCall: event.toolCall };
   if (event.type === "tool.completed") return { type: "tool-completed", toolCallId: event.toolCallId, result: event.result };
+  if (event.type === "session.failed") return { type: "failed", code: event.code, message: event.message };
   return null;
 }

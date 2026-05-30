@@ -42,6 +42,7 @@ export function createPiAgentCoreAdapter(options: PiAgentCoreAdapterOptions): Pi
 
     agent.subscribe((event) => {
       for (const mapped of mapAgentEvent(event, pendingContextEvents)) {
+        if (mapped.type === "session.failed") failed = true;
         emit(mapped);
       }
 
@@ -116,7 +117,7 @@ function toPiAgentTools(
     name: tool.name,
     label: tool.name,
     description: tool.description,
-    parameters: parametersForTool(tool.name),
+    parameters: parametersForTool(tool.name, tool.inputSchema),
     prepareArguments: (args) => (args && typeof args === "object" ? args as Record<string, unknown> : {}),
     execute: async (toolCallId, params) => {
       const name = piToolNameSchema.parse(tool.name);
@@ -132,13 +133,17 @@ function toPiAgentTools(
   }));
 }
 
-function parametersForTool(name: PiToolName) {
+function parametersForTool(name: PiToolName, inputSchema?: Record<string, unknown>) {
+  const schemaParameters = parametersFromInputSchema(inputSchema);
+  if (schemaParameters) return schemaParameters;
+
   if (name === "get_world_manifest") return Type.Object({ worldId: Type.String() }, { additionalProperties: true });
   if (name === "search_world_assets") return Type.Object({ worldId: Type.String(), query: Type.String() }, { additionalProperties: true });
   if (name === "get_asset_brief" || name === "get_asset_detail" || name === "get_asset_source_fragments") {
     return Type.Object({ worldId: Type.String(), assetId: Type.String() }, { additionalProperties: true });
   }
   if (name === "list_repository_releases") return Type.Object({ repositoryId: Type.String() }, { additionalProperties: true });
+  if (name === "propose_release_notes") return Type.Object({ repositoryId: Type.String() }, { additionalProperties: true });
   if (name === "propose_story_seed") {
     return Type.Object(
       {
@@ -155,6 +160,17 @@ function parametersForTool(name: PiToolName) {
       body: Type.Optional(Type.String()),
       summary: Type.Optional(Type.String()),
     },
+    { additionalProperties: true },
+  );
+}
+
+function parametersFromInputSchema(inputSchema: Record<string, unknown> | undefined) {
+  if (!inputSchema || inputSchema.type !== "object") return null;
+  const required = inputSchema.required;
+  if (!Array.isArray(required) || !required.every((field): field is string => typeof field === "string")) return null;
+
+  return Type.Object(
+    Object.fromEntries(required.map((field) => [field, Type.String()])),
     { additionalProperties: true },
   );
 }
@@ -178,6 +194,17 @@ function mapAgentEvent(event: AgentEvent, pendingContextEvents: Map<string, PiRu
   }
 
   if (event.type === "tool_execution_end") {
+    if (event.isError) {
+      pendingContextEvents.delete(event.toolCallId);
+      return [
+        {
+          type: "session.failed",
+          code: "PI_TOOL_EXECUTION_FAILED",
+          message: `WorldDock tool ${event.toolName} failed: ${toolErrorMessage(event.result)}`,
+        },
+      ];
+    }
+
     const result = normalizeToolResult(event.result);
     const events: PiRuntimeEvent[] = [
       { type: "tool.completed", toolCallId: event.toolCallId, result },
@@ -191,6 +218,22 @@ function mapAgentEvent(event: AgentEvent, pendingContextEvents: Map<string, PiRu
   }
 
   return [];
+}
+
+function toolErrorMessage(value: unknown) {
+  if (!value || typeof value !== "object") return "tool execution failed";
+  const content = (value as { content?: unknown }).content;
+  if (!Array.isArray(content)) return "tool execution failed";
+  const text = content
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const record = item as { type?: unknown; text?: unknown };
+      return record.type === "text" && typeof record.text === "string" ? record.text : "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  return text || "tool execution failed";
 }
 
 function normalizeToolResult(value: unknown): Record<string, unknown> {
