@@ -50,7 +50,13 @@ describe("billing alpha endpoints", () => {
       .get("/v1/billing/usage")
       .set("authorization", "Bearer session_user_1")
       .expect(200);
-    expect(usage.body.usage.placeholderIntents).toContainEqual(expect.objectContaining({ plan: "creator" }));
+    expect(usage.body.usage.placeholderIntents).toContainEqual(expect.objectContaining({
+      id: intent.body.intent.id,
+      userId: "user_1",
+      plan: "creator",
+      source: "alpha_ui",
+      status: "captured",
+    }));
   });
 });
 
