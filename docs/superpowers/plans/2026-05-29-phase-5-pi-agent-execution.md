@@ -960,7 +960,7 @@ git log -1 --format=fuller
 - Modify: `docs/product/pi-upstream-audit.md`
 - Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Append implementation evidence to pi upstream audit**
+- [x] **Step 1: Append implementation evidence to pi upstream audit**
 
 Append this section to `docs/product/pi-upstream-audit.md`:
 
@@ -983,7 +983,7 @@ WorldDock maps pi events as follows:
 WorldDock tool execution remains outside pi product writes. The adapter calls a WorldDock executor, the runner applies `SafetyGate`, and tool results return to pi as tool result messages.
 ```
 
-- [ ] **Step 2: Mark Phase 5 complete in incomplete task record**
+- [x] **Step 2: Mark Phase 5 complete in incomplete task record**
 
 Replace the Phase 5 section in `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` with:
 
@@ -1019,7 +1019,7 @@ Replace the Phase 5 section in `docs/superpowers/plans/2026-05-28-alpha-incomple
 - 真实模型调用依赖 `AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY`；本地 E2E 仍可使用测试 provider 或 mock runtime 保持稳定。
 ```
 
-- [ ] **Step 3: Run final verification**
+- [x] **Step 3: Run final verification**
 
 Run:
 
@@ -1036,7 +1036,7 @@ pnpm build
 
 Expected: all commands pass. Record any command that cannot run with the exact reason and the last failing output line.
 
-- [ ] **Step 4: Commit completion evidence**
+- [x] **Step 4: Commit completion evidence**
 
 ```bash
 git add docs/product/pi-upstream-audit.md docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md
@@ -1048,14 +1048,14 @@ git log -1 --format=fuller
 
 ## Acceptance Checklist
 
-- [ ] `AI_PROVIDER=pi` production wiring creates a `PiAgentProvider` backed by `PiAgentCoreRuntimeClient` and real `@earendil-works/pi-agent-core` `Agent`.
-- [ ] pi Agent tool calls execute through WorldDock `SafetyGate` and `WorldToolRegistry`.
-- [ ] `get_asset_detail` and `get_asset_source_fragments` still require prior Card or Brief disclosure in the same run.
-- [ ] Proposal tools produce pending suggestions only; product writes still happen through `saveAgentSuggestion`.
-- [ ] SSE includes `pi.session.started`, `context.used`, `tool.requested`, `tool.completed`, `message.delta`, `suggestion.created`, `run.completed`, and error/cancel events.
-- [ ] `AgentRun.piSessionId` and `AgentRun.provider` persist for pi runs.
-- [ ] Frontend context drawer shows real streamed context refs grouped by disclosure level.
-- [ ] Phase 5 section in `2026-05-28-alpha-incomplete-tasks.md` is updated only after tests pass.
+- [x] `AI_PROVIDER=pi` production wiring creates a `PiAgentProvider` backed by `PiAgentCoreRuntimeClient` and real `@earendil-works/pi-agent-core` `Agent`.
+- [x] pi Agent tool calls execute through WorldDock `SafetyGate` and `WorldToolRegistry`.
+- [x] `get_asset_detail` and `get_asset_source_fragments` still require prior Card or Brief disclosure in the same run.
+- [x] Proposal tools produce pending suggestions only; product writes still happen through `saveAgentSuggestion`.
+- [x] SSE includes `pi.session.started`, `context.used`, `tool.requested`, `tool.completed`, `message.delta`, `suggestion.created`, `run.completed`, and error/cancel events.
+- [x] `AgentRun.piSessionId` and `AgentRun.provider` persist for pi runs.
+- [x] Frontend context drawer shows real streamed context refs grouped by disclosure level.
+- [x] Phase 5 section in `2026-05-28-alpha-incomplete-tasks.md` is updated only after tests pass.
 
 ## Self-Review
 

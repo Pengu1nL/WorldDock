@@ -112,24 +112,33 @@
 
 ## Phase 5: 基于 pi 的 Agent Session、工具和长世界记忆
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `docs/product/pi-upstream-audit.md`。
-- 缺少 `docs/product/pi-agent-architecture.md`。
-- 缺少 `docs/product/world-asset-progressive-disclosure.md`。
-- 缺少 `packages/domain/src/agent/context.ts` 和 `packages/domain/src/agent/pi.ts`。
-- 缺少 `apps/api/src/modules/agent/pi/*`。
-- 缺少 `apps/api/src/modules/agent/context-builder.ts`。
-- `packages/db/prisma/schema.prisma` 的 `AgentRun` 缺少 `piSessionId` 和 `provider`。
-- `ContextRef` 缺少 `level` 和 `source`。
-- `packages/domain/src/agent/index.ts` 未包含 pi session/tool event 类型。
-- `apps/api/src/modules/agent/agent.provider.ts` 当前是 OpenAI provider，不是 PiAgentProvider。
-- 缺少 `pi-agent.integration-spec.ts`、`agent-context.integration-spec.ts`、`pi-agent.spec.ts`。
+完成依据：
 
-已有但不足：
+- `docs/product/pi-upstream-audit.md`、`docs/product/pi-agent-architecture.md` 和 `docs/product/world-asset-progressive-disclosure.md` 已固定 pi upstream、架构边界和长世界渐进披露协议。
+- `packages/domain/src/agent/context.ts` 和 `packages/domain/src/agent/pi.ts` 已定义 disclosure level、context ref、pi runtime event、tool call 和 session event 类型。
+- `packages/db/prisma/schema.prisma` 已包含 `AgentRun.provider`、`AgentRun.piSessionId`、`ContextRef.level`、`ContextRef.source` 及对应 migration。
+- `apps/api/src/modules/agent/context-builder.ts` 已按 manifest、card、brief 选择初始上下文。
+- `apps/api/src/modules/agent/pi/*` 已提供真实 pi Agent adapter、runtime client、session runner、event adapter、tool registry、WorldDock tools、skill loader 和 safety gate。
+- `AgentService` 已把 `pi.session.started`、`context.used`、tool events、message delta、pending suggestion、usage settlement 和失败退款串入 Agent Run SSE。
+- `apps/web/src/features/agent/context-inspector.tsx` 与工作台已展示真实上下文 ref 和工具活动，pending suggestion 仍需用户确认后才写入世界资产。
 
-- Agent Run、SSE 事件、pending suggestion、save/discard、失败/取消退款已有雏形。
-- 当前 provider 可调用 OpenAI-compatible chat completions，但不符合 pi session/tool/progressive disclosure 架构。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test -- agent.provider.spec.ts pi-agent-core.adapter.spec.ts`：通过。
+- `pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts agent-context.integration-spec.ts agent.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- pi-agent.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+
+剩余说明：
+
+- Phase 5 不让 pi 直接保存、删除、发布、收费或读取本地文件；这些动作仍由 WorldDock API 在用户显式确认后执行。
+- 真实模型调用依赖 `AI_PROVIDER=pi`、`PI_MODEL_PROVIDER`、`PI_MODEL_ID`、`PI_PROVIDER_API_KEY`；本地 E2E 仍可使用测试 provider 或 mock runtime 保持稳定。
 
 ## Phase 6: 版本、发布、回滚和 Fork 同步
 
