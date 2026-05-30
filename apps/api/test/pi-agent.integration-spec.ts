@@ -45,6 +45,67 @@ describe("pi agent runtime boundary", () => {
     expect(events[2]).toMatchObject({ type: "context.used", source: "tool", targetId: "asset_1" });
   });
 
+  it("turns proposal tool results into pending suggestions without writing product assets", async () => {
+    const runtime: PiRuntimeClient = {
+      async *runSession(_input, executeTool) {
+        const toolCall = {
+          id: "call_propose_1",
+          name: "propose_setting" as const,
+          arguments: {
+            title: "记忆交易许可",
+            category: "制度",
+            summary: "记忆交易必须经过许可。",
+            body: "未经许可的记忆交易会被城市信用系统追踪。",
+          },
+        };
+        yield { type: "tool.requested", toolCall };
+        const executed = await executeTool?.(toolCall);
+        yield { type: "tool.completed", toolCallId: toolCall.id, result: executed?.result ?? {} };
+        const suggestion = executed?.result.suggestion;
+        if (suggestion) yield { type: "suggestion.created", suggestion };
+        yield { type: "session.completed" };
+      },
+    };
+    const registry = new WorldToolRegistry();
+    registry.register("propose_setting", async (input) => ({
+      suggestion: {
+        id: "setting_license",
+        kind: "setting",
+        category: String(input.category),
+        title: String(input.title),
+        summary: String(input.summary),
+        body: String(input.body),
+      },
+    }));
+    const runner = new PiSessionRunner(runtime, registry, new SafetyGate());
+
+    const events = [];
+    for await (const event of runner.run({
+      runId: "run_1",
+      userId: "user_1",
+      worldId: "world_1",
+      mode: "expand",
+      prompt: "生成制度建议",
+      context: [],
+      tools: [...describeWorldTools()],
+      skills: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({
+      type: "suggestion.created",
+      suggestion: {
+        id: "setting_license",
+        kind: "setting",
+        category: "制度",
+        title: "记忆交易许可",
+        summary: "记忆交易必须经过许可。",
+        body: "未经许可的记忆交易会被城市信用系统追踪。",
+      },
+    });
+  });
+
   it("exposes pi as an AgentProvider without direct product writes", async () => {
     const provider = new PiAgentProvider();
     const chunks = [];

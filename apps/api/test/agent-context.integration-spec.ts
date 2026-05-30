@@ -50,4 +50,24 @@ describe("agent context progressive disclosure", () => {
       }, new Set(["asset_1"])),
     ).not.toThrow();
   });
+
+  it("allows proposal tools but blocks unknown tool names", () => {
+    const gate = new SafetyGate();
+
+    expect(() =>
+      gate.assertToolAllowed({
+        id: "tool_3",
+        name: "propose_setting",
+        arguments: { title: "许可制度", body: "必须申请许可。" },
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      gate.assertToolAllowed({
+        id: "tool_4",
+        name: "delete_world" as never,
+        arguments: { worldId: "world_1" },
+      }),
+    ).toThrow("Blocked unsafe pi tool");
+  });
 });

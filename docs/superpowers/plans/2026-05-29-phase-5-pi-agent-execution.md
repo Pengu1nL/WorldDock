@@ -661,7 +661,7 @@ git log -1 --format=fuller
 - Modify: `apps/api/test/pi-agent.integration-spec.ts`
 - Modify: `apps/api/test/agent-context.integration-spec.ts`
 
-- [ ] **Step 1: Add a proposal tool integration test**
+- [x] **Step 1: Add a proposal tool integration test**
 
 Append this test to `apps/api/test/pi-agent.integration-spec.ts`:
 
@@ -728,7 +728,7 @@ it("turns proposal tool results into pending suggestions without writing product
 });
 ```
 
-- [ ] **Step 2: Strengthen safety gate tests**
+- [x] **Step 2: Strengthen safety gate tests**
 
 In `apps/api/test/agent-context.integration-spec.ts`, add:
 
@@ -754,7 +754,7 @@ it("allows proposal tools but blocks unknown tool names", () => {
 });
 ```
 
-- [ ] **Step 3: Confirm proposal tools do not call `worlds.createArchiveEntry`**
+- [x] **Step 3: Confirm proposal tools do not call `worlds.createArchiveEntry`**
 
 Run:
 
@@ -764,7 +764,7 @@ pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts ag
 
 Expected: PASS. The proposal test only observes runtime events; product asset persistence remains in `AgentService.saveSuggestion`.
 
-- [ ] **Step 4: Commit safety coverage**
+- [x] **Step 4: Commit safety coverage**
 
 ```bash
 git add apps/api/test/pi-agent.integration-spec.ts apps/api/test/agent-context.integration-spec.ts apps/api/src/modules/agent/pi/world-tools.ts apps/api/src/modules/agent/pi/safety-gate.ts
