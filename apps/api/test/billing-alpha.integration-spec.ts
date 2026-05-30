@@ -120,8 +120,8 @@ function createInMemoryBillingRepository() {
     },
     async markFreeCreditGranted(accountId, grantedAt) { const account = accounts.get(accountId); if (!account) return null; const next = { ...account, freeCreditGrantedAt: grantedAt, updatedAt: new Date() }; accounts.set(accountId, next); return next; },
     async createLedgerEntry(input) { const entry = { id: `ule_${entries.size + 1}`, createdAt: new Date(), ...input }; entries.set(entry.id, entry); return entry; },
-    async createLedgerEntryOnceForRunType(input) {
-      const existing = input.agentRunId ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && entry.type === input.type) : null;
+    async createTerminalLedgerEntryOnce(input) {
+      const existing = input.agentRunId ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && isTerminalBillingEntry(entry)) : null;
       if (existing) return existing;
       const entry = { id: `ule_${entries.size + 1}`, createdAt: new Date(), ...input };
       entries.set(entry.id, entry);
@@ -137,4 +137,8 @@ function createInMemoryBillingRepository() {
     async listPlaceholderIntents(userId) { return [...placeholderIntents.values()].filter((intent) => intent.userId === userId); },
   };
   return repository;
+}
+
+function isTerminalBillingEntry(entry: UsageLedgerEntryRecord) {
+  return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
 }

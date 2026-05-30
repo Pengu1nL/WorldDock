@@ -15,6 +15,21 @@ describe("BillingService", () => {
     const entries = await repository.listLedgerEntriesForRun("run_1");
     expect(entries.filter((entry) => entry.type === "model_run_settled")).toHaveLength(1);
   });
+
+  it("creates only one terminal entry when settlement and refund race", async () => {
+    const repository = createRacyBillingRepository();
+    const service = new BillingService(repository);
+
+    await Promise.all([
+      service.settleAgentRun("user_1", "run_1", { inputTokens: 12, outputTokens: 30, totalTokens: 42 }, { provider: "openai-compatible", model: "qwen3-32b" }),
+      service.refundAgentRun("user_1", "run_1", "provider_failed"),
+    ]);
+
+    const entries = await repository.listLedgerEntriesForRun("run_1");
+    const terminalEntries = entries.filter((entry) => entry.type === "model_run_settled" || entry.type === "model_run_refunded");
+    expect(terminalEntries).toHaveLength(1);
+    expect(entries.reduce((total, entry) => total + entry.amountCents, 0)).toBeLessThanOrEqual(0);
+  });
 });
 
 function createRacyBillingRepository(): BillingRepository {
@@ -57,10 +72,8 @@ function createRacyBillingRepository(): BillingRepository {
       entries.set(entry.id, entry);
       return entry;
     },
-    async createLedgerEntryOnceForRunType(input) {
-      const existing = input.agentRunId
-        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && entry.type === input.type)
-        : null;
+    async createTerminalLedgerEntryOnce(input) {
+      const existing = [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && isTerminalEntry(entry));
       if (existing) return existing;
       const entry = { id: `ule_${entries.size + 1}`, createdAt: new Date(), ...input };
       entries.set(entry.id, entry);
@@ -87,4 +100,8 @@ function createRacyBillingRepository(): BillingRepository {
       return [];
     },
   };
+}
+
+function isTerminalEntry(entry: UsageLedgerEntryRecord) {
+  return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
 }

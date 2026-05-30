@@ -63,7 +63,7 @@ export class BillingService {
 
     const reservedCents = this.reservedCents(entries);
     const costCents = calculateAgentRunCostCents(tokenUsage, priceInput);
-    return this.billing.createLedgerEntryOnceForRunType({
+    return this.billing.createTerminalLedgerEntryOnce({
       accountId: account.id,
       userId,
       agentRunId,
@@ -82,7 +82,7 @@ export class BillingService {
 
     const reservedCents = this.reservedCents(entries);
     if (reservedCents <= 0) return null;
-    return this.billing.createLedgerEntryOnceForRunType({
+    return this.billing.createTerminalLedgerEntryOnce({
       accountId: account.id,
       userId,
       agentRunId,

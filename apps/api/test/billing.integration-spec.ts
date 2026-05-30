@@ -137,9 +137,9 @@ function createInMemoryBillingRepository() {
       entries.set(entry.id, entry);
       return entry;
     },
-    async createLedgerEntryOnceForRunType(input) {
+    async createTerminalLedgerEntryOnce(input) {
       const existing = input.agentRunId
-        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && entry.type === input.type)
+        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && isTerminalBillingEntry(entry))
         : null;
       if (existing) return existing;
       const entry: UsageLedgerEntryRecord = {
@@ -172,4 +172,8 @@ function createInMemoryBillingRepository() {
   };
 
   return repository;
+}
+
+function isTerminalBillingEntry(entry: UsageLedgerEntryRecord) {
+  return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
 }

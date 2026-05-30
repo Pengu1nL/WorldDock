@@ -440,9 +440,9 @@ function createInMemoryBillingRepository() {
       entries.set(entry.id, entry);
       return entry;
     },
-    async createLedgerEntryOnceForRunType(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
+    async createTerminalLedgerEntryOnce(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
       const existing = input.agentRunId
-        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && entry.type === input.type)
+        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && isTerminalBillingEntry(entry))
         : null;
       if (existing) return existing;
       const entry: UsageLedgerEntryRecord = {
@@ -475,6 +475,10 @@ function createInMemoryBillingRepository() {
   } satisfies BillingRepository & { accounts: typeof accounts; entries: typeof entries };
 
   return repository;
+}
+
+function isTerminalBillingEntry(entry: UsageLedgerEntryRecord) {
+  return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
 }
 
 function seedBillingAccount(repository: ReturnType<typeof createInMemoryBillingRepository>, userId: string, balanceCents: number) {

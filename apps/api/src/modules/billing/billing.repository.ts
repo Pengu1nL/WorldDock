@@ -33,7 +33,7 @@ export type BillingPlaceholderIntentRecord = {
   createdAt: Date;
 };
 
-export type RunUniqueLedgerEntryInput = Omit<UsageLedgerEntryRecord, "id" | "createdAt" | "agentRunId" | "type"> & {
+export type TerminalLedgerEntryInput = Omit<UsageLedgerEntryRecord, "id" | "createdAt" | "agentRunId" | "type"> & {
   agentRunId: string;
   type: Extract<UsageLedgerEntryType, "model_run_settled" | "model_run_refunded">;
 };
@@ -43,7 +43,7 @@ export type BillingRepository = {
   createAccount(input: { userId: string; freeCreditGrantedAt?: Date | null }): Promise<BillingAccountRecord>;
   markFreeCreditGranted(accountId: string, grantedAt: Date): Promise<BillingAccountRecord | null>;
   createLedgerEntry(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">): Promise<UsageLedgerEntryRecord>;
-  createLedgerEntryOnceForRunType(input: RunUniqueLedgerEntryInput): Promise<UsageLedgerEntryRecord>;
+  createTerminalLedgerEntryOnce(input: TerminalLedgerEntryInput): Promise<UsageLedgerEntryRecord>;
   listLedgerEntries(userId: string): Promise<UsageLedgerEntryRecord[]>;
   listLedgerEntriesForRun(agentRunId: string): Promise<UsageLedgerEntryRecord[]>;
   createPlaceholderIntent(input: Omit<BillingPlaceholderIntentRecord, "id" | "createdAt" | "status"> & Partial<Pick<BillingPlaceholderIntentRecord, "status">>): Promise<BillingPlaceholderIntentRecord>;

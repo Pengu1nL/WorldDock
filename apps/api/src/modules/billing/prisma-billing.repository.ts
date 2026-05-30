@@ -37,15 +37,13 @@ export class PrismaBillingRepository implements BillingRepository, OnModuleDestr
     return mapLedgerEntry(entry);
   }
 
-  async createLedgerEntryOnceForRunType(input: Parameters<BillingRepository["createLedgerEntryOnceForRunType"]>[0]) {
-    if (!input.agentRunId) return this.createLedgerEntry(input);
-
+  async createTerminalLedgerEntryOnce(input: Parameters<BillingRepository["createTerminalLedgerEntryOnce"]>[0]) {
     try {
       return await this.createLedgerEntry(input);
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
       const existing = await this.prisma.usageLedgerEntry.findFirst({
-        where: { agentRunId: input.agentRunId, type: input.type },
+        where: { agentRunId: input.agentRunId, type: { in: ["model_run_settled", "model_run_refunded"] } },
         orderBy: { createdAt: "asc" },
       });
       if (!existing) throw error;
