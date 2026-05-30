@@ -33,8 +33,9 @@ export function ContextInspector({ refs }: ContextInspectorProps) {
               <div key={`${item.level}-${item.targetId ?? "world"}-${item.title}-${index}`} className="col gap-1">
                 <div className="row gap-2">
                   <strong style={{ fontSize: 13 }}>{item.title}</strong>
-                  <span className="mono" style={{ fontSize: 10, color: "var(--fg-3)" }}>{item.source}</span>
+                  <span className="mono" style={{ fontSize: 10, color: "var(--fg-3)" }}>{item.kind} · {item.source}</span>
                 </div>
+                <span className="mono" style={{ fontSize: 10, color: "var(--fg-3)" }}>{item.id}</span>
                 <span style={{ fontSize: 12, color: "var(--fg-2)" }}>{item.excerpt}</span>
               </div>
             ))}

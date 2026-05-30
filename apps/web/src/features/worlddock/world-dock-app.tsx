@@ -67,6 +67,15 @@ type AgentToolEvent = {
   status: "requested" | "completed";
 };
 
+type AgentRunStatus = "idle" | "running" | "completed" | "failed";
+
+type AgentContextSnapshot = {
+  refs: AgentContextRef[];
+  toolEvents: AgentToolEvent[];
+  tokens: number;
+  runStatus: AgentRunStatus;
+};
+
 export function WorldDockApp() {
   return (
     <QueryClientProvider client={worldDockQueryClient}>
@@ -109,6 +118,7 @@ function WorldDockRuntime() {
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
   const [agentContextRefs, setAgentContextRefs] = useState<AgentContextRef[]>([]);
   const [agentToolEvents, setAgentToolEvents] = useState<AgentToolEvent[]>([]);
+  const [agentRunStatus, setAgentRunStatus] = useState<AgentRunStatus>("idle");
   const [assetSaving, setAssetSaving] = useState(false);
   const [assetRelationQuery, setAssetRelationQuery] = useState("");
   const [localAssetRelationLabels, setLocalAssetRelationLabels] = useState<Record<string, {
@@ -213,9 +223,23 @@ function WorldDockRuntime() {
   useEffect(() => {
     if (!currentWorld) return;
     worldStatesRef.current[currentWorld.id] = {
-      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode, agentContextRefs, agentToolEvents,
+      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode,
+      agentContextRefs, agentToolEvents, agentRunStatus, runTokens,
     };
-  }, [currentWorld, messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode, agentContextRefs, agentToolEvents]);
+  }, [
+    currentWorld,
+    messages,
+    savedSettings,
+    savedSeeds,
+    savedConflicts,
+    savedIssues,
+    savedIds,
+    agentMode,
+    agentContextRefs,
+    agentToolEvents,
+    agentRunStatus,
+    runTokens,
+  ]);
 
   const pushToast = useCallback((toast: any) => {
     const id = Math.random().toString(36).slice(2);
@@ -230,6 +254,12 @@ function WorldDockRuntime() {
   const drawerRelationTargets = drawerOpen?.kind === "asset-relation"
     ? readRelationTargets(drawerOpen.item?.relationTargets ?? drawerOpen.item?.payload?.relationTargets)
     : [];
+  const latestContextSnapshot: AgentContextSnapshot = {
+    refs: agentContextRefs,
+    toolEvents: agentToolEvents,
+    tokens: runTokens,
+    runStatus: agentRunStatus,
+  };
 
   const startAgentRun = useCallback(async (userText: string, targetWorld = currentWorld) => {
     if (agentBusy) return;
@@ -241,6 +271,7 @@ function WorldDockRuntime() {
     setRunTokens(0);
     setAgentContextRefs([]);
     setAgentToolEvents([]);
+    setAgentRunStatus("running");
 
     const agentMsg = {
       id: "m_" + Date.now(),
@@ -254,73 +285,122 @@ function WorldDockRuntime() {
     };
     setMessages(prev => [...prev, agentMsg]);
 
+    const abortController = new AbortController();
+    agentAbortRef.current = abortController;
     try {
-      const abortController = new AbortController();
-      agentAbortRef.current = abortController;
       const created: any = await createAgentRun(
         targetWorld.id,
         { prompt: userText, mode: getBackendAgentMode(agentMode) },
         { sessionToken },
       );
+      if (agentAbortRef.current !== abortController) {
+        void cancelAgentRun(created.run.id, { sessionToken });
+        return;
+      }
       setActiveAgentRunId(created.run.id);
       let currentText = "";
       let contextRefs = 0;
+      let latestTokens = 0;
+      let latestRunStatus: AgentRunStatus = "running";
+      let streamedContextRefs: AgentContextRef[] = [];
+      let streamedToolEvents: AgentToolEvent[] = [];
       const suggestions: any[] = [];
 
       await streamAgentEvents(created.run.id, { sessionToken, signal: abortController.signal }, (event) => {
+        if (agentAbortRef.current !== abortController) return;
         if (event.type === "pi.session.started") {
-          setAgentToolEvents((prev) => [...prev, { id: event.payload.piSessionId, label: "pi session", status: "completed" }]);
+          streamedToolEvents = [
+            ...streamedToolEvents,
+            { id: event.payload.piSessionId, label: "pi session", status: "completed" },
+          ];
+          setAgentToolEvents(streamedToolEvents);
         }
         if (event.type === "message.delta") {
           currentText += event.payload.text;
           setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id ? { ...m, text: currentText } : m));
-          setRunTokens((tk: number) => tk + Math.max(1, Math.ceil(event.payload.text.length / 2)));
+          latestTokens += Math.max(1, Math.ceil(event.payload.text.length / 2));
+          setRunTokens(latestTokens);
         }
         if (event.type === "context.used") {
           contextRefs++;
-          setAgentContextRefs((prev) => [...prev, event.payload.contextRef]);
+          streamedContextRefs = [...streamedContextRefs, event.payload.contextRef];
+          setAgentContextRefs(streamedContextRefs);
         }
         if (event.type === "tool.requested") {
-          setAgentToolEvents((prev) => [
-            ...prev,
+          streamedToolEvents = [
+            ...streamedToolEvents,
             { id: event.payload.toolCall.id, label: event.payload.toolCall.name, status: "requested" },
-          ]);
+          ];
+          setAgentToolEvents(streamedToolEvents);
         }
         if (event.type === "tool.completed") {
-          setAgentToolEvents((prev) => {
-            if (!prev.some((item) => item.id === event.payload.toolCallId)) {
-              return [...prev, { id: event.payload.toolCallId, label: event.payload.toolCallId, status: "completed" }];
-            }
-            return prev.map((item) =>
+          if (!streamedToolEvents.some((item) => item.id === event.payload.toolCallId)) {
+            streamedToolEvents = [
+              ...streamedToolEvents,
+              { id: event.payload.toolCallId, label: event.payload.toolCallId, status: "completed" },
+            ];
+          } else {
+            streamedToolEvents = streamedToolEvents.map((item) =>
               item.id === event.payload.toolCallId ? { ...item, status: "completed" } : item,
             );
-          });
+          }
+          setAgentToolEvents(streamedToolEvents);
         }
         if (event.type === "suggestion.created") {
           suggestions.push({ ...event.payload.suggestion, agentSuggestionId: event.payload.suggestionId });
         }
         if (event.type === "run.completed" && event.payload.tokenUsage) {
-          setRunTokens(event.payload.tokenUsage.totalTokens);
+          latestRunStatus = "completed";
+          latestTokens = event.payload.tokenUsage.totalTokens;
+          setRunTokens(latestTokens);
+          setAgentRunStatus("completed");
         }
         if (event.type === "run.failed") {
+          latestRunStatus = "failed";
+          setAgentRunStatus("failed");
           pushToast({ kind: "warn", text: event.payload.message || "模型不可用" });
         }
+        if (event.type === "run.cancelled") {
+          latestRunStatus = "failed";
+          setAgentRunStatus("failed");
+          pushToast({ kind: "warn", text: event.payload.reason || "Agent 已取消" });
+        }
       });
+      if (agentAbortRef.current !== abortController) return;
 
+      if (latestRunStatus === "running") {
+        latestRunStatus = "completed";
+        setAgentRunStatus("completed");
+      }
+      const contextSnapshot: AgentContextSnapshot = {
+        refs: streamedContextRefs,
+        toolEvents: streamedToolEvents,
+        tokens: latestTokens,
+        runStatus: latestRunStatus,
+      };
       setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id
-        ? { ...m, streaming: false, suggestions, contextRefs }
+        ? { ...m, streaming: false, suggestions, contextRefs, contextSnapshot }
         : m));
-      try {
-        const billing = await getBillingBalance({ sessionToken });
-        setBalance(billing.balance.balanceCents / 100);
-      } catch {
-        pushToast({ kind: "info", text: "Agent 已完成，用量稍后同步" });
+      if (latestRunStatus === "completed") {
+        try {
+          const billing = await getBillingBalance({ sessionToken });
+          setBalance(billing.balance.balanceCents / 100);
+        } catch {
+          pushToast({ kind: "info", text: "Agent 已完成，用量稍后同步" });
+        }
       }
       if (agentAbortRef.current === abortController) agentAbortRef.current = null;
       setAgentBusy(false);
       setActiveAgentRunId(null);
     } catch (error) {
-      if (isAbortError(error)) return;
+      if (isAbortError(error)) {
+        if (agentAbortRef.current === abortController) {
+          agentAbortRef.current = null;
+          setAgentBusy(false);
+          setActiveAgentRunId(null);
+        }
+        return;
+      }
       agentAbortRef.current = null;
       setMessages((prev: any[]) => prev.filter((m: any) => m.id !== agentMsg.id));
       setAgentBusy(false);
@@ -338,16 +418,60 @@ function WorldDockRuntime() {
       void cancelAgentRun(activeAgentRunId, { sessionToken });
       setActiveAgentRunId(null);
     }
+    const contextSnapshot: AgentContextSnapshot = {
+      refs: agentContextRefs,
+      toolEvents: agentToolEvents,
+      tokens: runTokens,
+      runStatus: "failed",
+    };
     agentAbortRef.current?.abort();
     agentAbortRef.current = null;
     setAgentBusy(false);
-    setMessages((prev: any[]) => prev.map((m: any) => m.streaming ? { ...m, streaming: false, text: m.text + " [已停止]" } : m));
-  }, [activeAgentRunId, sessionToken]);
+    setAgentRunStatus("failed");
+    setMessages((prev: any[]) => prev.map((m: any) => m.streaming
+      ? { ...m, streaming: false, text: m.text + " [已停止]", contextRefs: agentContextRefs.length, contextSnapshot }
+      : m));
+  }, [activeAgentRunId, agentContextRefs, agentToolEvents, runTokens, sessionToken]);
 
   // ────────── Navigation handlers ──────────
   const openWorld = (id: string) => {
     const w = worlds.find((world: any) => world.id === id);
     if (!w) return;
+    if (activeAgentRunId && sessionToken) {
+      void cancelAgentRun(activeAgentRunId, { sessionToken });
+    }
+    if (agentAbortRef.current) {
+      const contextSnapshot: AgentContextSnapshot = {
+        refs: agentContextRefs,
+        toolEvents: agentToolEvents,
+        tokens: runTokens,
+        runStatus: "failed",
+      };
+      const stoppedMessages = messages.map((message: any) => message.streaming
+        ? { ...message, streaming: false, text: `${message.text} [已停止]`, contextRefs: agentContextRefs.length, contextSnapshot }
+        : message);
+      if (currentWorld?.id) {
+        worldStatesRef.current[currentWorld.id] = {
+          ...(worldStatesRef.current[currentWorld.id] ?? {}),
+          messages: stoppedMessages,
+          savedSettings,
+          savedSeeds,
+          savedConflicts,
+          savedIssues,
+          savedIds,
+          agentMode,
+          agentContextRefs,
+          agentToolEvents,
+          agentRunStatus: "failed",
+          runTokens,
+        };
+      }
+      agentAbortRef.current.abort();
+      agentAbortRef.current = null;
+      setAgentBusy(false);
+      setActiveAgentRunId(null);
+      setAgentRunStatus("failed");
+    }
     setCurrentWorld(w);
     setView("workbench");
     // Restore prior state if we have it
@@ -362,6 +486,8 @@ function WorldDockRuntime() {
       setAgentMode(saved.agentMode || "expand");
       setAgentContextRefs(saved.agentContextRefs || []);
       setAgentToolEvents(saved.agentToolEvents || []);
+      setAgentRunStatus(saved.agentRunStatus || "idle");
+      setRunTokens(saved.runTokens || 0);
     } else {
       setMessages([]);
       setSavedSettings([]);
@@ -372,8 +498,9 @@ function WorldDockRuntime() {
       setAgentMode("expand");
       setAgentContextRefs([]);
       setAgentToolEvents([]);
+      setAgentRunStatus("idle");
+      setRunTokens(0);
     }
-    setRunTokens(0);
   };
 
   const continueDraft = () => {
@@ -443,6 +570,8 @@ function WorldDockRuntime() {
       setSavedIds([]);
       setAgentContextRefs([]);
       setAgentToolEvents([]);
+      setAgentRunStatus("idle");
+      setRunTokens(0);
       setView("workbench");
       setTimeout(() => startAgentRun(inspiration, newWorld), 200);
     } catch {
@@ -814,7 +943,7 @@ function WorldDockRuntime() {
               onStop={stopAgent}
               onSave={handleSave}
               onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s })}
-              onOpenContext={() => setDrawerOpen({ kind: "context" })}
+              onOpenContext={(snapshot?: AgentContextSnapshot) => setDrawerOpen({ kind: "context", snapshot })}
               onOpenSuggestions={() => setDrawerOpen({ kind: "pending" })}
             />
           )}
@@ -1008,10 +1137,7 @@ function WorldDockRuntime() {
             )}
             {drawerOpen?.kind === "context" && (
               <AgentContextDrawer
-                refs={agentContextRefs}
-                toolEvents={agentToolEvents}
-                status={agentBusy ? "running" : "completed"}
-                tokens={runTokens}
+                snapshot={drawerOpen.snapshot ?? latestContextSnapshot}
               />
             )}
             {drawerOpen?.kind === "pending" && (
@@ -1054,24 +1180,14 @@ function WorldDockRuntime() {
   );
 }
 
-const AgentContextDrawer = ({
-  refs,
-  toolEvents,
-  status,
-  tokens,
-}: {
-  refs: AgentContextRef[];
-  toolEvents: AgentToolEvent[];
-  status: "running" | "completed";
-  tokens: number;
-}) => (
+const AgentContextDrawer = ({ snapshot }: { snapshot: AgentContextSnapshot }) => (
   <div className="col gap-4">
-    <AgentRunPanel status={status} tokens={tokens}>
+    <AgentRunPanel status={snapshot.runStatus} tokens={snapshot.tokens}>
       <div className="col gap-2" style={{ marginTop: 12 }}>
-        {toolEvents.length === 0 ? (
+        {snapshot.toolEvents.length === 0 ? (
           <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>本轮暂无工具事件</span>
         ) : (
-          toolEvents.map((tool) => (
+          snapshot.toolEvents.map((tool) => (
             <span key={tool.id} className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
               {tool.label} · {tool.status}
             </span>
@@ -1079,7 +1195,7 @@ const AgentContextDrawer = ({
         )}
       </div>
     </AgentRunPanel>
-    <ContextInspector refs={refs} />
+    <ContextInspector refs={snapshot.refs} />
   </div>
 );
 
@@ -1113,7 +1229,10 @@ const Workbench = ({
             </div>
             {messages.map((m: any) => (
               <Message key={m.id} msg={m} savedIds={getMessageSavedSuggestionIds(m, savedIds)}
-                onSave={onSave} onOpenDetail={onOpenDetail} onOpenContext={onOpenContext}/>
+                onSave={onSave}
+                onOpenDetail={onOpenDetail}
+                onOpenContext={() => onOpenContext(m.contextSnapshot)}
+              />
             ))}
           </>
         )}
@@ -1128,7 +1247,7 @@ const Workbench = ({
         contextRefs={contextRefs}
         modeFlash={modeFlash}
         onOpenSuggestions={onOpenSuggestions}
-        onOpenContext={onOpenContext}
+        onOpenContext={() => onOpenContext()}
       />
     </div>
   );

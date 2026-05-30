@@ -111,8 +111,8 @@ export type CreateConflictInput = {
 export type AgentRunMode = "expand" | "challenge" | "fork" | "polish";
 
 export type AgentContextRef = {
-  id?: string;
-  kind: "world" | "setting" | "seed" | "conflict" | "repository";
+  id: string;
+  kind: "world" | "archive" | "seed" | "conflict" | "repository";
   title: string;
   excerpt: string;
   targetId?: string;
@@ -120,17 +120,24 @@ export type AgentContextRef = {
   source: "initial" | "tool";
 };
 
+export type AgentEventBase = {
+  id: string;
+  runId: string;
+  sequence: number;
+  createdAt: string;
+};
+
 export type AgentEvent =
-  | { type: "run.started"; payload: { runId: string; mode: AgentRunMode } }
-  | { type: "pi.session.started"; payload: { piSessionId: string } }
-  | { type: "context.used"; payload: { contextRef: AgentContextRef } }
-  | { type: "message.delta"; payload: { text: string } }
-  | { type: "tool.requested"; payload: { toolCall: { id: string; name: string; arguments: Record<string, unknown> } } }
-  | { type: "tool.completed"; payload: { toolCallId: string; result: Record<string, unknown> } }
-  | { type: "suggestion.created"; payload: { suggestionId: string; suggestion: any } }
-  | { type: "run.completed"; payload: { tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number } } }
-  | { type: "run.failed"; payload: { code: string; message: string } }
-  | { type: "run.cancelled"; payload: { reason?: string } };
+  | (AgentEventBase & { type: "run.started"; payload: { runId: string; mode: AgentRunMode } })
+  | (AgentEventBase & { type: "pi.session.started"; payload: { piSessionId: string } })
+  | (AgentEventBase & { type: "context.used"; payload: { contextRef: AgentContextRef } })
+  | (AgentEventBase & { type: "message.delta"; payload: { text: string } })
+  | (AgentEventBase & { type: "tool.requested"; payload: { toolCall: { id: string; name: string; arguments: Record<string, unknown> } } })
+  | (AgentEventBase & { type: "tool.completed"; payload: { toolCallId: string; result: Record<string, unknown> } })
+  | (AgentEventBase & { type: "suggestion.created"; payload: { suggestionId: string; suggestion: any } })
+  | (AgentEventBase & { type: "run.completed"; payload: { tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number } } })
+  | (AgentEventBase & { type: "run.failed"; payload: { code: string; message: string } })
+  | (AgentEventBase & { type: "run.cancelled"; payload: { reason?: string } });
 
 export type SaveAgentSuggestionResponse = {
   suggestion?: {
