@@ -155,7 +155,6 @@ export function calculateAgentRunCostCents(
   tokenUsage: TokenUsage,
   priceInput: { provider?: ModelPrice["provider"] | string | null; model?: string | null } = {},
 ) {
-  if (tokenUsage.totalTokens <= 0) return 0;
   const modelPrice = normalizeModelPriceInput(priceInput);
   return calculateModelRunCostCents({
     provider: modelPrice.provider,

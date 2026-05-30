@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateModelRunCostCents, MODEL_PRICE_BOOK } from "@worlddock/domain";
+import { calculateAgentRunCostCents } from "../src/modules/billing/billing.service";
 
 describe("billing price book", () => {
   it("prices model runs from provider/model/token usage", () => {
@@ -34,13 +35,18 @@ describe("billing price book", () => {
     })).toBe(0);
   });
 
-  it("rejects negative token usage", () => {
+  it.each([
+    { label: "negative", inputTokens: -1, outputTokens: 1 },
+    { label: "decimal", inputTokens: 1.5, outputTokens: 1 },
+    { label: "NaN", inputTokens: Number.NaN, outputTokens: 1 },
+    { label: "Infinity", inputTokens: Number.POSITIVE_INFINITY, outputTokens: 1 },
+  ])("rejects $label token usage", ({ inputTokens, outputTokens }) => {
     expect(() => calculateModelRunCostCents({
       provider: "openai",
       model: "gpt-5.4",
-      inputTokens: -1,
-      outputTokens: 1,
-    })).toThrow("Invalid token usage: token counts must be non-negative");
+      inputTokens,
+      outputTokens,
+    })).toThrow("Invalid token usage: token counts must be non-negative integers");
   });
 
   it("rejects model runs without an explicit price", () => {
@@ -50,5 +56,16 @@ describe("billing price book", () => {
       inputTokens: 1,
       outputTokens: 1,
     })).toThrow("Missing model price: openai/missing-model");
+  });
+
+  it("prices agent runs from input and output tokens even when total tokens is zero", () => {
+    expect(calculateAgentRunCostCents({
+      inputTokens: 12,
+      outputTokens: 30,
+      totalTokens: 0,
+    }, {
+      provider: "openai-compatible",
+      model: "qwen3-32b",
+    })).toBe(1);
   });
 });

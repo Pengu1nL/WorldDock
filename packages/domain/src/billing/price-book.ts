@@ -17,14 +17,14 @@ export function calculateModelRunCostCents(input: {
   inputTokens: number;
   outputTokens: number;
 }) {
-  const price = MODEL_PRICE_BOOK.find((item) => item.provider === input.provider && item.model === input.model);
-  if (!price) throw new Error(`Missing model price: ${input.provider}/${input.model}`);
-
-  if (input.inputTokens < 0 || input.outputTokens < 0) {
-    throw new Error("Invalid token usage: token counts must be non-negative");
+  if (!Number.isInteger(input.inputTokens) || !Number.isInteger(input.outputTokens) || input.inputTokens < 0 || input.outputTokens < 0) {
+    throw new Error("Invalid token usage: token counts must be non-negative integers");
   }
 
   if (input.inputTokens === 0 && input.outputTokens === 0) return 0;
+
+  const price = MODEL_PRICE_BOOK.find((item) => item.provider === input.provider && item.model === input.model);
+  if (!price) throw new Error(`Missing model price: ${input.provider}/${input.model}`);
 
   const inputCost = input.inputTokens * price.inputCentsPerMillionTokens / 1_000_000;
   const outputCost = input.outputTokens * price.outputCentsPerMillionTokens / 1_000_000;
