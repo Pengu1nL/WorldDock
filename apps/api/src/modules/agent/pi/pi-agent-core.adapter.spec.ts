@@ -7,12 +7,7 @@ import {
 } from "@earendil-works/pi-ai";
 import type { PiRuntimeEvent } from "@worlddock/domain/agent/pi";
 import { createPiAgentCoreAdapter } from "./pi-agent-core.adapter";
-
-type WorldDockToolCall = {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-};
+import type { PiRuntimeToolExecutor } from "./pi-runtime.client";
 
 describe("createPiAgentCoreAdapter", () => {
   it("runs a real pi Agent loop and bridges WorldDock tool results back into the loop", async () => {
@@ -82,7 +77,7 @@ describe("createPiAgentCoreAdapter", () => {
           skills: [],
         },
         (event) => events.push(event),
-        async (toolCall: WorldDockToolCall) => {
+        async (toolCall: Parameters<PiRuntimeToolExecutor>[0]) => {
           expect(toolCall).toMatchObject({
             id: "call_search_1",
             name: "search_world_assets",

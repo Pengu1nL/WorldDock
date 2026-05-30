@@ -427,7 +427,7 @@ git log -1 --format=fuller
 - Modify: `apps/api/src/modules/agent/pi/pi-event-adapter.ts`
 - Test: `apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts`
 
-- [ ] **Step 1: Replace the adapter stub with real Agent wiring**
+- [x] **Step 1: Replace the adapter stub with real Agent wiring**
 
 Replace `apps/api/src/modules/agent/pi/pi-agent-core.adapter.ts` with an implementation shaped like this:
 
@@ -622,7 +622,7 @@ function normalizeToolResult(value: unknown): Record<string, unknown> {
 }
 ```
 
-- [ ] **Step 2: Run adapter unit test**
+- [x] **Step 2: Run adapter unit test**
 
 Run:
 
@@ -632,7 +632,7 @@ pnpm --filter @worlddock/api test -- pi-agent-core.adapter.spec.ts
 
 Expected: PASS. The test must see `tool.requested`, `tool.completed`, `context.used`, streamed text, usage, and `session.completed`.
 
-- [ ] **Step 3: Run provider and integration tests**
+- [x] **Step 3: Run provider and integration tests**
 
 Run:
 
@@ -643,7 +643,7 @@ pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts ag
 
 Expected: PASS. Existing `new PiAgentProvider()` mock constructor can remain for unit smoke tests, but Nest production wiring with `AI_PROVIDER=pi` must use `createPiAgentCoreAdapter`.
 
-- [ ] **Step 4: Commit real adapter**
+- [x] **Step 4: Commit real adapter**
 
 ```bash
 git add apps/api/src/modules/agent/pi/pi-agent-core.adapter.ts apps/api/src/modules/agent/pi/pi-event-adapter.ts apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts
