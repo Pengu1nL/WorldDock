@@ -28,7 +28,7 @@ export class ReleasesController {
   @Post("releases/:releaseId/rollback")
   @RequireScopes("world:write")
   async rollbackRelease(@CurrentSubject() subject: AuthSubject, @Param("releaseId") releaseId: string) {
-    return { release: await this.releases.rollbackRelease(subject, releaseId) };
+    return this.releases.rollbackRelease(subject, releaseId);
   }
 
   @Get("forks/:forkId/upstream-diff")

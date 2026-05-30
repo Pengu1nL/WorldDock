@@ -189,6 +189,7 @@ async function seedRepository(
       archiveEntries: [{ id: "archive_1", title: "交易法", category: "世界规则", summary: "摘要", body: "正文", relations: [] }],
       storySeeds: [{ id: "seed_1", title: "继承的童年", hook: "钩子", trigger: "触发", conflict: "冲突", protagonists: "主角", questions: ["问题"] }],
       conflicts: [{ id: "conflict_1", title: "人格权冲突", summary: "摘要", body: "正文", related: [], derivedSeeds: [] }],
+      assetRelations: [],
       createdAt: release.createdAt.toISOString(),
     },
   });
@@ -200,6 +201,7 @@ function createInMemoryRepositoryRepository() {
   const releases = new Map<string, ReleaseRecord>();
   const snapshots = new Map<string, ReleaseSnapshotRecord>();
   const forks: ForkRecord[] = [];
+  const assetMaps = new Map<string, any>();
   const collections = new Map<string, any>();
   const repository: RepositoryRepository = {
     async findById(id) { return repositories.get(id) ?? null; },
@@ -227,6 +229,10 @@ function createInMemoryRepositoryRepository() {
     async updateForkSourceRelease(id, sourceReleaseId) { const fork = forks.find((item) => item.id === id); if (!fork) return null; fork.sourceReleaseId = sourceReleaseId; return fork; },
     async deleteFork(id) { const index = forks.findIndex((fork) => fork.id === id); if (index === -1) return null; const [fork] = forks.splice(index, 1); return fork; },
     async listForksForRepository(repositoryId) { return forks.filter((fork) => fork.repositoryId === repositoryId); },
+    async createForkAssetMaps(input) { return Promise.all(input.map((map) => repository.upsertForkAssetMap(map))); },
+    async listForkAssetMaps(forkId) { return [...assetMaps.values()].filter((map) => map.forkId === forkId); },
+    async upsertForkAssetMap(input) { const now = new Date(); const key = `${input.forkId}:${input.upstreamAssetId}`; const next = { ...(assetMaps.get(key) ?? { id: `fork_asset_map_${assetMaps.size + 1}`, createdAt: now }), ...input, updatedAt: now }; assetMaps.set(key, next); return next; },
+    async deleteForkAssetMap(forkId, upstreamAssetId) { const key = `${forkId}:${upstreamAssetId}`; const existing = assetMaps.get(key) ?? null; assetMaps.delete(key); return existing; },
     async saveToCollection(input) {
       const name = input.name ?? "saved";
       const existing = [...collections.values()].find((item) => item.repositoryId === input.repositoryId && item.userId === input.userId && item.name === name);
@@ -275,7 +281,14 @@ function createInMemoryWorldRepository() {
     async createStorySeed() { throw new Error("Not implemented for community tests."); },
     async listConflicts() { return []; },
     async createConflict() { throw new Error("Not implemented for community tests."); },
+    async listAssetRelations() { return []; },
     async countAssets() { return { archive: 0, seeds: 0, conflicts: 0 }; },
+    async replaceWorldFromSnapshot() { return null; },
+    async createAssetFromSnapshot() { return null; },
+    async remapForkAssetReferences() { return; },
+    async replaceForkAssetRelationsFromSnapshot() { return true; },
+    async forkAssetRelationsMatchSnapshot() { return true; },
+    async applyForkSnapshotChange(input) { return { status: "skipped" as const, change: input.change, reason: "missing_source" as const }; },
   } satisfies WorldRepository;
 }
 

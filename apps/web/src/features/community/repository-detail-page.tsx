@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CommunityRepository, CommunityRepositoryAsset, ReportRepositoryInput, RepositoryCollection } from "../worlddock/api";
 import { getCommunityRepository, listCommunityRepositoryAssets } from "../worlddock/api";
 import { Icon } from "../worlddock/components";
+import { ForkSyncPanel } from "../releases/fork-sync-panel";
 import { ReportDialog } from "./report-dialog";
 
 type RepositoryDetailPageProps = {
@@ -46,6 +47,7 @@ export function RepositoryDetailPage({
   const [assets, setAssets] = useState<Record<AssetKind, CommunityRepositoryAsset[]>>({ archive: [], seed: [], conflict: [] });
   const [assetCursor, setAssetCursor] = useState<Record<AssetKind, string | null>>({ archive: null, seed: null, conflict: null });
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [detachedForkIds, setDetachedForkIds] = useState<string[]>([]);
 
   useEffect(() => {
     setRepository(initialRepository);
@@ -131,7 +133,14 @@ export function RepositoryDetailPage({
             />
           ) : null}
           {tab === "releases" ? <ReleaseHistory repository={repository} /> : null}
-          {tab === "forks" ? <ForkGraph repository={repository} /> : null}
+          {tab === "forks" ? (
+            <ForkGraph
+              repository={repository}
+              sessionToken={sessionToken}
+              detachedForkIds={detachedForkIds}
+              onDetached={(forkId) => setDetachedForkIds((prev) => [...prev, forkId])}
+            />
+          ) : null}
         </main>
         <aside className="card" style={{ padding: 14, alignSelf: "start" }}>
           <div className="label">授权</div>
@@ -225,8 +234,18 @@ function ReleaseHistory({ repository }: { repository: CommunityRepository }) {
   );
 }
 
-function ForkGraph({ repository }: { repository: CommunityRepository }) {
-  const forks = repository.forkGraph?.forks ?? [];
+function ForkGraph({
+  repository,
+  sessionToken,
+  detachedForkIds,
+  onDetached,
+}: {
+  repository: CommunityRepository;
+  sessionToken: string;
+  detachedForkIds: string[];
+  onDetached: (forkId: string) => void;
+}) {
+  const forks = (repository.forkGraph?.forks ?? []).filter((fork) => !detachedForkIds.includes(fork.id));
   return (
     <section className="col" style={{ gap: 10 }}>
       <h2 className="title-font" style={{ margin: 0, fontSize: "var(--t-18)" }}>Forks</h2>
@@ -237,7 +256,8 @@ function ForkGraph({ repository }: { repository: CommunityRepository }) {
             <span className="mono" style={{ fontSize: 12 }}>{fork.id}</span>
             <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{fork.createdAt}</span>
           </div>
-          <p className="prose" style={{ marginBottom: 0 }}>源版本 {fork.sourceReleaseId} · 私有世界 {fork.targetWorldId}</p>
+          <p className="prose">源版本 {fork.sourceReleaseId} · 私有世界 {fork.targetWorldId}</p>
+          <ForkSyncPanel forkId={fork.id} sessionToken={sessionToken} onDetached={onDetached} />
         </article>
       ))}
       {forks.length === 0 ? <p className="prose">还没有公开 fork 记录。</p> : null}

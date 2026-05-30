@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { BillingModule } from "../billing/billing.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { WorldsModule } from "../worlds/worlds.module";
 import { PrismaRepositoryRepository } from "./prisma-repository.repository";
@@ -9,7 +10,7 @@ import { MeilisearchRepositorySearchClient, REPOSITORY_SEARCH_CLIENT } from "./r
 import { RepositoryService } from "./repository.service";
 
 @Module({
-  imports: [AuthModule, OutboxModule, WorldsModule],
+  imports: [AuthModule, BillingModule, OutboxModule, WorldsModule],
   controllers: [RepositoryController],
   providers: [
     RepositoryService,

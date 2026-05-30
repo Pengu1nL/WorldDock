@@ -468,11 +468,27 @@ model RepositoryFork {
   sourceRelease      RepositoryRelease @relation(fields: [sourceReleaseId], references: [id], onDelete: Cascade)
   targetWorld        World            @relation(fields: [targetWorldId], references: [id], onDelete: Cascade)
   user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assetMaps          RepositoryForkAssetMap[]
 
   @@index([repositoryId])
   @@index([userId])
   @@index([targetWorldId])
   @@map("forks")
+}
+
+model RepositoryForkAssetMap {
+  id              String         @id @default(cuid())
+  forkId          String
+  upstreamAssetId String
+  targetAssetId   String
+  kind            String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  fork            RepositoryFork @relation(fields: [forkId], references: [id], onDelete: Cascade)
+
+  @@unique([forkId, upstreamAssetId])
+  @@index([targetAssetId])
+  @@map("fork_asset_maps")
 }
 
 model OutboxEvent {

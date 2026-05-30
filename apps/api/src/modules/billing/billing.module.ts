@@ -18,6 +18,6 @@ import { PrismaBillingRepository } from "./prisma-billing.repository";
       useExisting: PrismaBillingRepository,
     },
   ],
-  exports: [BillingService, BILLING_REPOSITORY],
+  exports: [BillingService, EntitlementsService, BILLING_REPOSITORY],
 })
 export class BillingModule {}

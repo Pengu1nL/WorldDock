@@ -300,7 +300,14 @@ function createInMemoryWorldRepository() {
     async createConflict(input) {
       return { id: "conflict_unused", ...input, createdAt: new Date(), updatedAt: new Date() } satisfies ConflictRecord;
     },
+    async listAssetRelations() { return []; },
     async countAssets() { return { archive: 0, seeds: 0, conflicts: 0 }; },
+    async replaceWorldFromSnapshot() { return null; },
+    async createAssetFromSnapshot() { return null; },
+    async remapForkAssetReferences() { return; },
+    async replaceForkAssetRelationsFromSnapshot() { return true; },
+    async forkAssetRelationsMatchSnapshot() { return true; },
+    async applyForkSnapshotChange(input) { return { status: "skipped", change: input.change, reason: "missing_source" }; },
   };
 
   return repository;

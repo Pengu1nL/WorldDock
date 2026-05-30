@@ -1,7 +1,8 @@
-import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { licenseSchema, releaseSnapshotSchema, type ReleaseChange, type ReleaseDiff, type ReleaseSnapshot } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
+import { EntitlementsService } from "../billing/entitlements.service";
 import { OUTBOX_REPOSITORY, type OutboxRepository } from "../outbox/outbox.repository";
 import { WORLD_REPOSITORY, type WorldRecord, type WorldRepository } from "../worlds/world.repository";
 import { REPOSITORY_REPOSITORY, type ForkRecord, type PublicRepositoryRecord, type ReleaseRecord, type RepositoryRepository } from "./repository.repository";
@@ -14,6 +15,7 @@ export class RepositoryService {
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
     @Inject(REPOSITORY_SEARCH_CLIENT) private readonly searchClient: RepositorySearchClient,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async listPublicRepositories() {
@@ -67,7 +69,7 @@ export class RepositoryService {
   async previewWorldRelease(subject: AuthSubject, worldId: string, input: { releaseNote?: string; license?: string }) {
     const world = await this.requireOwnedWorld(subject, worldId);
     const existing = await this.repositories.findByWorldId(world.id);
-    const previousRelease = existing ? (await this.repositories.listReleases(existing.id))[0] : null;
+    const previousRelease = existing ? latestPublishedRelease(await this.repositories.listReleases(existing.id)) : null;
     const previousSnapshot = previousRelease ? await this.repositories.findSnapshotByReleaseId(previousRelease.id) : null;
     const currentSnapshot = await this.buildCurrentSnapshot(existing?.id ?? "preview_repository", "preview_release", world, new Date());
     const changes = buildReleaseChanges(previousSnapshot?.snapshot, currentSnapshot);
@@ -94,7 +96,7 @@ export class RepositoryService {
       },
       {
         code: "entitlement" as const,
-        ok: hasPublicPublishingEntitlement(subject),
+        ok: this.entitlements.getAlphaEntitlements().publicPublishing,
         message: "当前账户不包含公开发布权益。",
       },
     ];
@@ -124,7 +126,7 @@ export class RepositoryService {
       throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "This repository does not allow forks." });
     }
 
-    const latestRelease = (await this.repositories.listReleases(repository.id))[0];
+    const latestRelease = latestPublishedRelease(await this.repositories.listReleases(repository.id));
     if (!latestRelease) throw this.notFound("Release not found.");
     const snapshot = await this.repositories.findSnapshotByReleaseId(latestRelease.id);
     if (!snapshot) throw this.notFound("Release snapshot not found.");
@@ -138,11 +140,6 @@ export class RepositoryService {
       mode: "cloud",
       maturity: snapshot.snapshot.world.maturity,
     });
-    await Promise.all([
-      ...snapshot.snapshot.archiveEntries.map((entry) => this.worlds.createArchiveEntry({ worldId: world.id, ...entry })),
-      ...snapshot.snapshot.storySeeds.map((seed) => this.worlds.createStorySeed({ worldId: world.id, ...seed })),
-      ...snapshot.snapshot.conflicts.map((conflict) => this.worlds.createConflict({ worldId: world.id, ...conflict })),
-    ]);
     const fork = await this.repositories.createFork({
       repositoryId: repository.id,
       sourceReleaseId: latestRelease.id,
@@ -150,6 +147,28 @@ export class RepositoryService {
       userId: subject.user.id,
       licenseSnapshot: repository.license,
     });
+    const assetMaps = (await Promise.all(
+      snapshotAssetIds(snapshot.snapshot).map((upstreamAssetId) =>
+        this.worlds.createAssetFromSnapshot({
+          worldId: world.id,
+          upstreamAssetId,
+          targetAssetId: deterministicForkTargetAssetId(fork.id, upstreamAssetId),
+          snapshot: snapshot.snapshot,
+        })),
+    )).filter((map): map is NonNullable<typeof map> => map !== null);
+    const persistedAssetMaps = await this.repositories.createForkAssetMaps(assetMaps.map((map) => ({ forkId: fork.id, ...map })));
+    await this.worlds.remapForkAssetReferences({ worldId: world.id, assetMaps: persistedAssetMaps });
+    const relationsReplaced = await this.worlds.replaceForkAssetRelationsFromSnapshot({
+      worldId: world.id,
+      snapshot: snapshot.snapshot,
+      assetMaps: persistedAssetMaps,
+    });
+    if (!relationsReplaced) {
+      throw new InternalServerErrorException({
+        code: "FORK_RELATION_REMAP_FAILED",
+        message: "Fork relation remap failed.",
+      });
+    }
     await this.emitRepositoryEvent("repository.forked", repository.id, { repositoryId: repository.id, forkId: fork.id, userId: subject.user.id });
 
     return { world, fork };
@@ -242,7 +261,8 @@ export class RepositoryService {
 
     const previousReleases = await this.repositories.listReleases(repository.id);
     const currentSnapshot = await this.buildCurrentSnapshot(repository.id, "preview_release", world, new Date());
-    const previousSnapshot = previousReleases[0] ? await this.repositories.findSnapshotByReleaseId(previousReleases[0].id) : null;
+    const previousRelease = latestPublishedRelease(previousReleases);
+    const previousSnapshot = previousRelease ? await this.repositories.findSnapshotByReleaseId(previousRelease.id) : null;
     const changes = buildReleaseChanges(previousSnapshot?.snapshot, currentSnapshot);
     const diff = summarizeChanges(changes);
     const release = await this.repositories.createRelease({
@@ -261,6 +281,7 @@ export class RepositoryService {
       archiveEntries: currentSnapshot.archiveEntries,
       storySeeds: currentSnapshot.storySeeds,
       conflicts: currentSnapshot.conflicts,
+      assetRelations: currentSnapshot.assetRelations,
       createdAt: release.createdAt.toISOString(),
     });
     await this.repositories.createSnapshot({
@@ -284,10 +305,47 @@ export class RepositoryService {
     const repository = await this.repositories.findById(release.repositoryId);
     if (!repository) throw this.notFound("Repository not found.");
     this.requireRepositoryOwner(subject, repository);
-    const rolledBack = await this.repositories.updateReleaseStatus(release.id, "rolled_back");
+    if (release.status !== "published") {
+      throw new BadRequestException({ code: "INVALID_RELEASE_STATE", message: "Only published releases can be rolled back." });
+    }
+    if (!repository.worldId) {
+      throw new BadRequestException({ code: "INVALID_RELEASE_SOURCE", message: "Only cloud-published releases can be rolled back." });
+    }
+    const publishedReleases = (await this.repositories.listReleases(repository.id)).filter((item) => item.status === "published");
+    if (publishedReleases[0]?.id !== release.id) {
+      throw new BadRequestException({ code: "INVALID_RELEASE_STATE", message: "Only the latest published release can be rolled back." });
+    }
+    const activeRelease = publishedReleases[1];
+    if (!activeRelease) {
+      throw new BadRequestException({ code: "INVALID_RELEASE_STATE", message: "Rollback requires a previous published release." });
+    }
+    const activeSnapshot = await this.requireSnapshot(activeRelease.id);
+    const event = {
+      type: "repository.release_rolled_back",
+      aggregateId: repository.id,
+      payload: {
+        repositoryId: repository.id,
+        releaseId: release.id,
+        activeReleaseId: activeRelease.id,
+      },
+    };
+    if (!this.repositories.rollbackReleaseWithSnapshot) {
+      throw new InternalServerErrorException({
+        code: "ROLLBACK_TRANSACTION_UNAVAILABLE",
+        message: "Rollback requires transactional repository support.",
+      });
+    }
+
+    const rolledBack = await this.repositories.rollbackReleaseWithSnapshot({
+      releaseId: release.id,
+      activeReleaseId: activeRelease.id,
+      repositoryId: repository.id,
+      worldId: repository.worldId,
+      snapshot: activeSnapshot.snapshot,
+      event,
+    });
     if (!rolledBack) throw this.notFound("Release not found.");
-    await this.emitRepositoryEvent("repository.release_rolled_back", repository.id, { repositoryId: repository.id, releaseId: release.id });
-    return toReleaseDetail(rolledBack);
+    return { release: toReleaseDetail(rolledBack), activeRelease: toReleaseDetail(activeRelease) };
   }
 
   async getForkUpstreamDiff(subject: AuthSubject, forkId: string) {
@@ -299,32 +357,136 @@ export class RepositoryService {
     const fork = await this.requireOwnedFork(subject, forkId);
     const preview = await this.buildForkSyncPreview(fork);
     if (!preview.hasUpstreamChanges) {
-      return { ...preview, applied: [], skipped: [] };
+      const updatedFork = fork.sourceReleaseId === preview.upstreamReleaseId
+        ? fork
+        : await this.repositories.updateForkSourceRelease(fork.id, preview.upstreamReleaseId);
+      return { ...preview, sourceReleaseId: updatedFork?.sourceReleaseId ?? preview.upstreamReleaseId, applied: [], skipped: [] };
     }
 
+    const sourceSnapshot = await this.requireSnapshot(fork.sourceReleaseId);
     const upstreamSnapshot = await this.requireSnapshot(preview.upstreamReleaseId);
-    const existingAssets = await this.listWorldAssetIds(fork.targetWorldId);
+    const assetMaps = await this.repositories.listForkAssetMaps(fork.id);
+    const assetMapByUpstreamId = new Map(assetMaps.map((map) => [map.upstreamAssetId, map]));
+    const existingTargetAssets = await this.listWorldAssetIds(fork.targetWorldId);
+    const assetChanges = preview.changes.filter((change) => !isRelationChange(change));
+    const relationChanges = preview.changes.filter(isRelationChange);
+    const forkRelationsMatchSource = relationChanges.length === 0
+      ? true
+      : await this.worlds.forkAssetRelationsMatchSnapshot({
+          worldId: fork.targetWorldId,
+          snapshot: sourceSnapshot.snapshot,
+          assetMaps,
+        });
     const applied: ReleaseChange[] = [];
     const skipped: ReleaseChange[] = [];
+    const appliedRemovedAssetIds: string[] = [];
+    let shouldRemapForkReferences = false;
 
-    for (const change of preview.changes) {
-      if (change.kind !== "added" || existingAssets.has(change.assetId)) {
-        skipped.push(change);
+    for (const change of assetChanges) {
+      if (change.kind === "added") {
+        const existingMap = assetMapByUpstreamId.get(change.assetId);
+        if (existingMap && existingTargetAssets.has(existingMap.targetAssetId)) {
+          applied.push(change);
+          continue;
+        }
+        const created = await this.worlds.createAssetFromSnapshot({
+          worldId: fork.targetWorldId,
+          upstreamAssetId: change.assetId,
+          targetAssetId: deterministicForkTargetAssetId(fork.id, change.assetId),
+          snapshot: upstreamSnapshot.snapshot,
+        });
+        if (!created) {
+          skipped.push(change);
+          continue;
+        }
+        const map = await this.repositories.upsertForkAssetMap({ forkId: fork.id, ...created });
+        assetMapByUpstreamId.set(map.upstreamAssetId, map);
+        existingTargetAssets.add(map.targetAssetId);
+        applied.push(change);
+        shouldRemapForkReferences = true;
         continue;
       }
-      await this.copySnapshotAssetToWorld(upstreamSnapshot.snapshot, change.assetId, fork.targetWorldId);
-      applied.push(change);
+
+      const targetAsset = assetMapByUpstreamId.get(change.assetId);
+      const result = await this.worlds.applyForkSnapshotChange({
+        worldId: fork.targetWorldId,
+        targetAsset,
+        assetMaps: [...assetMapByUpstreamId.values()],
+        sourceSnapshot: sourceSnapshot.snapshot,
+        upstreamSnapshot: upstreamSnapshot.snapshot,
+        change,
+      });
+      if (result.status === "applied") {
+        applied.push(change);
+        if (change.kind === "removed") {
+          appliedRemovedAssetIds.push(change.assetId);
+        }
+      } else {
+        skipped.push(change);
+      }
     }
 
-    await this.repositories.updateForkSourceRelease(fork.id, preview.upstreamReleaseId);
+    if (shouldRemapForkReferences) {
+      await this.worlds.remapForkAssetReferences({ worldId: fork.targetWorldId, assetMaps: [...assetMapByUpstreamId.values()] });
+    }
+
+    if (relationChanges.length > 0) {
+      if (skipped.length > 0) {
+        skipped.push(...relationChanges);
+      } else if (forkRelationsMatchSource) {
+        const relationsReplaced = await this.worlds.replaceForkAssetRelationsFromSnapshot({
+          worldId: fork.targetWorldId,
+          snapshot: upstreamSnapshot.snapshot,
+          assetMaps: [...assetMapByUpstreamId.values()],
+        });
+        if (relationsReplaced) {
+          applied.push(...relationChanges);
+        } else {
+          skipped.push(...relationChanges);
+        }
+      } else {
+        const forkRelationsMatchUpstream = await this.worlds.forkAssetRelationsMatchSnapshot({
+          worldId: fork.targetWorldId,
+          snapshot: upstreamSnapshot.snapshot,
+          assetMaps: [...assetMapByUpstreamId.values()],
+        });
+        if (forkRelationsMatchUpstream) {
+          applied.push(...relationChanges);
+        } else {
+          skipped.push(...relationChanges);
+        }
+      }
+    }
+
+    const updatedFork = skipped.length === 0
+      ? await this.repositories.updateForkSourceRelease(fork.id, preview.upstreamReleaseId)
+      : fork;
+    if (skipped.length === 0) {
+      for (const assetId of appliedRemovedAssetIds) {
+        await this.repositories.deleteForkAssetMap(fork.id, assetId);
+      }
+    }
     await this.emitRepositoryEvent("repository.fork_synced", fork.repositoryId, {
       repositoryId: fork.repositoryId,
       forkId: fork.id,
-      sourceReleaseId: preview.upstreamReleaseId,
+      sourceReleaseId: updatedFork?.sourceReleaseId ?? fork.sourceReleaseId,
       applied: applied.map((change) => change.assetId),
       skipped: skipped.map((change) => change.assetId),
     });
-    return { ...preview, sourceReleaseId: preview.upstreamReleaseId, applied, skipped };
+    return { ...preview, sourceReleaseId: updatedFork?.sourceReleaseId ?? fork.sourceReleaseId, applied, skipped };
+  }
+
+  private async listWorldAssetIds(worldId: string) {
+    const [archiveEntries, storySeeds, conflicts] = await Promise.all([
+      this.worlds.listArchiveEntries(worldId),
+      this.worlds.listStorySeeds(worldId),
+      this.worlds.listConflicts(worldId),
+    ]);
+    return new Set([
+      ...archiveEntries.map((entry) => `archive:${entry.id}`),
+      ...storySeeds.map((seed) => `seed:${seed.id}`),
+      ...conflicts.map((conflict) => `conflict:${conflict.id}`),
+    ]);
   }
 
   async detachFork(subject: AuthSubject, forkId: string) {
@@ -336,10 +498,11 @@ export class RepositoryService {
   }
 
   private async buildCurrentSnapshot(repositoryId: string, releaseId: string, world: WorldRecord, createdAt: Date) {
-    const [archiveEntries, storySeeds, conflicts] = await Promise.all([
+    const [archiveEntries, storySeeds, conflicts, assetRelations] = await Promise.all([
       this.worlds.listArchiveEntries(world.id),
       this.worlds.listStorySeeds(world.id),
       this.worlds.listConflicts(world.id),
+      this.worlds.listAssetRelations(world.id),
     ]);
     return releaseSnapshotSchema.parse({
       repositoryId,
@@ -354,13 +517,13 @@ export class RepositoryService {
       archiveEntries,
       storySeeds,
       conflicts,
+      assetRelations,
       createdAt: createdAt.toISOString(),
     });
   }
 
   private async buildForkSyncPreview(fork: ForkRecord) {
-    const releases = await this.repositories.listReleases(fork.repositoryId);
-    const upstreamRelease = releases[0];
+    const upstreamRelease = latestPublishedRelease(await this.repositories.listReleases(fork.repositoryId));
     if (!upstreamRelease) throw this.notFound("Release not found.");
     const sourceSnapshot = await this.requireSnapshot(fork.sourceReleaseId);
     const upstreamSnapshot = await this.requireSnapshot(upstreamRelease.id);
@@ -396,40 +559,9 @@ export class RepositoryService {
     }
   }
 
-  private async listWorldAssetIds(worldId: string) {
-    const [archiveEntries, storySeeds, conflicts] = await Promise.all([
-      this.worlds.listArchiveEntries(worldId),
-      this.worlds.listStorySeeds(worldId),
-      this.worlds.listConflicts(worldId),
-    ]);
-    return new Set([
-      ...archiveEntries.map((entry) => `archive:${entry.id}`),
-      ...storySeeds.map((seed) => `seed:${seed.id}`),
-      ...conflicts.map((conflict) => `conflict:${conflict.id}`),
-    ]);
-  }
-
-  private async copySnapshotAssetToWorld(snapshot: ReleaseSnapshot, assetId: string, worldId: string) {
-    const [kind, id] = assetId.split(":");
-    if (kind === "archive") {
-      const entry = snapshot.archiveEntries.find((item) => item.id === id);
-      if (entry) await this.worlds.createArchiveEntry({ ...entry, worldId } as Parameters<WorldRepository["createArchiveEntry"]>[0]);
-      return;
-    }
-    if (kind === "seed") {
-      const seed = snapshot.storySeeds.find((item) => item.id === id);
-      if (seed) await this.worlds.createStorySeed({ ...seed, worldId } as Parameters<WorldRepository["createStorySeed"]>[0]);
-      return;
-    }
-    if (kind === "conflict") {
-      const conflict = snapshot.conflicts.find((item) => item.id === id);
-      if (conflict) await this.worlds.createConflict({ ...conflict, worldId } as Parameters<WorldRepository["createConflict"]>[0]);
-    }
-  }
-
   private async toRepositoryDetail(repository: PublicRepositoryRecord) {
     const releases = await this.repositories.listReleases(repository.id);
-    const latest = releases[0];
+    const latest = latestPublishedRelease(releases);
     return {
       id: repository.id,
       owner: repository.ownerName,
@@ -516,6 +648,8 @@ function buildDiff(isFirstRelease: boolean, archiveCount: number, seedCount: num
 function buildReleaseChanges(before: ReleaseSnapshot | null | undefined, after: ReleaseSnapshot): ReleaseChange[] {
   const beforeAssets = before ? snapshotAssetMap(before) : new Map<string, SnapshotAsset>();
   const afterAssets = snapshotAssetMap(after);
+  const beforeRelations = before ? snapshotRelationMap(before) : new Map<string, SnapshotAsset>();
+  const afterRelations = snapshotRelationMap(after);
   const changes: ReleaseChange[] = [];
 
   for (const [assetId, asset] of afterAssets) {
@@ -530,6 +664,18 @@ function buildReleaseChanges(before: ReleaseSnapshot | null | undefined, after: 
   for (const [assetId, asset] of beforeAssets) {
     if (!afterAssets.has(assetId)) {
       changes.push({ assetId, kind: "removed", title: asset.title, beforeHash: asset.hash });
+    }
+  }
+
+  for (const [assetId, relation] of afterRelations) {
+    if (!beforeRelations.has(assetId)) {
+      changes.push({ assetId, kind: "added", title: relation.title, afterHash: relation.hash });
+    }
+  }
+
+  for (const [assetId, relation] of beforeRelations) {
+    if (!afterRelations.has(assetId)) {
+      changes.push({ assetId, kind: "removed", title: relation.title, beforeHash: relation.hash });
     }
   }
 
@@ -564,8 +710,24 @@ function snapshotAssetMap(snapshot: ReleaseSnapshot) {
   return assets;
 }
 
+function snapshotRelationMap(snapshot: ReleaseSnapshot) {
+  const relations = new Map<string, SnapshotAsset>();
+  for (const relation of snapshot.assetRelations) {
+    const relationHash = stableHash(relation);
+    relations.set(`relation:${relationHash}`, {
+      title: `Relation ${relation.sourceAssetId} -> ${relation.targetAssetId}`,
+      hash: relationHash,
+    });
+  }
+  return relations;
+}
+
+function isRelationChange(change: ReleaseChange) {
+  return change.assetId.startsWith("relation:");
+}
+
 function stableHash(value: unknown) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 16);
+  return createHash("sha256").update(stableStringify(stripTimestampFields(value))).digest("hex").slice(0, 16);
 }
 
 function countSnapshotAssets(snapshot: ReleaseSnapshot) {
@@ -577,15 +739,55 @@ function moderationPreScanPasses(world: WorldRecord, releaseNote: string) {
   return !["malware", "credential leak", "api key", "spam-only"].some((term) => text.includes(term));
 }
 
-function hasPublicPublishingEntitlement(_subject: AuthSubject) {
-  return process.env.ALPHA_PUBLIC_PUBLISHING_ENABLED !== "0";
-}
-
 function nextVersion(previousReleases: ReleaseRecord[]) {
   if (previousReleases.length === 0) return "v1.0.0";
   const latest = previousReleases[0]?.version.match(/^v(\d+)\.(\d+)\.(\d+)$/);
   if (!latest) return `v1.${previousReleases.length}.0`;
   return `v${latest[1]}.${Number(latest[2]) + 1}.0`;
+}
+
+function latestPublishedRelease(releases: ReleaseRecord[]) {
+  return releases.find((release) => release.status === "published") ?? null;
+}
+
+function snapshotAssetIds(snapshot: ReleaseSnapshot) {
+  return [
+    ...snapshot.archiveEntries.map((entry) => `archive:${entry.id}`),
+    ...snapshot.storySeeds.map((seed) => `seed:${seed.id}`),
+    ...snapshot.conflicts.map((conflict) => `conflict:${conflict.id}`),
+  ];
+}
+
+function deterministicForkTargetAssetId(forkId: string, upstreamAssetId: string) {
+  const parsed = parseTypedAssetId(upstreamAssetId);
+  if (!parsed) return undefined;
+  const digest = createHash("sha256").update(`${forkId}\0${upstreamAssetId}`).digest("hex").slice(0, 24);
+  return `${parsed.kind}:${parsed.kind}_${digest}`;
+}
+
+function parseTypedAssetId(assetId: string) {
+  const separator = assetId.indexOf(":");
+  if (separator === -1) return null;
+  const kind = assetId.slice(0, separator);
+  const id = assetId.slice(separator + 1);
+  if (!id || (kind !== "archive" && kind !== "seed" && kind !== "conflict")) return null;
+  return { kind, id } as const;
+}
+
+function stripTimestampFields(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripTimestampFields);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !["createdAt", "updatedAt"].includes(key))
+      .map(([key, nested]) => [key, stripTimestampFields(nested)]),
+  );
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  if (!value || typeof value !== "object") return JSON.stringify(value);
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`).join(",")}}`;
 }
 
 function slugify(value: string) {

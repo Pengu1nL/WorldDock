@@ -318,6 +318,7 @@ function createInMemoryWorldRepository() {
     async createStorySeed(input) { const seed = { id: `seed_${storySeeds.size + 1}`, ...input, questions: input.questions ?? [], createdAt: new Date(), updatedAt: new Date() }; storySeeds.set(seed.id, seed); return seed; },
     async listConflicts(worldId) { return [...conflicts.values()].filter((conflict) => conflict.worldId === worldId); },
     async createConflict(input) { const conflict = { id: `conflict_${conflicts.size + 1}`, ...input, related: input.related ?? [], derivedSeeds: input.derivedSeeds ?? [], createdAt: new Date(), updatedAt: new Date() }; conflicts.set(conflict.id, conflict); return conflict; },
+    async listAssetRelations() { return []; },
     async countAssets(worldId) {
       return {
         archive: [...archiveEntries.values()].filter((entry) => entry.worldId === worldId).length,
@@ -325,6 +326,12 @@ function createInMemoryWorldRepository() {
         conflicts: [...conflicts.values()].filter((conflict) => conflict.worldId === worldId).length,
       };
     },
+    async replaceWorldFromSnapshot() { return null; },
+    async createAssetFromSnapshot() { return null; },
+    async remapForkAssetReferences() { return; },
+    async replaceForkAssetRelationsFromSnapshot() { return true; },
+    async forkAssetRelationsMatchSnapshot() { return true; },
+    async applyForkSnapshotChange(input) { return { status: "skipped", change: input.change, reason: "missing_source" }; },
   };
 
   return repository;

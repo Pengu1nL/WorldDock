@@ -1,4 +1,14 @@
-import type { Notification, PublicRepository, WorldAsset, WorldAssetKind, WorldPackage } from "@worlddock/domain";
+import type {
+  ForkSyncPreview,
+  ForkSyncResult,
+  Notification,
+  PublicRepository,
+  ReleasePreflight,
+  RollbackReleaseResponse,
+  WorldAsset,
+  WorldAssetKind,
+  WorldPackage,
+} from "@worlddock/domain";
 
 export type AccessTokenScope = "world:read" | "world:write" | "repository:push";
 
@@ -207,24 +217,6 @@ export type LocalPushInput = PublishWorldInput & {
     storySeeds: unknown[];
     conflicts: unknown[];
   };
-};
-
-export type ReleaseChange = {
-  assetId: string;
-  kind: "added" | "changed" | "removed";
-  title: string;
-  beforeHash?: string;
-  afterHash?: string;
-};
-
-export type ReleasePreflight = {
-  ok: boolean;
-  checks: Array<{
-    code: "assets" | "license" | "release_note" | "moderation" | "entitlement";
-    ok: boolean;
-    message: string;
-  }>;
-  changes: ReleaseChange[];
 };
 
 export type ReportRepositoryInput = {
@@ -851,7 +843,10 @@ export async function listRepositoryReleases(repositoryId: string, options: ApiC
   });
 }
 
-export async function rollbackRelease(releaseId: string, options: ApiClientOptions) {
+export async function rollbackRelease(
+  releaseId: string,
+  options: ApiClientOptions,
+): Promise<RollbackReleaseResponse> {
   return requestJson(`/v1/releases/${releaseId}/rollback`, {
     method: "POST",
     sessionToken: options.sessionToken,
@@ -891,7 +886,10 @@ export async function forkRepository(repositoryId: string, options: ApiClientOpt
   });
 }
 
-export async function getForkUpstreamDiff(forkId: string, options: ApiClientOptions) {
+export async function getForkUpstreamDiff(
+  forkId: string,
+  options: ApiClientOptions,
+): Promise<{ diff: ForkSyncPreview }> {
   return requestJson(`/v1/forks/${forkId}/upstream-diff`, {
     method: "GET",
     sessionToken: options.sessionToken,
@@ -901,7 +899,7 @@ export async function getForkUpstreamDiff(forkId: string, options: ApiClientOpti
   });
 }
 
-export async function syncFork(forkId: string, options: ApiClientOptions) {
+export async function syncFork(forkId: string, options: ApiClientOptions): Promise<{ sync: ForkSyncResult }> {
   return requestJson(`/v1/forks/${forkId}/sync`, {
     method: "POST",
     sessionToken: options.sessionToken,
@@ -911,7 +909,10 @@ export async function syncFork(forkId: string, options: ApiClientOptions) {
   });
 }
 
-export async function detachFork(forkId: string, options: ApiClientOptions) {
+export async function detachFork(
+  forkId: string,
+  options: ApiClientOptions,
+): Promise<{ fork: { forkId: string; detached: true } }> {
   return requestJson(`/v1/forks/${forkId}/detach`, {
     method: "POST",
     sessionToken: options.sessionToken,

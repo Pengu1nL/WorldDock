@@ -130,6 +130,24 @@ async function installApiMocks(page: Page) {
       return json(route, { conflicts: [] });
     }
 
+    if (method === "POST" && /\/v1\/worlds\/[^/]+\/releases\/preview$/.test(path)) {
+      return json(route, {
+        preflight: {
+          ok: true,
+          checks: [
+            { code: "assets", ok: true, message: "至少保存一个世界资产" },
+            { code: "license", ok: true, message: "已选择授权方式" },
+            { code: "release_note", ok: true, message: "已填写发布说明" },
+            { code: "moderation", ok: true, message: "发布前预扫描通过" },
+            { code: "entitlement", ok: true, message: "账户包含公开发布权益" },
+          ],
+          changes: [
+            { assetId: "archive:archive_1", kind: "added", title: "潮汐律", afterHash: "hash_1" },
+          ],
+        },
+      }, 201);
+    }
+
     if (method === "POST" && /\/v1\/worlds\/[^/]+\/agent-runs$/.test(path)) {
       return json(route, { run: { id: "run_e2e" }, suggestions: [] });
     }

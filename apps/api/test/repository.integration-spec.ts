@@ -674,6 +674,7 @@ function createInMemoryWorldRepository() {
     async createStorySeed(input) { const seed = { id: `seed_${storySeeds.size + 1}`, ...input, questions: input.questions ?? [], createdAt: new Date(), updatedAt: new Date() }; storySeeds.set(seed.id, seed); return seed; },
     async listConflicts(worldId) { return [...conflicts.values()].filter((conflict) => conflict.worldId === worldId); },
     async createConflict(input) { const conflict = { id: `conflict_${conflicts.size + 1}`, ...input, related: input.related ?? [], derivedSeeds: input.derivedSeeds ?? [], createdAt: new Date(), updatedAt: new Date() }; conflicts.set(conflict.id, conflict); return conflict; },
+    async listAssetRelations() { return []; },
     async countAssets(worldId) {
       return {
         archive: [...archiveEntries.values()].filter((entry) => entry.worldId === worldId).length,
@@ -681,9 +682,59 @@ function createInMemoryWorldRepository() {
         conflicts: [...conflicts.values()].filter((conflict) => conflict.worldId === worldId).length,
       };
     },
+    async replaceWorldFromSnapshot() { return null; },
+    async createAssetFromSnapshot(input) {
+      const asset = findSnapshotAssetForRepositoryTest(input.snapshot, input.upstreamAssetId);
+      if (!asset) return null;
+      if (asset.kind === "archive") {
+        const { id: _id, ...record } = asset.record;
+        const parsed = input.targetAssetId ? parseAssetIdForRepositoryTest(input.targetAssetId) : null;
+        const created = await repository.createArchiveEntry({ ...record, id: parsed?.kind === "archive" ? parsed.id : undefined, worldId: input.worldId } as Parameters<WorldRepository["createArchiveEntry"]>[0]);
+        return { upstreamAssetId: input.upstreamAssetId, targetAssetId: `archive:${created.id}`, kind: "archive" };
+      }
+      if (asset.kind === "seed") {
+        const { id: _id, ...record } = asset.record;
+        const parsed = input.targetAssetId ? parseAssetIdForRepositoryTest(input.targetAssetId) : null;
+        const created = await repository.createStorySeed({ ...record, id: parsed?.kind === "seed" ? parsed.id : undefined, worldId: input.worldId } as Parameters<WorldRepository["createStorySeed"]>[0]);
+        return { upstreamAssetId: input.upstreamAssetId, targetAssetId: `seed:${created.id}`, kind: "seed" };
+      }
+      const { id: _id, ...record } = asset.record;
+      const parsed = input.targetAssetId ? parseAssetIdForRepositoryTest(input.targetAssetId) : null;
+      const created = await repository.createConflict({ ...record, id: parsed?.kind === "conflict" ? parsed.id : undefined, worldId: input.worldId } as Parameters<WorldRepository["createConflict"]>[0]);
+      return { upstreamAssetId: input.upstreamAssetId, targetAssetId: `conflict:${created.id}`, kind: "conflict" };
+    },
+    async remapForkAssetReferences() { return; },
+    async replaceForkAssetRelationsFromSnapshot() { return true; },
+    async forkAssetRelationsMatchSnapshot() { return true; },
+    async applyForkSnapshotChange() {
+      throw new Error("Not implemented for repository tests.");
+    },
   };
 
   return repository;
+}
+
+function findSnapshotAssetForRepositoryTest(snapshot: Parameters<WorldRepository["createAssetFromSnapshot"]>[0]["snapshot"], assetId: string) {
+  const [kind, id] = assetId.split(":");
+  if (kind === "archive") {
+    const record = snapshot.archiveEntries.find((entry) => entry.id === id);
+    return record ? { kind: "archive" as const, record: { ...record, worldId: "" } } : null;
+  }
+  if (kind === "seed") {
+    const record = snapshot.storySeeds.find((seed) => seed.id === id);
+    return record ? { kind: "seed" as const, record: { ...record, worldId: "" } } : null;
+  }
+  if (kind === "conflict") {
+    const record = snapshot.conflicts.find((conflict) => conflict.id === id);
+    return record ? { kind: "conflict" as const, record: { ...record, worldId: "" } } : null;
+  }
+  return null;
+}
+
+function parseAssetIdForRepositoryTest(assetId: string) {
+  const [kind, id] = assetId.split(":");
+  if (!id || (kind !== "archive" && kind !== "seed" && kind !== "conflict")) return null;
+  return { kind, id } as const;
 }
 
 function createInMemoryStorageRepository() {
@@ -742,6 +793,7 @@ function createInMemoryRepositoryRepository() {
   const snapshots = new Map<string, ReleaseSnapshotRecord>();
   const stars = new Set<string>();
   const forks: any[] = [];
+  const assetMaps = new Map<string, any>();
   const collections = new Map<string, any>();
 
   const repository: RepositoryRepository = {
@@ -856,6 +908,28 @@ function createInMemoryRepositoryRepository() {
     },
     async listForksForRepository(repositoryId) {
       return forks.filter((fork) => fork.repositoryId === repositoryId);
+    },
+    async createForkAssetMaps(input) {
+      return Promise.all(input.map((map) => repository.upsertForkAssetMap(map)));
+    },
+    async listForkAssetMaps(forkId) {
+      return [...assetMaps.values()].filter((map) => map.forkId === forkId);
+    },
+    async upsertForkAssetMap(input) {
+      const key = `${input.forkId}:${input.upstreamAssetId}`;
+      const existing = assetMaps.get(key);
+      const now = new Date();
+      const next = existing
+        ? { ...existing, ...input, updatedAt: now }
+        : { id: `fork_asset_map_${assetMaps.size + 1}`, createdAt: now, updatedAt: now, ...input };
+      assetMaps.set(key, next);
+      return next;
+    },
+    async deleteForkAssetMap(forkId, upstreamAssetId) {
+      const key = `${forkId}:${upstreamAssetId}`;
+      const existing = assetMaps.get(key) ?? null;
+      assetMaps.delete(key);
+      return existing;
     },
     async saveToCollection(input) {
       const name = input.name ?? "saved";

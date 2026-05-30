@@ -142,22 +142,34 @@
 
 ## Phase 6: 版本、发布、回滚和 Fork 同步
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `packages/domain/src/releases/index.ts`。
-- 缺少 `apps/api/src/modules/releases/*`。
-- 缺少 `apps/web/src/features/releases/release-wizard.tsx` 和 `diff-view.tsx`。
-- release 状态机未按计划建模，缺少 `draft/published/rolled_back`。
-- 发布前检查不完整：未阻止零资产世界、未接入 moderation pre-scan 失败、未接入 billing entitlement。
-- 缺少 rollback。
-- 缺少 Fork upstream diff/sync/detach API。
-- 缺少 `releases.integration-spec.ts` 和 `release-flow.spec.ts`。
+完成依据：
 
-已有但不足：
+- `packages/domain/src/releases/index.ts` 已定义 release 状态、diff change、preflight、rollback 和 fork sync contract。
+- `apps/api/src/modules/releases/*` 已提供 release preview、rollback、fork upstream diff、sync 和 detach endpoint，并复用认证 scope。
+- `apps/api/src/modules/repositories/repository.service.ts` 已在发布前检查零资产、授权、发布说明、moderation pre-scan 和公开发布 entitlement。
+- 发布流程会生成 repository release、release snapshot、实体级 changes 和版本号；repository detail 使用最新 published release，跳过 rolled_back release。
+- rollback 只允许仓库 owner 回滚最新 published release，并会把 Cloud 世界恢复到上一个 published snapshot。
+- Fork sync 会基于 fork source snapshot 与 upstream snapshot 计算差异，自动应用非冲突 added、changed、removed 变更；冲突项进入 skipped，当前 Web contract 兼容可选 reason。
+- `apps/web/src/features/releases/release-wizard.tsx` 和 `diff-view.tsx` 已使用服务端 preflight 与 changes 渲染发布检查和差异预览。
+- `apps/web/src/features/releases/fork-sync-panel.tsx` 与 repository detail Forks tab 已提供 upstream diff、sync 和 detach 操作入口。
+- `apps/api/test/releases.integration-spec.ts` 和 `apps/web/tests/e2e/release-flow.spec.ts` 覆盖发布预检、发布、回滚、Fork 对比、同步和 detach。
 
-- 已有 `POST /v1/worlds/:worldId/publish`。
-- 已有 repository release snapshot、版本递增和基础 Fork。
-- 前端 `view-publish.tsx` 有发布表单和静态差异预览。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test:integration -- releases.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- release-flow.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+
+剩余说明：
+
+- Phase 6 不实现多人协同分支、复杂三路冲突编辑器、release draft 草稿编辑页或真实审核后台；这些进入后续版本。
+- 当前 sync 策略只自动应用 fork 本地未修改的 upstream changes；发生 local conflict 时保留 fork 本地内容并在 skipped 中返回对应变更。
 
 ## Phase 7: 真实模型、创作点账本和支付 UI 占位
 

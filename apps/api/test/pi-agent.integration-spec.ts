@@ -77,7 +77,14 @@ describe("pi agent runtime boundary", () => {
       createConflict: vi.fn(async () => {
         throw new Error("createConflict should not be called by proposal tools.");
       }),
+      listAssetRelations: vi.fn(async () => []),
       countAssets: vi.fn(async () => ({ archive: 0, seeds: 0, conflicts: 0 })),
+      replaceWorldFromSnapshot: vi.fn(async () => null),
+      createAssetFromSnapshot: vi.fn(async () => null),
+      remapForkAssetReferences: vi.fn(async () => undefined),
+      replaceForkAssetRelationsFromSnapshot: vi.fn(async () => true),
+      forkAssetRelationsMatchSnapshot: vi.fn(async () => true),
+      applyForkSnapshotChange: vi.fn(async (input) => ({ status: "skipped" as const, change: input.change, reason: "missing_source" as const })),
     };
     const expectedSuggestion: WorldSuggestion = {
       id: "setting_license",

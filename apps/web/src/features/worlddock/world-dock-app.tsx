@@ -983,6 +983,7 @@ function WorldDockRuntime() {
             <PublishView
               mode={t.mode}
               world={currentWorld}
+              sessionToken={sessionToken}
               communityConnected={communityConnected}
               onBack={() => setView("workbench")}
               onConfirm={async ({ releaseNote, license }: any) => {

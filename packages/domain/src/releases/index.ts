@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ReleaseDetail } from "../repository";
 
 export const releaseStatusSchema = z.enum(["draft", "published", "rolled_back"]);
 export const releaseDiffKindSchema = z.enum(["added", "changed", "removed"]);
@@ -43,9 +44,53 @@ export const forkSyncPreviewSchema = z.object({
   changes: z.array(releaseChangeSchema),
 });
 
+const releaseDetailDiffSchema = z.object({
+  addedSettings: z.number().int().min(0),
+  changedSettings: z.number().int().min(0),
+  removedSettings: z.number().int().min(0),
+  addedSeeds: z.number().int().min(0),
+});
+
+const releaseDetailResponseSchema = z.object({
+  id: z.string().min(1),
+  repositoryId: z.string().min(1),
+  version: z.string().min(1),
+  note: z.string().min(1),
+  status: releaseStatusSchema,
+  license: z.enum([
+    "all-rights-reserved",
+    "non-commercial-attribution",
+    "free-fork-attribution",
+    "commercial-attribution",
+    "no-fork",
+  ]),
+  diff: releaseDetailDiffSchema,
+  changes: z.array(releaseChangeSchema).default([]),
+  createdAt: z.string().datetime(),
+}).passthrough();
+
+export const rollbackReleaseResponseSchema = z.object({
+  release: releaseDetailResponseSchema,
+  activeRelease: releaseDetailResponseSchema,
+});
+
+const forkSyncSkippedChangeSchema = releaseChangeSchema.extend({
+  reason: z.enum(["local_conflict", "missing_upstream", "missing_source"]).optional(),
+});
+
+export const forkSyncResultSchema = forkSyncPreviewSchema.extend({
+  applied: z.array(releaseChangeSchema),
+  skipped: z.array(forkSyncSkippedChangeSchema),
+});
+
 export type ReleaseStatus = z.infer<typeof releaseStatusSchema>;
 export type ReleaseDiffKind = z.infer<typeof releaseDiffKindSchema>;
 export type ReleaseChange = z.infer<typeof releaseChangeSchema>;
 export type WorldRelease = z.infer<typeof worldReleaseSchema>;
 export type ReleasePreflight = z.infer<typeof releasePreflightSchema>;
 export type ForkSyncPreview = z.infer<typeof forkSyncPreviewSchema>;
+export type RollbackReleaseResponse = {
+  release: ReleaseDetail;
+  activeRelease: ReleaseDetail;
+};
+export type ForkSyncResult = z.infer<typeof forkSyncResultSchema>;

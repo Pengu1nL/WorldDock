@@ -1,5 +1,6 @@
 import type { ReleaseChange, ReleaseDiff, ReleaseSnapshot, ReleaseStatus } from "@worlddock/domain";
 import type { ModerationStatus } from "@worlddock/domain";
+import type { OutboxEventRecord } from "../outbox/outbox.repository";
 
 export const REPOSITORY_REPOSITORY = Symbol("REPOSITORY_REPOSITORY");
 
@@ -53,6 +54,16 @@ export type ForkRecord = {
   createdAt: Date;
 };
 
+export type ForkAssetMapRecord = {
+  id: string;
+  forkId: string;
+  upstreamAssetId: string;
+  targetAssetId: string;
+  kind: "archive" | "seed" | "conflict";
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type RepositoryCollectionRecord = {
   id: string;
   repositoryId: string;
@@ -72,6 +83,14 @@ export type RepositoryRepository = {
   createRelease(input: Omit<ReleaseRecord, "id" | "createdAt" | "status" | "changes"> & Partial<Pick<ReleaseRecord, "status" | "changes">>): Promise<ReleaseRecord>;
   findReleaseById(id: string): Promise<ReleaseRecord | null>;
   updateReleaseStatus(id: string, status: ReleaseStatus): Promise<ReleaseRecord | null>;
+  rollbackReleaseWithSnapshot?(input: {
+    releaseId: string;
+    activeReleaseId: string;
+    repositoryId: string;
+    worldId: string;
+    snapshot: ReleaseSnapshot;
+    event: Omit<OutboxEventRecord, "id" | "createdAt" | "processedAt">;
+  }): Promise<ReleaseRecord | null>;
   listReleases(repositoryId: string): Promise<ReleaseRecord[]>;
   createSnapshot(input: Omit<ReleaseSnapshotRecord, "id" | "createdAt">): Promise<ReleaseSnapshotRecord>;
   findSnapshotByReleaseId(releaseId: string): Promise<ReleaseSnapshotRecord | null>;
@@ -82,6 +101,10 @@ export type RepositoryRepository = {
   updateForkSourceRelease(id: string, sourceReleaseId: string): Promise<ForkRecord | null>;
   deleteFork(id: string): Promise<ForkRecord | null>;
   listForksForRepository(repositoryId: string): Promise<ForkRecord[]>;
+  createForkAssetMaps(input: Array<Omit<ForkAssetMapRecord, "id" | "createdAt" | "updatedAt">>): Promise<ForkAssetMapRecord[]>;
+  listForkAssetMaps(forkId: string): Promise<ForkAssetMapRecord[]>;
+  upsertForkAssetMap(input: Omit<ForkAssetMapRecord, "id" | "createdAt" | "updatedAt">): Promise<ForkAssetMapRecord>;
+  deleteForkAssetMap(forkId: string, upstreamAssetId: string): Promise<ForkAssetMapRecord | null>;
   saveToCollection(input: { repositoryId: string; userId: string; name?: string }): Promise<RepositoryCollectionRecord>;
   removeFromCollection(input: { collectionId: string; repositoryId: string; userId: string }): Promise<RepositoryCollectionRecord | null>;
   listCollectionsForUser(userId: string): Promise<RepositoryCollectionRecord[]>;

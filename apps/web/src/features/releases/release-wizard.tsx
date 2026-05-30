@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import type { World, WorldMode } from "@worlddock/domain";
+import { useEffect, useMemo, useState } from "react";
+import type { ReleasePreflight, World, WorldMode } from "@worlddock/domain";
+import { previewWorldRelease } from "../worlddock/api";
 import { Icon } from "../worlddock/components";
 import { DiffView, type ReleaseDiffItem } from "./diff-view";
 
@@ -29,15 +30,17 @@ const PRIVATE_ITEMS = [
 type ReleaseWizardProps = {
   mode: WorldMode;
   world: World;
+  sessionToken: string;
   communityConnected?: boolean;
   hasPublicPublishingEntitlement?: boolean;
   onBack: () => void;
-  onConfirm: (payload: { releaseNote: string; license: string }) => void;
+  onConfirm: (payload: { releaseNote: string; license: string }) => Promise<void> | void;
 };
 
 export function ReleaseWizard({
   mode,
   world,
+  sessionToken,
   communityConnected = true,
   hasPublicPublishingEntitlement = true,
   onBack,
@@ -45,26 +48,74 @@ export function ReleaseWizard({
 }: ReleaseWizardProps) {
   const [releaseNote, setReleaseNote] = useState("");
   const [license, setLicense] = useState("non-commercial-attribution");
+  const [preflight, setPreflight] = useState<ReleasePreflight | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightError, setPreflightError] = useState("");
   const isLocal = mode === "local";
   const assetCount = (world.archive ?? 0) + (world.seeds ?? 0) + (world.conflicts ?? 0);
   const moderationOk = !["malware", "credential leak", "api key", "spam-only"].some((term) =>
     `${world.name}\n${world.summary}\n${releaseNote}`.toLowerCase().includes(term),
   );
   const blocked = isLocal && !communityConnected;
-  const checks = useMemo(() => [
-    { id: "assets", ok: assetCount > 0, label: "至少保存一个世界资产" },
-    { id: "license", ok: Boolean(license), label: "已选择授权方式" },
-    { id: "release_note", ok: Boolean(releaseNote.trim()), label: "已填写发布说明" },
-    { id: "moderation", ok: moderationOk, label: "发布前预扫描通过" },
-    { id: "entitlement", ok: hasPublicPublishingEntitlement, label: "账户包含公开发布权益" },
-  ], [assetCount, hasPublicPublishingEntitlement, license, moderationOk, releaseNote]);
-  const canSubmit = !blocked && checks.every((check) => check.ok);
-  const diff: ReleaseDiffItem[] = [
-    { label: "新增设定", value: world.archive ?? 0, tone: "sage" },
-    { label: "修改设定", value: world.status === "published" ? Math.max(0, world.archive ?? 0) : 0 },
-    { label: "删除设定", value: 0 },
-    { label: "新增故事种子", value: world.seeds ?? 0, tone: "sage" },
-  ];
+
+  useEffect(() => {
+    if (isLocal || !sessionToken || !world.id) {
+      setPreflight(null);
+      setPreflightLoading(false);
+      setPreflightError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    setPreflight(null);
+    setPreflightLoading(true);
+    setPreflightError("");
+    const timeout = window.setTimeout(() => {
+      void previewWorldRelease(world.id, { releaseNote, license }, { sessionToken, signal: controller.signal })
+        .then((result) => setPreflight(result.preflight))
+        .catch((error) => {
+          if (controller.signal.aborted || error instanceof DOMException && error.name === "AbortError") return;
+          setPreflightError("发布前检查暂不可用");
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setPreflightLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [isLocal, license, releaseNote, sessionToken, world.id]);
+
+  const checks = useMemo(() => {
+    if (!isLocal && preflight) {
+      return preflight.checks.map((check) => ({ id: check.code, ok: check.ok, label: check.message }));
+    }
+    return [
+      { id: "assets", ok: assetCount > 0, label: "至少保存一个世界资产" },
+      { id: "license", ok: Boolean(license), label: "已选择授权方式" },
+      { id: "release_note", ok: Boolean(releaseNote.trim()), label: "已填写发布说明" },
+      { id: "moderation", ok: moderationOk, label: "发布前预扫描通过" },
+      { id: "entitlement", ok: hasPublicPublishingEntitlement, label: "账户包含公开发布权益" },
+    ];
+  }, [assetCount, hasPublicPublishingEntitlement, isLocal, license, moderationOk, preflight, releaseNote]);
+  const canSubmit = !blocked
+    && !preflightLoading
+    && !preflightError
+    && (isLocal ? checks.every((check) => check.ok) : preflight?.ok === true);
+  const diff: ReleaseDiffItem[] = preflight !== null
+    ? [
+        { label: "新增资产", value: preflight.changes.filter((change) => change.kind === "added").length, tone: "sage" },
+        { label: "修改资产", value: preflight.changes.filter((change) => change.kind === "changed").length },
+        { label: "删除资产", value: preflight.changes.filter((change) => change.kind === "removed").length, tone: "amber" },
+      ]
+    : [
+        { label: "新增设定", value: world.archive ?? 0, tone: "sage" },
+        { label: "修改设定", value: world.status === "published" ? Math.max(0, world.archive ?? 0) : 0 },
+        { label: "删除设定", value: 0 },
+        { label: "新增故事种子", value: world.seeds ?? 0, tone: "sage" },
+      ];
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
@@ -128,6 +179,8 @@ export function ReleaseWizard({
                 本地未连接社区，无法 Push
               </div>
             )}
+            {preflightLoading ? <div className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>发布前检查中</div> : null}
+            {preflightError ? <div className="badge amber" style={{ justifyContent: "flex-start", minHeight: 24 }}>{preflightError}</div> : null}
           </div>
           <button
             className="btn primary lg"

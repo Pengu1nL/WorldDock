@@ -170,7 +170,14 @@ function createInMemoryWorldRepository() {
     async createStorySeed(input) { const seed = { id: `seed_${storySeeds.size + 1}`, ...input, questions: input.questions ?? [], createdAt: new Date(), updatedAt: new Date() }; storySeeds.set(seed.id, seed); return seed; },
     async listConflicts(worldId) { return [...conflicts.values()].filter((conflict) => conflict.worldId === worldId); },
     async createConflict(input) { const conflict = { id: `conflict_${conflicts.size + 1}`, ...input, related: input.related ?? [], derivedSeeds: input.derivedSeeds ?? [], createdAt: new Date(), updatedAt: new Date() }; conflicts.set(conflict.id, conflict); return conflict; },
+    async listAssetRelations() { return []; },
     async countAssets(worldId) { return { archive: [...archiveEntries.values()].filter((entry) => entry.worldId === worldId).length, seeds: [...storySeeds.values()].filter((seed) => seed.worldId === worldId).length, conflicts: [...conflicts.values()].filter((conflict) => conflict.worldId === worldId).length }; },
+    async replaceWorldFromSnapshot() { return null; },
+    async createAssetFromSnapshot() { return null; },
+    async remapForkAssetReferences() { return; },
+    async replaceForkAssetRelationsFromSnapshot() { return true; },
+    async forkAssetRelationsMatchSnapshot() { return true; },
+    async applyForkSnapshotChange(input) { return { status: "skipped", change: input.change, reason: "missing_source" }; },
   };
   return repository;
 }
@@ -180,6 +187,7 @@ function createInMemoryRepositoryRepository() {
   const releases = new Map<string, ReleaseRecord>();
   const snapshots = new Map<string, ReleaseSnapshotRecord>();
   const forks: ForkRecord[] = [];
+  const assetMaps = new Map<string, any>();
   const collections = new Map<string, any>();
   const repository: RepositoryRepository = {
     async findById(id) { return repositories.get(id) ?? null; },
@@ -202,6 +210,10 @@ function createInMemoryRepositoryRepository() {
     async updateForkSourceRelease(id, sourceReleaseId) { const fork = forks.find((item) => item.id === id); if (!fork) return null; fork.sourceReleaseId = sourceReleaseId; return fork; },
     async deleteFork(id) { const index = forks.findIndex((fork) => fork.id === id); if (index === -1) return null; const [fork] = forks.splice(index, 1); return fork; },
     async listForksForRepository(repositoryId) { return forks.filter((fork) => fork.repositoryId === repositoryId); },
+    async createForkAssetMaps(input) { return Promise.all(input.map((map) => repository.upsertForkAssetMap(map))); },
+    async listForkAssetMaps(forkId) { return [...assetMaps.values()].filter((map) => map.forkId === forkId); },
+    async upsertForkAssetMap(input) { const now = new Date(); const key = `${input.forkId}:${input.upstreamAssetId}`; const next = { ...(assetMaps.get(key) ?? { id: `fork_asset_map_${assetMaps.size + 1}`, createdAt: now }), ...input, updatedAt: now }; assetMaps.set(key, next); return next; },
+    async deleteForkAssetMap(forkId, upstreamAssetId) { const key = `${forkId}:${upstreamAssetId}`; const existing = assetMaps.get(key) ?? null; assetMaps.delete(key); return existing; },
     async saveToCollection(input) { const collection = { id: `collection_${collections.size + 1}`, createdAt: new Date(), name: input.name ?? "saved", ...input }; collections.set(collection.id, collection); return collection; },
     async removeFromCollection(input) { const collection = collections.get(input.collectionId); if (!collection) return null; collections.delete(collection.id); return collection; },
     async listCollectionsForUser(userId) { return [...collections.values()].filter((collection) => collection.userId === userId); },

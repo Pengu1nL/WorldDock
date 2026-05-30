@@ -93,6 +93,11 @@ const snapshotConflictSchema = z.object({
   derivedSeeds: z.array(z.string().min(1)).optional(),
 });
 
+const snapshotAssetRelationSchema = z.object({
+  sourceAssetId: z.string().min(1),
+  targetAssetId: z.string().min(1),
+});
+
 export const releaseSnapshotSchema = z.object({
   repositoryId: z.string().min(1),
   releaseId: z.string().min(1),
@@ -106,6 +111,7 @@ export const releaseSnapshotSchema = z.object({
   archiveEntries: z.array(snapshotArchiveEntrySchema),
   storySeeds: z.array(snapshotStorySeedSchema),
   conflicts: z.array(snapshotConflictSchema),
+  assetRelations: z.array(snapshotAssetRelationSchema).default([]),
   createdAt: z.string().datetime(),
 });
 

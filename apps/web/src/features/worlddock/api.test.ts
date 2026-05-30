@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  forkSyncPreviewSchema,
+  forkSyncResultSchema,
+  rollbackReleaseResponseSchema,
+} from "@worlddock/domain";
+import {
   canUseFixtures,
   clearStoredSessionToken,
   createAccessToken,
@@ -28,6 +33,11 @@ import {
   streamAgentEvents,
   unstarRepository,
   forkRepository,
+  detachFork,
+  getForkUpstreamDiff,
+  previewWorldRelease,
+  rollbackRelease,
+  syncFork,
   writeStoredSessionToken,
 } from "./api";
 
@@ -232,6 +242,99 @@ describe("worlddock API client", () => {
       body: JSON.stringify({ reason: "other", detail: "复核这个世界。" }),
     }));
     expect(fetcher).toHaveBeenNthCalledWith(5, "http://localhost:4000/v1/repositories/local-push", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("previews releases, rolls back releases, and manages fork upstream sync", async () => {
+    const releaseDetail = {
+      id: "rel_2",
+      repositoryId: "repo_1",
+      version: "v1.0.1",
+      note: "回滚前版本",
+      status: "rolled_back",
+      license: "free-fork-attribution",
+      diff: { addedSettings: 0, changedSettings: 1, removedSettings: 0, addedSeeds: 0 },
+      changes: [],
+      createdAt: "2026-05-30T10:00:00.000Z",
+    };
+    const activeRelease = {
+      ...releaseDetail,
+      id: "rel_1",
+      version: "v1.0.0",
+      note: "稳定版本",
+      status: "published",
+      createdAt: "2026-05-29T10:00:00.000Z",
+    };
+    const upstreamDiff = {
+      forkId: "fork_1",
+      repositoryId: "repo_1",
+      sourceReleaseId: "rel_1",
+      upstreamReleaseId: "rel_2",
+      hasUpstreamChanges: true,
+      changes: [
+        { assetId: "archive:upstream_1", kind: "changed", title: "档案", beforeHash: "old", afterHash: "new" },
+      ],
+    };
+    const syncResult = {
+      ...upstreamDiff,
+      sourceReleaseId: "rel_2",
+      hasUpstreamChanges: false,
+      applied: upstreamDiff.changes,
+      skipped: [
+        { assetId: "archive:local_1", kind: "changed", title: "本地档案", beforeHash: "old", afterHash: "new" },
+      ],
+    };
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ preflight: { ok: true, checks: [], changes: upstreamDiff.changes } }))
+      .mockResolvedValueOnce(jsonResponse({ release: releaseDetail, activeRelease }))
+      .mockResolvedValueOnce(jsonResponse({ diff: upstreamDiff }))
+      .mockResolvedValueOnce(jsonResponse({ sync: syncResult }))
+      .mockResolvedValueOnce(jsonResponse({ fork: { forkId: "fork_1", detached: true } }));
+
+    const preview = await previewWorldRelease(
+      "world_1",
+      { releaseNote: "发布说明", license: "free-fork-attribution" },
+      { sessionToken: "session_valid", fetcher },
+    );
+    const rollback = await rollbackRelease("rel_2", { sessionToken: "session_valid", fetcher });
+    const diff = await getForkUpstreamDiff("fork_1", { sessionToken: "session_valid", fetcher });
+    const sync = await syncFork("fork_1", { sessionToken: "session_valid", fetcher });
+    const detach = await detachFork("fork_1", { sessionToken: "session_valid", fetcher });
+
+    expect(preview.preflight.changes).toEqual(upstreamDiff.changes);
+    expect(rollbackReleaseResponseSchema.parse(rollback).activeRelease.id).toBe("rel_1");
+    expect(forkSyncPreviewSchema.parse(diff.diff).changes).toHaveLength(1);
+    expect(forkSyncResultSchema.parse(sync.sync).skipped[0]?.reason).toBeUndefined();
+    expect(detach.fork).toEqual({ forkId: "fork_1", detached: true });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/releases/preview", expect.objectContaining({
+      method: "POST",
+      headers: {
+        authorization: "Bearer session_valid",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ releaseNote: "发布说明", license: "free-fork-attribution" }),
+    }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/releases/rel_2/rollback", expect.objectContaining({
+      method: "POST",
+      headers: { authorization: "Bearer session_valid" },
+    }));
+    expect(fetcher.mock.calls[1]?.[1]).not.toHaveProperty("body");
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/forks/fork_1/upstream-diff", expect.objectContaining({
+      method: "GET",
+      headers: { authorization: "Bearer session_valid" },
+    }));
+    expect(fetcher.mock.calls[2]?.[1]).not.toHaveProperty("body");
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/forks/fork_1/sync", expect.objectContaining({
+      method: "POST",
+      headers: { authorization: "Bearer session_valid" },
+    }));
+    expect(fetcher.mock.calls[3]?.[1]).not.toHaveProperty("body");
+    expect(fetcher).toHaveBeenNthCalledWith(5, "http://localhost:4000/v1/forks/fork_1/detach", expect.objectContaining({
+      method: "POST",
+      headers: { authorization: "Bearer session_valid" },
+    }));
+    expect(fetcher.mock.calls[4]?.[1]).not.toHaveProperty("body");
   });
 
   it("streams agent SSE events as chunks arrive", async () => {

@@ -223,6 +223,10 @@ function createInMemoryRepositoryRepository() {
     async updateForkSourceRelease(): Promise<ForkRecord | null> { return null; },
     async deleteFork(): Promise<ForkRecord | null> { return null; },
     async listForksForRepository() { return []; },
+    async createForkAssetMaps() { return []; },
+    async listForkAssetMaps() { return []; },
+    async upsertForkAssetMap(input) { return { id: "fork_asset_map_1", createdAt: now, updatedAt: now, ...input }; },
+    async deleteForkAssetMap() { return null; },
     async saveToCollection(): Promise<RepositoryCollectionRecord> { return { id: "collection_1", repositoryId: repository.id, userId: "user_1", name: "saved", createdAt: now }; },
     async removeFromCollection(): Promise<RepositoryCollectionRecord | null> { return null; },
     async listCollectionsForUser() { return []; },
@@ -243,7 +247,14 @@ function createInMemoryWorldRepository() {
     async createStorySeed(): Promise<StorySeedRecord> { throw new Error("Not used."); },
     async listConflicts(): Promise<ConflictRecord[]> { return []; },
     async createConflict(): Promise<ConflictRecord> { throw new Error("Not used."); },
+    async listAssetRelations() { return []; },
     async countAssets() { return { archive: 0, seeds: 0, conflicts: 0 }; },
+    async replaceWorldFromSnapshot(): Promise<WorldRecord | null> { return null; },
+    async createAssetFromSnapshot() { return null; },
+    async remapForkAssetReferences() { return; },
+    async replaceForkAssetRelationsFromSnapshot() { return true; },
+    async forkAssetRelationsMatchSnapshot() { return true; },
+    async applyForkSnapshotChange(input) { return { status: "skipped" as const, change: input.change, reason: "missing_source" as const }; },
   } satisfies WorldRepository;
 }
 

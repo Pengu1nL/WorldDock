@@ -1,7 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
 import { moderationStatusSchema, releaseChangeSchema, releaseDiffSchema, releaseSnapshotSchema, releaseStatusSchema } from "@worlddock/domain";
-import type { ForkRecord, PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryCollectionRecord, RepositoryRepository } from "./repository.repository";
+import type { ForkAssetMapRecord, ForkRecord, PublicRepositoryRecord, ReleaseRecord, ReleaseSnapshotRecord, RepositoryCollectionRecord, RepositoryRepository } from "./repository.repository";
 
 @Injectable()
 export class PrismaRepositoryRepository implements RepositoryRepository, OnModuleDestroy {
@@ -80,6 +80,20 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
     return this.findReleaseById(id);
   }
 
+  async rollbackReleaseWithSnapshot(input: NonNullable<RepositoryRepository["rollbackReleaseWithSnapshot"]> extends (input: infer Input) => unknown ? Input : never) {
+    const release = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.repositoryRelease.updateMany({
+        where: { id: input.releaseId, repositoryId: input.repositoryId, status: "published" },
+        data: { status: "rolled_back" },
+      });
+      if (updated.count === 0) return null;
+      await restoreWorldFromSnapshot(tx, input.worldId, input.snapshot);
+      await tx.outboxEvent.create({ data: input.event as never });
+      return tx.repositoryRelease.findUnique({ where: { id: input.releaseId } });
+    });
+    return release ? mapRelease(release) : null;
+  }
+
   async listReleases(repositoryId: string) {
     const releases = await this.prisma.repositoryRelease.findMany({
       where: { repositoryId },
@@ -152,6 +166,47 @@ export class PrismaRepositoryRepository implements RepositoryRepository, OnModul
   async listForksForRepository(repositoryId: string) {
     const forks = await this.prisma.repositoryFork.findMany({ where: { repositoryId }, orderBy: { createdAt: "desc" } });
     return forks.map(mapFork);
+  }
+
+  async createForkAssetMaps(input: Parameters<RepositoryRepository["createForkAssetMaps"]>[0]) {
+    if (input.length === 0) return [];
+    await this.prisma.repositoryForkAssetMap.createMany({ data: input });
+    const forkIds = [...new Set(input.map((item) => item.forkId))];
+    const upstreamAssetIds = input.map((item) => item.upstreamAssetId);
+    const maps = await this.prisma.repositoryForkAssetMap.findMany({
+      where: { forkId: { in: forkIds }, upstreamAssetId: { in: upstreamAssetIds } },
+      orderBy: { createdAt: "asc" },
+    });
+    return maps.map(mapForkAssetMap);
+  }
+
+  async listForkAssetMaps(forkId: string) {
+    const maps = await this.prisma.repositoryForkAssetMap.findMany({
+      where: { forkId },
+      orderBy: { createdAt: "asc" },
+    });
+    return maps.map(mapForkAssetMap);
+  }
+
+  async upsertForkAssetMap(input: Parameters<RepositoryRepository["upsertForkAssetMap"]>[0]) {
+    const map = await this.prisma.repositoryForkAssetMap.upsert({
+      where: { forkId_upstreamAssetId: { forkId: input.forkId, upstreamAssetId: input.upstreamAssetId } },
+      create: input,
+      update: {
+        targetAssetId: input.targetAssetId,
+        kind: input.kind,
+      },
+    });
+    return mapForkAssetMap(map);
+  }
+
+  async deleteForkAssetMap(forkId: string, upstreamAssetId: string) {
+    const map = await this.prisma.repositoryForkAssetMap.findUnique({
+      where: { forkId_upstreamAssetId: { forkId, upstreamAssetId } },
+    });
+    if (!map) return null;
+    await this.prisma.repositoryForkAssetMap.delete({ where: { id: map.id } });
+    return mapForkAssetMap(map);
   }
 
   async saveToCollection(input: Parameters<RepositoryRepository["saveToCollection"]>[0]) {
@@ -261,6 +316,88 @@ function mapFork(record: ForkRecord): ForkRecord {
   return record;
 }
 
+function mapForkAssetMap(record: Omit<ForkAssetMapRecord, "kind"> & { kind: string }): ForkAssetMapRecord {
+  return {
+    ...record,
+    kind: parseForkAssetKind(record.kind),
+  };
+}
+
+function parseForkAssetKind(value: string): ForkAssetMapRecord["kind"] {
+  if (value === "archive" || value === "seed" || value === "conflict") return value;
+  throw new Error(`Unknown fork asset map kind: ${value}`);
+}
+
 function mapCollection(record: RepositoryCollectionRecord): RepositoryCollectionRecord {
   return record;
+}
+
+async function restoreWorldFromSnapshot(tx: any, worldId: string, snapshot: ReleaseSnapshotRecord["snapshot"]) {
+  await tx.archiveEntry.deleteMany({ where: { worldId } });
+  await tx.storySeed.deleteMany({ where: { worldId } });
+  await tx.conflict.deleteMany({ where: { worldId } });
+  await tx.world.update({
+    where: { id: worldId },
+    data: {
+      name: snapshot.world.name,
+      type: snapshot.world.type,
+      summary: snapshot.world.summary,
+      tags: snapshot.world.tags,
+      maturity: snapshot.world.maturity,
+      status: "published",
+      visibility: "public",
+    },
+  });
+  for (const entry of snapshot.archiveEntries) {
+    await tx.archiveEntry.create({
+      data: {
+        id: entry.id,
+        worldId,
+        title: entry.title,
+        category: entry.category,
+        summary: entry.summary,
+        body: entry.body,
+        relations: entry.relations ?? [],
+      },
+    });
+  }
+  for (const seed of snapshot.storySeeds) {
+    await tx.storySeed.create({
+      data: {
+        id: seed.id,
+        worldId,
+        title: seed.title,
+        hook: seed.hook,
+        trigger: seed.trigger,
+        conflict: seed.conflict,
+        protagonists: seed.protagonists,
+        questions: seed.questions ?? [],
+      },
+    });
+  }
+  for (const conflict of snapshot.conflicts) {
+    await tx.conflict.create({
+      data: {
+        id: conflict.id,
+        worldId,
+        title: conflict.title,
+        summary: conflict.summary,
+        body: conflict.body,
+        related: conflict.related ?? [],
+        derivedSeeds: conflict.derivedSeeds ?? [],
+      },
+    });
+  }
+  await tx.worldAssetRelation.deleteMany({ where: { worldId } });
+  const snapshotAssetIds = new Set([
+    ...snapshot.archiveEntries.map((entry) => entry.id),
+    ...snapshot.storySeeds.map((seed) => seed.id),
+    ...snapshot.conflicts.map((conflict) => conflict.id),
+  ]);
+  for (const relation of snapshot.assetRelations) {
+    if (!snapshotAssetIds.has(relation.sourceAssetId) || !snapshotAssetIds.has(relation.targetAssetId)) continue;
+    await tx.worldAssetRelation.create({
+      data: { worldId, sourceAssetId: relation.sourceAssetId, targetAssetId: relation.targetAssetId },
+    });
+  }
 }
