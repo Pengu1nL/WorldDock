@@ -276,7 +276,7 @@ Expected: commit succeeds and `git log -1 --format=fuller` does not expose perso
 - Modify: `apps/api/src/modules/agent/pi/pi-session-runner.ts`
 - Modify: `apps/api/test/pi-agent.integration-spec.ts`
 
-- [ ] **Step 1: Update runtime types**
+- [x] **Step 1: Update runtime types**
 
 In `apps/api/src/modules/agent/pi/pi-runtime.client.ts`, extend the types near the existing `PiRuntimeClient` definitions:
 
@@ -349,7 +349,7 @@ export class PiAgentCoreRuntimeClient implements PiRuntimeClient {
 }
 ```
 
-- [ ] **Step 2: Move safety-gated tool execution into `PiSessionRunner` executor**
+- [x] **Step 2: Move safety-gated tool execution into `PiSessionRunner` executor**
 
 In `apps/api/src/modules/agent/pi/pi-session-runner.ts`, keep `contextEventsFromToolResult` and replace `run` with:
 
@@ -373,7 +373,7 @@ async *run(input: PiSessionInput): AsyncIterable<PiRuntimeEvent> {
 }
 ```
 
-- [ ] **Step 3: Update existing runner test expectations**
+- [x] **Step 3: Update existing runner test expectations**
 
 In `apps/api/test/pi-agent.integration-spec.ts`, replace the first fake runtime with one that calls the provided executor:
 
@@ -400,7 +400,7 @@ Expected event order remains:
 expect(events.map((event) => event.type)).toEqual(["tool.requested", "tool.completed", "context.used", "session.completed"]);
 ```
 
-- [ ] **Step 4: Run bridge tests**
+- [x] **Step 4: Run bridge tests**
 
 Run:
 
@@ -410,7 +410,7 @@ pnpm --filter @worlddock/api test:integration -- pi-agent.integration-spec.ts ag
 
 Expected: PASS, with no duplicate tool execution and no missing `context.used` events.
 
-- [ ] **Step 5: Commit runtime bridge**
+- [x] **Step 5: Commit runtime bridge**
 
 ```bash
 git add apps/api/src/modules/agent/pi/pi-runtime.client.ts apps/api/src/modules/agent/pi/pi-session-runner.ts apps/api/test/pi-agent.integration-spec.ts

@@ -41,19 +41,17 @@ export class PiSessionRunner {
   async *run(input: PiSessionInput): AsyncIterable<PiRuntimeEvent> {
     const disclosedAssetIds = new Set(input.context.map((ref) => ref.targetId).filter((id): id is string => Boolean(id)));
 
-    for await (const event of this.runtime.runSession(input)) {
-      if (event.type === "tool.requested") {
-        this.safetyGate.assertToolAllowed(event.toolCall, disclosedAssetIds);
-        const result = await this.tools.execute(event.toolCall.name, event.toolCall.arguments);
-        yield event;
-        yield { type: "tool.completed", toolCallId: event.toolCall.id, result };
-        for (const contextEvent of contextEventsFromToolResult(event.toolCall.name, result)) {
-          if (contextEvent.type === "context.used" && contextEvent.targetId) disclosedAssetIds.add(contextEvent.targetId);
-          yield contextEvent;
-        }
-        continue;
+    const executeTool = async (toolCall: { id: string; name: PiToolName; arguments: Record<string, unknown> }) => {
+      this.safetyGate.assertToolAllowed(toolCall, disclosedAssetIds);
+      const result = await this.tools.execute(toolCall.name, toolCall.arguments);
+      const contextEvents = contextEventsFromToolResult(toolCall.name, result);
+      for (const contextEvent of contextEvents) {
+        if (contextEvent.type === "context.used" && contextEvent.targetId) disclosedAssetIds.add(contextEvent.targetId);
       }
+      return { result, contextEvents };
+    };
 
+    for await (const event of this.runtime.runSession(input, executeTool)) {
       yield event;
     }
   }

@@ -1,4 +1,4 @@
-import { piRuntimeEventSchema, type PiRuntimeEvent, type PiToolName } from "@worlddock/domain/agent/pi";
+import { piRuntimeEventSchema, type PiRuntimeEvent, type PiToolCall, type PiToolName } from "@worlddock/domain/agent/pi";
 import type { WorldContextRef } from "@worlddock/domain/agent/context";
 
 export type PiSessionInput = {
@@ -13,14 +13,30 @@ export type PiSessionInput = {
   skills: Array<{ name: string; path: string; description: string }>;
 };
 
+export type PiToolExecutionResult = {
+  result: Record<string, unknown>;
+  contextEvents: PiRuntimeEvent[];
+};
+
+export type PiRuntimeToolExecutor = (toolCall: PiToolCall) => Promise<PiToolExecutionResult>;
+
 export type PiRuntimeClient = {
-  runSession(input: PiSessionInput): AsyncIterable<PiRuntimeEvent>;
+  runSession(input: PiSessionInput, executeTool?: PiRuntimeToolExecutor): AsyncIterable<PiRuntimeEvent>;
 };
 
 export type PiAgentCoreAdapter = (
   input: PiSessionInput,
   emit: (event: PiRuntimeEvent) => void,
+  executeTool: PiRuntimeToolExecutor,
 ) => Promise<void>;
+
+const defaultToolExecutor: PiRuntimeToolExecutor = async (toolCall) => ({
+  result: {
+    error: "WorldDock tool executor is not configured.",
+    toolCallId: toolCall.id,
+  },
+  contextEvents: [],
+});
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {
   private readonly values: T[] = [];
@@ -53,7 +69,7 @@ class AsyncEventQueue<T> implements AsyncIterable<T> {
 export class PiAgentCoreRuntimeClient implements PiRuntimeClient {
   constructor(private readonly adapter: PiAgentCoreAdapter) {}
 
-  async *runSession(input: PiSessionInput): AsyncIterable<PiRuntimeEvent> {
+  async *runSession(input: PiSessionInput, executeTool: PiRuntimeToolExecutor = defaultToolExecutor): AsyncIterable<PiRuntimeEvent> {
     const queue = new AsyncEventQueue<PiRuntimeEvent>();
 
     for (const contextRef of input.context) {
@@ -70,7 +86,7 @@ export class PiAgentCoreRuntimeClient implements PiRuntimeClient {
 
     const run = this.adapter(input, (event) => {
       queue.push(piRuntimeEventSchema.parse(event));
-    })
+    }, executeTool)
       .catch((error) => {
         queue.push(piRuntimeEventSchema.parse({
           type: "session.failed",

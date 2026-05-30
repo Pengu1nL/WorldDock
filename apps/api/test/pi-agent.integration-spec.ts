@@ -8,15 +8,16 @@ import { WorldToolRegistry, describeWorldTools } from "../src/modules/agent/pi/w
 describe("pi agent runtime boundary", () => {
   it("turns pi tool requests into completed tool events and context disclosure", async () => {
     const runtime: PiRuntimeClient = {
-      async *runSession() {
-        yield {
-          type: "tool.requested",
-          toolCall: {
-            id: "call_1",
-            name: "search_world_assets",
-            arguments: { query: "记忆" },
-          },
+      async *runSession(_input, executeTool) {
+        const toolCall = {
+          id: "call_1",
+          name: "search_world_assets" as const,
+          arguments: { worldId: "world_1", query: "记忆" },
         };
+        yield { type: "tool.requested", toolCall };
+        const executed = await executeTool?.(toolCall);
+        yield { type: "tool.completed", toolCallId: toolCall.id, result: executed?.result ?? {} };
+        for (const contextEvent of executed?.contextEvents ?? []) yield contextEvent;
         yield { type: "session.completed" };
       },
     };
