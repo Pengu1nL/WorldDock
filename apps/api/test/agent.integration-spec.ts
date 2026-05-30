@@ -63,7 +63,18 @@ describe("agent run endpoints", () => {
     expect(sse.text).toContain("event: message.delta");
     expect(sse.text).toContain("event: suggestion.created");
     expect(sse.text).toContain("event: run.completed");
-    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_settled"]);
+    const ledgerEntries = await billing.listLedgerEntriesForRun(createRun.body.run.id);
+    expect(ledgerEntries).toEqual([
+      expect.objectContaining({
+        type: "model_run_reserved",
+        amountCents: -100,
+      }),
+      expect.objectContaining({
+        type: "model_run_settled",
+        amountCents: 99,
+        tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
+      }),
+    ]);
 
     const suggestionId = (await agent.listSuggestions(createRun.body.run.id))[0].id;
     await request(app.getHttpServer())
