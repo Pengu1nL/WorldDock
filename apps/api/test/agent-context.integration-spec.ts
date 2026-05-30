@@ -1,3 +1,4 @@
+import type { PiToolCall } from "@worlddock/domain/agent/pi";
 import { describe, expect, it } from "vitest";
 import { selectInitialWorldContext } from "../src/modules/agent/context-builder";
 import { SafetyGate } from "../src/modules/agent/pi/safety-gate";
@@ -65,9 +66,9 @@ describe("agent context progressive disclosure", () => {
     expect(() =>
       gate.assertToolAllowed({
         id: "tool_4",
-        name: "delete_world" as never,
+        name: "delete_world",
         arguments: { worldId: "world_1" },
-      }),
+      } as unknown as PiToolCall),
     ).toThrow("Blocked unsafe pi tool");
   });
 });
