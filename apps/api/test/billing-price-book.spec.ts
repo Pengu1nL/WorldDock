@@ -3,7 +3,11 @@ import { calculateModelRunCostCents, MODEL_PRICE_BOOK } from "@worlddock/domain"
 
 describe("billing price book", () => {
   it("prices model runs from provider/model/token usage", () => {
-    expect(MODEL_PRICE_BOOK).toContainEqual(expect.objectContaining({ provider: "openai", model: "gpt-5.4" }));
+    expect(MODEL_PRICE_BOOK).toContainEqual(expect.objectContaining({
+      provider: "openai",
+      model: "gpt-5.4",
+    }));
+
     expect(calculateModelRunCostCents({
       provider: "openai",
       model: "gpt-5.4",
@@ -19,5 +23,14 @@ describe("billing price book", () => {
       inputTokens: 12,
       outputTokens: 30,
     })).toBe(1);
+  });
+
+  it("rejects model runs without an explicit price", () => {
+    expect(() => calculateModelRunCostCents({
+      provider: "openai",
+      model: "missing-model",
+      inputTokens: 1,
+      outputTokens: 1,
+    })).toThrow("Missing model price: openai/missing-model");
   });
 });
