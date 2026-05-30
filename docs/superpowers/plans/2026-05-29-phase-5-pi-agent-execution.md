@@ -105,7 +105,7 @@ Author 和 Committer 都不得包含真实姓名或个人邮箱。
 - Create: `apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts`
 - Modify: `apps/api/src/modules/agent/pi/pi-agent-core.adapter.ts`
 
-- [ ] **Step 1: Write the failing adapter contract test**
+- [x] **Step 1: Write the failing adapter contract test**
 
 Create `apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts`:
 
@@ -247,7 +247,7 @@ describe("createPiAgentCoreAdapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and confirm it fails on the current stub**
+- [x] **Step 2: Run the test and confirm it fails on the current stub**
 
 Run:
 
@@ -257,7 +257,7 @@ pnpm --filter @worlddock/api test -- pi-agent-core.adapter.spec.ts
 
 Expected: FAIL because `PiAgentCoreAdapterOptions` has no `modelOverride`, `PiAgentCoreAdapter` accepts only two arguments, and the current adapter never emits `tool.requested` or real model text.
 
-- [ ] **Step 3: Commit the failing test**
+- [x] **Step 3: Commit the failing test**
 
 ```bash
 git add apps/api/src/modules/agent/pi/pi-agent-core.adapter.spec.ts docs/superpowers/plans/2026-05-29-phase-5-pi-agent-execution.md
