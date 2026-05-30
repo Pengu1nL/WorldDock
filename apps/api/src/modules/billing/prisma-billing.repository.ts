@@ -37,6 +37,22 @@ export class PrismaBillingRepository implements BillingRepository, OnModuleDestr
     return mapLedgerEntry(entry);
   }
 
+  async createLedgerEntryOnceForRunType(input: Parameters<BillingRepository["createLedgerEntryOnceForRunType"]>[0]) {
+    if (!input.agentRunId) return this.createLedgerEntry(input);
+
+    try {
+      return await this.createLedgerEntry(input);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+      const existing = await this.prisma.usageLedgerEntry.findFirst({
+        where: { agentRunId: input.agentRunId, type: input.type },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!existing) throw error;
+      return mapLedgerEntry(existing);
+    }
+  }
+
   async listLedgerEntries(userId: string) {
     const entries = await this.prisma.usageLedgerEntry.findMany({
       where: { userId },
@@ -130,6 +146,10 @@ function parseEntryType(value: string): UsageLedgerEntryRecord["type"] {
     return value;
   }
   throw new Error(`Unknown usage ledger entry type: ${value}`);
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 }
 
 function mapPlaceholderIntent(record: {

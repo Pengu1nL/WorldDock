@@ -137,6 +137,19 @@ function createInMemoryBillingRepository() {
       entries.set(entry.id, entry);
       return entry;
     },
+    async createLedgerEntryOnceForRunType(input) {
+      const existing = input.agentRunId
+        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && entry.type === input.type)
+        : null;
+      if (existing) return existing;
+      const entry: UsageLedgerEntryRecord = {
+        id: `ule_${entries.size + 1}`,
+        createdAt: new Date(),
+        ...input,
+      };
+      entries.set(entry.id, entry);
+      return entry;
+    },
     async listLedgerEntries(userId) {
       return [...entries.values()].filter((entry) => entry.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     },

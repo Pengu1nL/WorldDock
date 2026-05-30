@@ -64,17 +64,14 @@ describe("agent run endpoints", () => {
     expect(sse.text).toContain("event: suggestion.created");
     expect(sse.text).toContain("event: run.completed");
     const ledgerEntries = await billing.listLedgerEntriesForRun(createRun.body.run.id);
-    expect(ledgerEntries).toEqual([
-      expect.objectContaining({
-        type: "model_run_reserved",
-        amountCents: -100,
-      }),
-      expect.objectContaining({
-        type: "model_run_settled",
-        amountCents: 99,
-        tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
-      }),
-    ]);
+    expect(ledgerEntries).toHaveLength(2);
+    expect(ledgerEntries.find((entry) => entry.type === "model_run_reserved")).toEqual(expect.objectContaining({
+      amountCents: -100,
+    }));
+    expect(ledgerEntries.find((entry) => entry.type === "model_run_settled")).toEqual(expect.objectContaining({
+      amountCents: 99,
+      tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
+    }));
 
     const suggestionId = (await agent.listSuggestions(createRun.body.run.id))[0].id;
     await request(app.getHttpServer())
@@ -435,6 +432,19 @@ function createInMemoryBillingRepository() {
       return next;
     },
     async createLedgerEntry(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
+      const entry: UsageLedgerEntryRecord = {
+        id: `ule_${entries.size + 1}`,
+        createdAt: new Date(),
+        ...input,
+      };
+      entries.set(entry.id, entry);
+      return entry;
+    },
+    async createLedgerEntryOnceForRunType(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
+      const existing = input.agentRunId
+        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && entry.type === input.type)
+        : null;
+      if (existing) return existing;
       const entry: UsageLedgerEntryRecord = {
         id: `ule_${entries.size + 1}`,
         createdAt: new Date(),
