@@ -1,3 +1,4 @@
+import { suggestionSchema, type WorldSuggestion } from "@worlddock/domain";
 import type { PiRuntimeEvent } from "@worlddock/domain/agent/pi";
 import { describe, expect, it, vi } from "vitest";
 import { PiAgentProvider } from "../src/modules/agent/agent.provider";
@@ -78,7 +79,7 @@ describe("pi agent runtime boundary", () => {
       }),
       countAssets: vi.fn(async () => ({ archive: 0, seeds: 0, conflicts: 0 })),
     };
-    const expectedSuggestion = {
+    const expectedSuggestion: WorldSuggestion = {
       id: "setting_license",
       kind: "setting",
       category: "制度",
@@ -102,8 +103,8 @@ describe("pi agent runtime boundary", () => {
         yield { type: "tool.requested", toolCall };
         const executed = await executeTool?.(toolCall);
         yield { type: "tool.completed", toolCallId: toolCall.id, result: executed?.result ?? {} };
-        const suggestion = executed?.result.suggestion;
-        if (suggestion) yield { type: "suggestion.created", suggestion };
+        const suggestion = suggestionSchema.safeParse(executed?.result.suggestion);
+        if (suggestion.success) yield { type: "suggestion.created", suggestion: suggestion.data };
         yield { type: "session.completed" };
       },
     };
