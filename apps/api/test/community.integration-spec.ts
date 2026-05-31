@@ -74,6 +74,23 @@ describe("community endpoints", () => {
     });
     expect(detail.body.repository.releaseHistory[0]).toMatchObject({ id: "rel_1", version: "v1.0.0" });
     expect(detail.body.repository.forkGraph.forks).toHaveLength(1);
+    expect(detail.body.repository.forkGraph.forks[0].ownedByCurrentUser).not.toBe(true);
+
+    const ownerDetail = await request(app.getHttpServer())
+      .get("/v1/community/repositories/ren/memory-market")
+      .set("authorization", "Bearer session_user_2")
+      .expect(200);
+    expect(ownerDetail.body.repository.forkGraph.forks[0]).toMatchObject({
+      id: "fork_1",
+      userId: "user_2",
+      ownedByCurrentUser: true,
+    });
+
+    const invalidBearerDetail = await request(app.getHttpServer())
+      .get("/v1/community/repositories/ren/memory-market")
+      .set("authorization", "Bearer invalid-session")
+      .expect(200);
+    expect(invalidBearerDetail.body.repository.forkGraph.forks[0].ownedByCurrentUser).not.toBe(true);
 
     const assets = await request(app.getHttpServer())
       .get(`/v1/community/repositories/${visible.id}/assets`)
@@ -175,6 +192,28 @@ describe("community endpoints", () => {
       assets: [],
       nextCursor: null,
     });
+  });
+
+  it("does not hide optional auth infrastructure failures as anonymous community detail", async () => {
+    const auth = createInMemoryAuthRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    await seedRepository(repositories, {
+      ownerId: "user_1",
+      ownerName: "ren",
+      name: "Memory Market",
+      slug: "memory-market",
+      tags: ["记忆"],
+    });
+    auth.findSessionByToken = async () => {
+      throw new Error("auth store unavailable");
+    };
+    app = await createTestApp(auth, repositories);
+
+    const response = await request(app.getHttpServer())
+      .get("/v1/community/repositories/ren/memory-market")
+      .set("authorization", "Bearer session_user_2")
+      .expect(500);
+    expect(response.body).toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
   });
 });
 

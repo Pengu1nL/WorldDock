@@ -14,12 +14,18 @@ import {
   fetchAgentEvents,
   getBillingBalance,
   getBillingUsage,
+  getCommunityCreator,
+  getCommunityRepository,
   getPublicRepository,
+  listCommunityCreatorRepositories,
+  listCommunityRepositories,
+  listCommunityRepositoryAssets,
   listArchiveEntries,
   listAccessTokens,
   listConflicts,
   listPublicRepositories,
   searchPublicRepositories,
+  addRepositoryToCollection,
   listRepositoryReleases,
   listStorySeeds,
   listWorlds,
@@ -27,6 +33,7 @@ import {
   publishWorld,
   reportRepository,
   revokeAccessToken,
+  removeRepositoryFromCollection,
   readStoredSessionToken,
   saveAgentSuggestion,
   starRepository,
@@ -210,6 +217,41 @@ describe("worlddock API client", () => {
     await searchPublicRepositories("memory", { sessionToken: "session_valid", fetcher, tags: ["记忆"], sort: "stars" });
 
     expect(fetcher).toHaveBeenCalledWith("http://localhost:4000/v1/repositories/search?q=memory&tag=%E8%AE%B0%E5%BF%86&sort=stars", expect.objectContaining({ method: "GET" }));
+  });
+
+  it("uses the community client contract for repositories, assets, creators, and collections", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ repositories: [], nextCursor: "cursor_2" }))
+      .mockResolvedValueOnce(jsonResponse({ repository: { id: "repo_1", slug: "memory-market" } }))
+      .mockResolvedValueOnce(jsonResponse({ repositoryId: "repo_1", releaseId: "rel_1", assets: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ creator: { handle: "ren" } }))
+      .mockResolvedValueOnce(jsonResponse({ repositories: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ collection: { id: "collection_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ collection: { id: "collection_1" }, removed: true }));
+
+    await listCommunityRepositories({
+      sessionToken: "session_valid",
+      fetcher,
+      query: "memory",
+      cursor: "cursor_1",
+      tags: ["记忆", "交易"],
+      sort: "stars",
+    });
+    await getCommunityRepository("ren", "memory-market", { sessionToken: "session_valid", fetcher });
+    await listCommunityRepositoryAssets("repo_1", { sessionToken: "session_valid", fetcher, kind: "archive", cursor: "8" });
+    await getCommunityCreator("ren", { sessionToken: "session_valid", fetcher });
+    await listCommunityCreatorRepositories("ren", { sessionToken: "session_valid", fetcher, sort: "updated" });
+    await addRepositoryToCollection("repo_1", { sessionToken: "session_valid", fetcher });
+    await removeRepositoryFromCollection("repo_1", "collection_1", { sessionToken: "session_valid", fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/community/repositories?q=memory&cursor=cursor_1&tag=%E8%AE%B0%E5%BF%86&tag=%E4%BA%A4%E6%98%93&sort=stars", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/community/repositories/ren/memory-market", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/community/repositories/repo_1/assets?kind=archive&cursor=8", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/community/creators/ren", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(5, "http://localhost:4000/v1/community/creators/ren/repositories?sort=updated", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(6, "http://localhost:4000/v1/community/repositories/repo_1/collections", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(7, "http://localhost:4000/v1/community/repositories/repo_1/collections/collection_1", expect.objectContaining({ method: "DELETE" }));
   });
 
   it("stars, unstars, forks, reports, and local-pushes repositories", async () => {

@@ -27,7 +27,7 @@ export class CommunityService {
     return { repositories: items, nextCursor };
   }
 
-  async getRepository(owner: string, slug: string) {
+  async getRepository(owner: string, slug: string, subject?: AuthSubject | null) {
     const repository = await this.repositoryService.getPublicRepository(owner, slug);
     const [releaseHistory, forks, latestSnapshot] = await Promise.all([
       this.repositoryService.listReleases(repository.id),
@@ -47,6 +47,7 @@ export class CommunityService {
           sourceReleaseId: fork.sourceReleaseId,
           targetWorldId: fork.targetWorldId,
           userId: fork.userId,
+          ownedByCurrentUser: subject ? fork.userId === subject.user.id : false,
           createdAt: fork.createdAt.toISOString(),
         })),
       },

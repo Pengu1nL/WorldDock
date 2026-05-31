@@ -33,6 +33,9 @@ test("community product flow uses paginated APIs and real repository snapshot de
 
   await page.getByRole("button", { name: "Forks" }).click();
   await expect(page.getByText("fork_1")).toBeVisible();
+  await expect(page.getByRole("button", { name: "比较上游" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "同步非冲突变更" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Detach" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "创作者" }).click();
   await expect(page.getByRole("heading", { name: "ren" })).toBeVisible();

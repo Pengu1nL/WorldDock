@@ -257,10 +257,18 @@ function ForkGraph({
             <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{fork.createdAt}</span>
           </div>
           <p className="prose">源版本 {fork.sourceReleaseId} · 私有世界 {fork.targetWorldId}</p>
-          <ForkSyncPanel forkId={fork.id} sessionToken={sessionToken} onDetached={onDetached} />
+          {canManageFork(fork) ? (
+            <ForkSyncPanel forkId={fork.id} sessionToken={sessionToken} onDetached={onDetached} />
+          ) : null}
         </article>
       ))}
       {forks.length === 0 ? <p className="prose">还没有公开 fork 记录。</p> : null}
     </section>
   );
+}
+
+type ForkGraphFork = NonNullable<CommunityRepository["forkGraph"]>["forks"][number];
+
+function canManageFork(fork: ForkGraphFork) {
+  return fork.ownedByCurrentUser === true || fork.viewer?.isOwner === true;
 }

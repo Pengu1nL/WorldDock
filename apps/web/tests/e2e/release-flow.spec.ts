@@ -85,7 +85,7 @@ test("repository detail can compare, sync, and detach a fork", async ({ page }) 
           releaseHistory: [],
           forkGraph: {
             repositoryId: "repo_release",
-            forks: [{ id: "fork_1", sourceReleaseId: "rel_1", targetWorldId: "world_fork", userId: "user_2", createdAt: new Date().toISOString() }],
+            forks: [{ id: "fork_1", sourceReleaseId: "rel_1", targetWorldId: "world_fork", userId: "user_2", ownedByCurrentUser: true, createdAt: new Date().toISOString() }],
           },
           assetCounts: { archive: 1, seeds: 0, conflicts: 0 },
         },

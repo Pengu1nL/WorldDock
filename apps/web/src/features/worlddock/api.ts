@@ -263,6 +263,10 @@ export type CommunityRepository = PublicRepository & {
       targetWorldId: string;
       userId: string;
       createdAt: string;
+      ownedByCurrentUser?: boolean;
+      viewer?: {
+        isOwner?: boolean;
+      };
     }>;
   };
 };

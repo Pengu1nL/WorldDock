@@ -1,12 +1,15 @@
-import { Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Controller, Delete, Get, Headers, Param, Post, Query, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
-import type { AuthSubject } from "../auth/auth.service";
+import { AuthService, type AuthSubject } from "../auth/auth.service";
 import { CommunityService, normalizeCommunityAssetKind, normalizeCommunitySort } from "./community.service";
 
 @Controller("community")
 export class CommunityController {
-  constructor(private readonly communityService: CommunityService) {}
+  constructor(
+    private readonly communityService: CommunityService,
+    private readonly authService: AuthService,
+  ) {}
 
   @Get("repositories")
   async repositories(
@@ -36,8 +39,13 @@ export class CommunityController {
   }
 
   @Get("repositories/:owner/:slug")
-  async detail(@Param("owner") owner: string, @Param("slug") slug: string) {
-    return { repository: await this.communityService.getRepository(owner, slug) };
+  async detail(
+    @Param("owner") owner: string,
+    @Param("slug") slug: string,
+    @Headers("authorization") authorization?: string | string[],
+  ) {
+    const subject = await this.authenticateOptionalBearer(authorization);
+    return { repository: await this.communityService.getRepository(owner, slug, subject) };
   }
 
   @Get("creators/:handle")
@@ -73,6 +81,21 @@ export class CommunityController {
     @Param("collectionId") collectionId: string,
   ) {
     return { collection: await this.communityService.removeRepositoryFromCollection(subject, repositoryId, collectionId), removed: true };
+  }
+
+  private async authenticateOptionalBearer(authorization?: string | string[]) {
+    const value = Array.isArray(authorization) ? authorization[0] : authorization;
+    if (!value?.startsWith("Bearer ")) return null;
+
+    const token = value.slice("Bearer ".length).trim();
+    if (!token) return null;
+
+    try {
+      return await this.authService.authenticateBearer(token);
+    } catch (error) {
+      if (!(error instanceof UnauthorizedException)) throw error;
+      return null;
+    }
   }
 }
 
