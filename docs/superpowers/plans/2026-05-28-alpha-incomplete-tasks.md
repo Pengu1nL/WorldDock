@@ -241,23 +241,39 @@
 
 ## Phase 9: Alpha 举报、人工治理 Runbook 和反滥用
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `docs/operations/alpha_moderation_runbook.md`。
-- 缺少 `docs/product/beta-admin-dashboard.md`。
-- 缺少 `apps/web/src/features/community/report-dialog.tsx`。
-- 举报流程缺少 creator profile report。
-- 举报 detail 没有计划要求的最小长度校验和弹窗选择体验。
-- 缺少 reporter + target + day 的重复举报幂等。
-- 当前存在 `GET /v1/admin/reports` 和 `POST /v1/admin/reports/:reportId/actions`，与 Alpha 计划中的“no admin route / no admin dashboard / no moderation workbench”冲突。
-- `apps/api/src/common/security.ts` 仍是单进程内存 rate limit，没有 Redis-backed key，也没有 ip/user/access-token route family 组合键。
-- 缺少 `alpha-moderation.integration-spec.ts` 和 `report-flow.spec.ts`。
+完成依据：
 
-已有但不足：
+- `docs/operations/alpha_moderation_runbook.md` 已明确 Alpha 不提供管理后台、审核工作台或管理员 HTTP API，并给出人工处理举报的最小日常流程、可用动作、证据要求和升级规则。
+- `docs/product/beta-admin-dashboard.md` 已把管理员举报队列、仓库/用户管理、审核动作 UI、审计日志、管理员角色和申诉工作流推迟到 Beta。
+- `packages/domain/src/moderation/index.ts` 已定义举报原因、target type、状态、审核动作和 `detail` 最小长度。
+- `packages/db/prisma/schema.prisma` 已支持 `Report.targetType`、`targetId`、nullable `repositoryId`，并提供 reporter + target + createdAt 查询索引。
+- `apps/api/src/modules/moderation/*` 已提供仓库举报和创作者主页举报，按 reporter + target + UTC day 幂等去重，并在重复公开仓库举报达到阈值时写入 moderation scan outbox。
+- `apps/api/src/modules/moderation/moderation.controller.ts` 只暴露用户举报 endpoint，不暴露 `/v1/admin/reports` 或审核 action HTTP route。
+- `apps/api/src/common/security.ts` 已提供 Redis-backed rate limit store，并按 IP、user、access-token 与 route family 组合键限流；`WorldDockAuthGuard` 已在认证主路径执行 subject rate limit。
+- `apps/worker/src/moderation-scan.ts` 已把重复举报阈值纳入审核扫描，并处理 `repository.moderation_scan_requested` outbox 入队。
+- `apps/web/src/features/community/report-dialog.tsx`、`repository-detail-page.tsx` 和 `creator-profile-page.tsx` 已提供举报原因选择、说明最小长度、提交状态和 `Alpha 团队会人工处理` 成功反馈。
+- `apps/web/src/features/worlddock/api.ts` 已提供 repository report 和 creator profile report API client。
+- `apps/api/test/alpha-moderation.integration-spec.ts` 与 `apps/web/tests/e2e/report-flow.spec.ts` 已覆盖 Alpha 举报产品流。
 
-- 已有 `POST /v1/repositories/:repositoryId/reports`。
-- 已有 report/moderation action 表和 Worker 规则扫描。
-- 发布和 Local Push 会写入 moderation scan outbox。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test:integration -- alpha-moderation.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/worker test -- moderation-scan.test.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- report-flow.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+- `rg -n "admin/reports|@Get\\(\"admin|@Post\\(\"admin|/v1/admin/reports" apps/api/src apps/web/src`：通过，产品源码无命中。
+- `rg -n "后端接入后|占位|mock|fixture" apps/web/src/features/community apps/web/tests/e2e/report-flow.spec.ts apps/api/test/alpha-moderation.integration-spec.ts`：通过，无命中。
+
+剩余说明：
+
+- Phase 9 不实现真实管理后台、管理员角色管理、申诉系统、通知闭环或法务工作流。
+- Alpha 人工处理仍依赖数据库记录、服务日志和发布证据；Beta 再引入正式审核队列、审计日志 UI 和权限模型。
 
 ## Phase 10: 文件、导入导出和数据权利
 
