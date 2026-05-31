@@ -184,6 +184,17 @@ describe("community endpoints", () => {
     });
     expect(detail.body.repository.latestRelease).toBeNull();
     expect(detail.body.repository.releaseHistory).toEqual([]);
+    expect(detail.body.repository.releases).toEqual([]);
+    expect(JSON.stringify({
+      latestRelease: detail.body.repository.latestRelease,
+      releaseHistory: detail.body.repository.releaseHistory,
+      releases: detail.body.repository.releases,
+    })).not.toContain("draft");
+    expect(JSON.stringify({
+      latestRelease: detail.body.repository.latestRelease,
+      releaseHistory: detail.body.repository.releaseHistory,
+      releases: detail.body.repository.releases,
+    })).not.toContain("rolled_back");
 
     const assets = await request(app.getHttpServer())
       .get(`/v1/community/repositories/${visible.id}/assets`)

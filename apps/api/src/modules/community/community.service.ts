@@ -39,6 +39,7 @@ export class CommunityService {
 
     return {
       ...repository,
+      releases: repository.releases.filter((release) => release.status === "published"),
       latestRelease: publicReleaseHistory[0] ?? null,
       releaseHistory: publicReleaseHistory,
       assetCounts: countSnapshotAssets(latestSnapshot?.snapshot),
