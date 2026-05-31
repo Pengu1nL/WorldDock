@@ -180,6 +180,7 @@
 - `packages/domain/src/billing/price-book.ts` 已定义 Alpha 模型 price book，并按 provider、model、input tokens 和 output tokens 计算 Agent Run 成本；未知模型和非法 token usage 会显式失败。
 - `apps/api/src/modules/billing/billing.service.ts` 已用 price book 替代 `totalTokens / 10` 简化计价，并保留 reserve、settle、refund 和低余额拦截语义。
 - `apps/api/src/modules/billing/billing.repository.ts`、`prisma-billing.repository.ts` 与 usage ledger terminal unique migration 已确保同一 Agent Run 只能出现一个 settled/refunded 终态账本条目，避免并发结算/退款双写。
+- `apps/api/src/modules/billing/prisma-billing.repository.ts` 已将终态账本写入与 AgentRun completed/failed/cancelled 状态更新放入同一个 Prisma transaction；无法领取 `running` 状态时不会写入 terminal ledger。
 - `apps/api/src/modules/agent/agent.service.ts` 已把 Agent Run 的 provider/model 传入 billing settlement；失败和取消路径会退回 reserve。
 - `packages/db/prisma/schema.prisma` 与 `packages/db/prisma/migrations/20260527211500_billing_placeholder_intents/migration.sql` 已包含 `BillingPlaceholderIntent`。
 - `apps/api/src/modules/billing/entitlements.service.ts`、`billing.controller.ts` 和 `prisma-billing.repository.ts` 已提供 Alpha entitlement、支付占位意向捕获和 usage 返回。
@@ -191,6 +192,7 @@
 验收证据：
 
 - `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test -- billing.service.spec.ts`：通过。
 - `pnpm --filter @worlddock/api test -- billing-price-book.spec.ts`：通过。
 - `pnpm --filter @worlddock/api test:integration -- billing-alpha.integration-spec.ts agent.integration-spec.ts`：通过。
 - `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。

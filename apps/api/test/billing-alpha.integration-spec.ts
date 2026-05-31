@@ -163,6 +163,13 @@ function createInMemoryBillingRepository() {
       entries.set(entry.id, entry);
       return entry;
     },
+    async createTerminalLedgerEntryAndUpdateRun(input) {
+      const existing = [...entries.values()].find((entry) => entry.agentRunId === input.entry.agentRunId && isTerminalBillingEntry(entry));
+      if (existing) return existing.type === input.entry.type ? existing : null;
+      const entry = { id: `ule_${entries.size + 1}`, createdAt: new Date(), ...input.entry };
+      entries.set(entry.id, entry);
+      return entry;
+    },
     async listLedgerEntries(userId) { return [...entries.values()].filter((entry) => entry.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); },
     async listLedgerEntriesForRun(agentRunId) { return [...entries.values()].filter((entry) => entry.agentRunId === agentRunId); },
     async createPlaceholderIntent(input) {

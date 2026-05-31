@@ -38,12 +38,29 @@ export type TerminalLedgerEntryInput = Omit<UsageLedgerEntryRecord, "id" | "crea
   type: Extract<UsageLedgerEntryType, "model_run_settled" | "model_run_refunded">;
 };
 
+export type AgentRunTerminalUpdateInput = {
+  status: "completed" | "failed" | "cancelled";
+  tokenUsage?: TokenUsage | null;
+  completedAt?: Date | null;
+  failedAt?: Date | null;
+  cancelledAt?: Date | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+};
+
+export type TerminalLedgerAndRunUpdateInput = {
+  entry: TerminalLedgerEntryInput;
+  expectedRunStatus: "running";
+  runUpdate: AgentRunTerminalUpdateInput;
+};
+
 export type BillingRepository = {
   findAccountByUserId(userId: string): Promise<BillingAccountRecord | null>;
   createAccount(input: { userId: string; freeCreditGrantedAt?: Date | null }): Promise<BillingAccountRecord>;
   markFreeCreditGranted(accountId: string, grantedAt: Date): Promise<BillingAccountRecord | null>;
   createLedgerEntry(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">): Promise<UsageLedgerEntryRecord>;
   createTerminalLedgerEntryOnce(input: TerminalLedgerEntryInput): Promise<UsageLedgerEntryRecord>;
+  createTerminalLedgerEntryAndUpdateRun(input: TerminalLedgerAndRunUpdateInput): Promise<UsageLedgerEntryRecord | null>;
   listLedgerEntries(userId: string): Promise<UsageLedgerEntryRecord[]>;
   listLedgerEntriesForRun(agentRunId: string): Promise<UsageLedgerEntryRecord[]>;
   createPlaceholderIntent(input: Omit<BillingPlaceholderIntentRecord, "id" | "createdAt" | "status"> & Partial<Pick<BillingPlaceholderIntentRecord, "status">>): Promise<BillingPlaceholderIntentRecord>;

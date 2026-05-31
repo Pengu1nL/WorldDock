@@ -1,6 +1,6 @@
 import { HttpException, Inject, Injectable } from "@nestjs/common";
 import { calculateModelRunCostCents, type ModelPrice, type TokenUsage } from "@worlddock/domain";
-import { BILLING_REPOSITORY, type BillingAccountRecord, type BillingRepository, type UsageLedgerEntryRecord } from "./billing.repository";
+import { BILLING_REPOSITORY, type AgentRunTerminalUpdateInput, type BillingAccountRecord, type BillingRepository, type UsageLedgerEntryRecord } from "./billing.repository";
 
 export const INITIAL_FREE_CREDIT_CENTS = 10_000;
 export const LOW_BALANCE_THRESHOLD_CENTS = 500;
@@ -76,6 +76,23 @@ export class BillingService {
     return terminalEntry.type === "model_run_settled" ? terminalEntry : null;
   }
 
+  async settleAgentRunAndComplete(
+    userId: string,
+    agentRunId: string,
+    tokenUsage: TokenUsage,
+    priceInput: { provider?: ModelPrice["provider"] | string | null; model?: string | null } = {},
+  ) {
+    return this.settleAgentRunAndUpdateStatus(userId, agentRunId, tokenUsage, priceInput, {
+      status: "completed",
+      tokenUsage,
+      completedAt: new Date(),
+      failedAt: null,
+      cancelledAt: null,
+      errorCode: null,
+      errorMessage: null,
+    });
+  }
+
   async refundAgentRun(userId: string, agentRunId: string, reason: string) {
     const account = await this.ensureAccount(userId);
     const entries = await this.billing.listLedgerEntriesForRun(agentRunId);
@@ -96,6 +113,30 @@ export class BillingService {
     return terminalEntry.type === "model_run_refunded" ? terminalEntry : null;
   }
 
+  async refundAgentRunAndFail(userId: string, agentRunId: string, reason: string, failure: { code: string; message: string }) {
+    return this.refundAgentRunAndUpdateStatus(userId, agentRunId, reason, {
+      status: "failed",
+      tokenUsage: null,
+      completedAt: null,
+      failedAt: new Date(),
+      cancelledAt: null,
+      errorCode: failure.code,
+      errorMessage: failure.message,
+    });
+  }
+
+  async refundAgentRunAndCancel(userId: string, agentRunId: string, reason: string) {
+    return this.refundAgentRunAndUpdateStatus(userId, agentRunId, reason, {
+      status: "cancelled",
+      tokenUsage: null,
+      completedAt: null,
+      failedAt: null,
+      cancelledAt: new Date(),
+      errorCode: null,
+      errorMessage: null,
+    });
+  }
+
   async capturePlaceholderIntent(userId: string, plan: string) {
     const account = await this.ensureAccount(userId);
     return this.billing.createPlaceholderIntent({
@@ -104,6 +145,59 @@ export class BillingService {
       plan,
       source: "alpha_ui",
     });
+  }
+
+  private async settleAgentRunAndUpdateStatus(
+    userId: string,
+    agentRunId: string,
+    tokenUsage: TokenUsage,
+    priceInput: { provider?: ModelPrice["provider"] | string | null; model?: string | null },
+    runUpdate: AgentRunTerminalUpdateInput,
+  ) {
+    const account = await this.ensureAccount(userId);
+    const entries = await this.billing.listLedgerEntriesForRun(agentRunId);
+    const reservedCents = this.reservedCents(entries);
+    const costCents = calculateAgentRunCostCents(tokenUsage, priceInput);
+    const terminalEntry = await this.billing.createTerminalLedgerEntryAndUpdateRun({
+      entry: {
+        accountId: account.id,
+        userId,
+        agentRunId,
+        type: "model_run_settled",
+        amountCents: reservedCents - costCents,
+        tokenUsage,
+        reason: "settle agent run",
+      },
+      expectedRunStatus: "running",
+      runUpdate,
+    });
+    return terminalEntry?.type === "model_run_settled" ? terminalEntry : null;
+  }
+
+  private async refundAgentRunAndUpdateStatus(
+    userId: string,
+    agentRunId: string,
+    reason: string,
+    runUpdate: AgentRunTerminalUpdateInput,
+  ) {
+    const account = await this.ensureAccount(userId);
+    const entries = await this.billing.listLedgerEntriesForRun(agentRunId);
+    const reservedCents = this.reservedCents(entries);
+    if (reservedCents <= 0) return null;
+    const terminalEntry = await this.billing.createTerminalLedgerEntryAndUpdateRun({
+      entry: {
+        accountId: account.id,
+        userId,
+        agentRunId,
+        type: "model_run_refunded",
+        amountCents: reservedCents,
+        tokenUsage: null,
+        reason,
+      },
+      expectedRunStatus: "running",
+      runUpdate,
+    });
+    return terminalEntry?.type === "model_run_refunded" ? terminalEntry : null;
   }
 
   private async ensureAccount(userId: string): Promise<BillingAccountRecord> {

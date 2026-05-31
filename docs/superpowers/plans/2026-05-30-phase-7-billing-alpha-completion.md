@@ -1223,11 +1223,19 @@ git log -1 --format=fuller
 
 Expected: latest commit author and committer are anonymous-safe.
 
+## Post-Review Risk Closure
+
+- [x] `apps/api/src/modules/billing/prisma-billing.repository.ts` 已新增 `createTerminalLedgerEntryAndUpdateRun`，在同一个 Prisma transaction 内领取 `AgentRun.status = running` 并写入 terminal ledger。
+- [x] `apps/api/src/modules/agent/agent.service.ts` 的 completed/failed/cancelled 路径改为调用 BillingService 的原子终态方法，不再在账本写入后分离更新 AgentRun 状态。
+- [x] `apps/api/src/modules/billing/billing.service.spec.ts` 覆盖无法领取 running 状态时不写入 terminal ledger。
+- [x] `apps/api/test/agent.integration-spec.ts` 覆盖 completed/failed/cancelled SSE 之后 AgentRun 状态已经随账本终态落下。
+
 ## Self-Review Checklist
 
 - Phase 7 price book has a shared domain source of truth and explicit unknown-model failure.
 - Agent Run no longer uses `totalTokens / 10` as the source of billing truth.
 - Reserve, settle and refund remain append-only usage ledger entries.
+- Terminal ledger 与 AgentRun 终态状态在真实 Prisma repository 中同事务提交；无法领取 running 状态时不产生终态账本。
 - Placeholder payment intents are persisted as Alpha waitlist signals only.
 - Entitlements explicitly disable Beta payments and Stripe capabilities.
 - Billing UI shows balance, latest run usage, ledger entries, disabled payment buttons and waitlist action.

@@ -30,7 +30,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository();
+    const billing = createInMemoryBillingRepository(agent);
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -63,6 +63,10 @@ describe("agent run endpoints", () => {
     expect(sse.text).toContain("event: message.delta");
     expect(sse.text).toContain("event: suggestion.created");
     expect(sse.text).toContain("event: run.completed");
+    expect(await agent.findRunById(createRun.body.run.id)).toEqual(expect.objectContaining({
+      status: "completed",
+      tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
+    }));
     const ledgerEntries = await billing.listLedgerEntriesForRun(createRun.body.run.id);
     expect(ledgerEntries).toHaveLength(2);
     expect(ledgerEntries.find((entry) => entry.type === "model_run_reserved")).toEqual(expect.objectContaining({
@@ -104,7 +108,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository();
+    const billing = createInMemoryBillingRepository(agent);
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -135,6 +139,7 @@ describe("agent run endpoints", () => {
     expect(sse.text).toContain("event: run.cancelled");
     expect(sse.text).not.toContain("event: message.delta");
     expect(sse.text).not.toContain("event: suggestion.created");
+    expect(await agent.findRunById(createRun.body.run.id)).toEqual(expect.objectContaining({ status: "cancelled" }));
     expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
   });
 
@@ -142,7 +147,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository();
+    const billing = createInMemoryBillingRepository(agent);
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -167,6 +172,10 @@ describe("agent run endpoints", () => {
 
     expect(sse.text).toContain("event: run.failed");
     expect(sse.text).toContain("MODEL_UNAVAILABLE");
+    expect(await agent.findRunById(createRun.body.run.id)).toEqual(expect.objectContaining({
+      status: "failed",
+      errorCode: "MODEL_UNAVAILABLE",
+    }));
     expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
   });
 
@@ -174,7 +183,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository();
+    const billing = createInMemoryBillingRepository(agent);
     addSession(auth, "session_user_1", "user_1");
     const world = await worlds.createWorld({
       ownerId: "user_1",
@@ -210,7 +219,7 @@ describe("agent run endpoints", () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();
     const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository();
+    const billing = createInMemoryBillingRepository(agent);
     addSession(auth, "session_user_1", "user_1");
     seedBillingAccount(billing, "user_1", 50);
     const world = await worlds.createWorld({
@@ -466,7 +475,7 @@ function createInMemoryAgentRepository() {
   return repository;
 }
 
-function createInMemoryBillingRepository() {
+function createInMemoryBillingRepository(agentRepository?: AgentRepository) {
   const accounts = new Map<string, BillingAccountRecord>();
   const entries = new Map<string, UsageLedgerEntryRecord>();
   const placeholderIntents = new Map<string, BillingPlaceholderIntentRecord>();
@@ -515,6 +524,28 @@ function createInMemoryBillingRepository() {
         id: `ule_${entries.size + 1}`,
         createdAt: new Date(),
         ...input,
+      };
+      entries.set(entry.id, entry);
+      return entry;
+    },
+    async createTerminalLedgerEntryAndUpdateRun(input) {
+      const existing = [...entries.values()].find((entry) => entry.agentRunId === input.entry.agentRunId && isTerminalBillingEntry(entry));
+      if (existing) {
+        if (existing.type !== input.entry.type) return null;
+        const updated = agentRepository
+          ? await agentRepository.updateRunIfStatus(input.entry.agentRunId, input.expectedRunStatus, input.runUpdate)
+          : null;
+        const run = agentRepository ? await agentRepository.findRunById(input.entry.agentRunId) : null;
+        return updated || run?.status === input.runUpdate.status ? existing : null;
+      }
+      const updated = agentRepository
+        ? await agentRepository.updateRunIfStatus(input.entry.agentRunId, input.expectedRunStatus, input.runUpdate)
+        : { id: input.entry.agentRunId };
+      if (!updated) return null;
+      const entry: UsageLedgerEntryRecord = {
+        id: `ule_${entries.size + 1}`,
+        createdAt: new Date(),
+        ...input.entry,
       };
       entries.set(entry.id, entry);
       return entry;

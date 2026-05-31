@@ -68,9 +68,25 @@ describe("BillingService", () => {
     expect(entries.filter((entry) => entry.type === "model_run_settled")).toHaveLength(1);
     expect(entries.filter((entry) => entry.type === "model_run_refunded")).toHaveLength(0);
   });
+
+  it("does not write a terminal ledger entry when completion cannot claim the running run", async () => {
+    const repository = createRacyBillingRepository({ synchronizeFirstRunLists: false, runStatus: "cancelled" });
+    const service = new BillingService(repository);
+
+    const settlement = await service.settleAgentRunAndComplete(
+      "user_1",
+      "run_1",
+      { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
+      { provider: "openai-compatible", model: "qwen3-32b" },
+    );
+
+    const entries = await repository.listLedgerEntriesForRun("run_1");
+    expect(settlement).toBeNull();
+    expect(entries.filter((entry) => entry.type === "model_run_settled" || entry.type === "model_run_refunded")).toHaveLength(0);
+  });
 });
 
-function createRacyBillingRepository(options: { synchronizeFirstRunLists?: boolean } = {}): BillingRepository {
+function createRacyBillingRepository(options: { synchronizeFirstRunLists?: boolean; runStatus?: "running" | "completed" | "failed" | "cancelled" } = {}): BillingRepository {
   const synchronizeFirstRunLists = options.synchronizeFirstRunLists ?? true;
   const account: BillingAccountRecord = {
     id: "ba_1",
@@ -95,6 +111,7 @@ function createRacyBillingRepository(options: { synchronizeFirstRunLists?: boole
   ]);
   const listWaiters: Array<() => void> = [];
   let runLedgerListCalls = 0;
+  let runStatus = options.runStatus ?? "running";
 
   return {
     async findAccountByUserId(userId) {
@@ -116,6 +133,19 @@ function createRacyBillingRepository(options: { synchronizeFirstRunLists?: boole
       if (existing) return existing;
       const entry = { id: `ule_${entries.size + 1}`, createdAt: new Date(), ...input };
       entries.set(entry.id, entry);
+      return entry;
+    },
+    async createTerminalLedgerEntryAndUpdateRun(input) {
+      const existing = [...entries.values()].find((entry) => entry.agentRunId === input.entry.agentRunId && isTerminalEntry(entry));
+      if (existing) {
+        if (existing.type !== input.entry.type) return null;
+        if (runStatus === input.expectedRunStatus) runStatus = input.runUpdate.status;
+        return runStatus === input.runUpdate.status ? existing : null;
+      }
+      if (runStatus !== input.expectedRunStatus) return null;
+      const entry = { id: `ule_${entries.size + 1}`, createdAt: new Date(), ...input.entry };
+      entries.set(entry.id, entry);
+      runStatus = input.runUpdate.status;
       return entry;
     },
     async listLedgerEntries(userId) {

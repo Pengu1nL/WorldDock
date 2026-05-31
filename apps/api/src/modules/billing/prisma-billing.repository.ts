@@ -51,6 +51,17 @@ export class PrismaBillingRepository implements BillingRepository, OnModuleDestr
     }
   }
 
+  async createTerminalLedgerEntryAndUpdateRun(input: Parameters<BillingRepository["createTerminalLedgerEntryAndUpdateRun"]>[0]) {
+    try {
+      return await this.createTerminalLedgerEntryAndUpdateRunInTransaction(input);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) throw error;
+      const existing = await this.updateRunForExistingTerminalEntry(input);
+      if (!existing.found) throw error;
+      return existing.entry;
+    }
+  }
+
   async listLedgerEntries(userId: string) {
     const entries = await this.prisma.usageLedgerEntry.findMany({
       where: { userId },
@@ -87,6 +98,54 @@ export class PrismaBillingRepository implements BillingRepository, OnModuleDestr
 
   async onModuleDestroy() {
     await this.prisma.$disconnect();
+  }
+
+  private async createTerminalLedgerEntryAndUpdateRunInTransaction(input: Parameters<BillingRepository["createTerminalLedgerEntryAndUpdateRun"]>[0]) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.usageLedgerEntry.findFirst({
+        where: { agentRunId: input.entry.agentRunId, type: { in: ["model_run_settled", "model_run_refunded"] } },
+        orderBy: { createdAt: "asc" },
+      });
+      if (existing) return await this.claimRunForExistingTerminalEntry(tx, existing, input);
+
+      const updated = await tx.agentRun.updateMany({
+        where: { id: input.entry.agentRunId, status: input.expectedRunStatus },
+        data: input.runUpdate as never,
+      });
+      if (updated.count === 0) return null;
+
+      const entry = await tx.usageLedgerEntry.create({ data: input.entry as never });
+      return mapLedgerEntry(entry);
+    });
+  }
+
+  private async updateRunForExistingTerminalEntry(input: Parameters<BillingRepository["createTerminalLedgerEntryAndUpdateRun"]>[0]) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.usageLedgerEntry.findFirst({
+        where: { agentRunId: input.entry.agentRunId, type: { in: ["model_run_settled", "model_run_refunded"] } },
+        orderBy: { createdAt: "asc" },
+      });
+      if (!existing) return { found: false as const, entry: null };
+      return { found: true as const, entry: await this.claimRunForExistingTerminalEntry(tx, existing, input) };
+    });
+  }
+
+  private async claimRunForExistingTerminalEntry(
+    tx: Pick<PrismaClient, "agentRun" | "usageLedgerEntry">,
+    existing: Parameters<typeof mapLedgerEntry>[0],
+    input: Parameters<BillingRepository["createTerminalLedgerEntryAndUpdateRun"]>[0],
+  ) {
+    if (existing.type !== input.entry.type) return null;
+
+    const updated = await tx.agentRun.updateMany({
+      where: { id: input.entry.agentRunId, status: input.expectedRunStatus },
+      data: input.runUpdate as never,
+    });
+    if (updated.count === 0) {
+      const run = await tx.agentRun.findUnique({ where: { id: input.entry.agentRunId } });
+      if (run?.status !== input.runUpdate.status) return null;
+    }
+    return mapLedgerEntry(existing);
   }
 }
 
