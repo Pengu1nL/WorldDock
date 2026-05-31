@@ -1,6 +1,7 @@
 import { type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import type { ReleaseSnapshot } from "@worlddock/domain";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { configureApiApp } from "../src/configure-api-app";
@@ -112,6 +113,69 @@ describe("community endpoints", () => {
       .set("authorization", "Bearer session_user_2")
       .expect(200);
   });
+
+  it("does not expose assets from unpublished release snapshots", async () => {
+    const auth = createInMemoryAuthRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    const visible = await repositories.createRepository({
+      worldId: null,
+      ownerId: "user_1",
+      ownerName: "ren",
+      slug: "draft-market",
+      name: "Draft Market",
+      summary: "草稿资产不应公开。",
+      tags: ["草稿"],
+      license: "free-fork-attribution",
+    });
+    const draft = await repositories.createRelease({
+      repositoryId: visible.id,
+      version: "v1.0.0",
+      status: "draft",
+      note: "草稿",
+      license: "free-fork-attribution",
+      diff: { addedSettings: 1, changedSettings: 0, removedSettings: 0, addedSeeds: 1 },
+      changes: [],
+      source: "cloud-publish",
+    });
+    await repositories.createSnapshot({
+      repositoryId: visible.id,
+      releaseId: draft.id,
+      snapshot: createSnapshotPayload(visible, draft.id),
+    });
+    const rolledBack = await repositories.createRelease({
+      repositoryId: visible.id,
+      version: "v1.0.1",
+      status: "rolled_back",
+      note: "回滚",
+      license: "free-fork-attribution",
+      diff: { addedSettings: 1, changedSettings: 0, removedSettings: 0, addedSeeds: 1 },
+      changes: [],
+      source: "cloud-publish",
+    });
+    await repositories.createSnapshot({
+      repositoryId: visible.id,
+      releaseId: rolledBack.id,
+      snapshot: createSnapshotPayload(visible, rolledBack.id),
+    });
+    app = await createTestApp(auth, repositories);
+
+    const detail = await request(app.getHttpServer())
+      .get("/v1/community/repositories/ren/draft-market")
+      .expect(200);
+    expect(detail.body.repository).toMatchObject({
+      assetCounts: { archive: 0, seeds: 0, conflicts: 0 },
+    });
+
+    const assets = await request(app.getHttpServer())
+      .get(`/v1/community/repositories/${visible.id}/assets`)
+      .expect(200);
+    expect(assets.body).toEqual({
+      repositoryId: visible.id,
+      releaseId: null,
+      assets: [],
+      nextCursor: null,
+    });
+  });
 });
 
 async function createTestApp(authRepository: AuthRepository, repositoryRepository: RepositoryRepository) {
@@ -189,18 +253,22 @@ async function seedRepository(
   await repositories.createSnapshot({
     repositoryId: repository.id,
     releaseId: release.id,
-    snapshot: {
-      repositoryId: repository.id,
-      releaseId: release.id,
-      world: { name: input.name, type: "近未来", summary: "记忆可以被买卖。", tags: input.tags, maturity: 64 },
-      archiveEntries: [{ id: "archive_1", title: "交易法", category: "世界规则", summary: "摘要", body: "正文", relations: [] }],
-      storySeeds: [{ id: "seed_1", title: "继承的童年", hook: "钩子", trigger: "触发", conflict: "冲突", protagonists: "主角", questions: ["问题"] }],
-      conflicts: [{ id: "conflict_1", title: "人格权冲突", summary: "摘要", body: "正文", related: [], derivedSeeds: [] }],
-      assetRelations: [],
-      createdAt: release.createdAt.toISOString(),
-    },
+    snapshot: createSnapshotPayload(repository, release.id),
   });
   return repository;
+}
+
+function createSnapshotPayload(repository: PublicRepositoryRecord, releaseId: string): ReleaseSnapshot {
+  return {
+    repositoryId: repository.id,
+    releaseId,
+    world: { name: repository.name, type: "近未来", summary: repository.summary, tags: repository.tags, maturity: 64 },
+    archiveEntries: [{ id: "archive_1", title: "交易法", category: "世界规则", summary: "摘要", body: "正文", relations: [] }],
+    storySeeds: [{ id: "seed_1", title: "继承的童年", hook: "钩子", trigger: "触发", conflict: "冲突", protagonists: "主角", questions: ["问题"] }],
+    conflicts: [{ id: "conflict_1", title: "人格权冲突", summary: "摘要", body: "正文", related: [], derivedSeeds: [] }],
+    assetRelations: [],
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function createInMemoryRepositoryRepository() {

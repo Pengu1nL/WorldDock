@@ -125,7 +125,7 @@ export class CommunityService {
 
   private async findLatestSnapshot(repositoryId: string) {
     const releases = await this.repositories.listReleases(repositoryId);
-    const latestRelease = releases.find((release) => release.status === "published") ?? releases[0];
+    const latestRelease = releases.find((release) => release.status === "published");
     return latestRelease ? this.repositories.findSnapshotByReleaseId(latestRelease.id) : null;
   }
 
