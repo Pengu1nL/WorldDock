@@ -59,12 +59,14 @@ describe("community endpoints", () => {
       .query({ q: "memory", tag: "记忆", sort: "updated" })
       .expect(200);
     expect(list.body.repositories.map((repository: any) => repository.slug)).toEqual(["memory-market"]);
+    expect(list.body.nextCursor).toBeNull();
     expect(JSON.stringify(list.body)).not.toContain("removed-world");
 
     const detail = await request(app.getHttpServer())
       .get("/v1/community/repositories/ren/memory-market")
       .expect(200);
     expect(detail.body.repository).toMatchObject({
+      owner: "ren",
       slug: "memory-market",
       latestRelease: { version: "v1.0.0" },
       assetCounts: { archive: 1, seeds: 1, conflicts: 1 },
@@ -76,14 +78,19 @@ describe("community endpoints", () => {
       .get(`/v1/community/repositories/${visible.id}/assets`)
       .query({ kind: "archive" })
       .expect(200);
+    expect(assets.body).toMatchObject({ repositoryId: visible.id, releaseId: "rel_1", nextCursor: null });
     expect(assets.body.assets).toEqual([
-      expect.objectContaining({ assetId: "archive:archive_1", title: "交易法" }),
+      expect.objectContaining({ assetId: "archive:archive_1", kind: "archive", title: "交易法" }),
     ]);
 
     const creator = await request(app.getHttpServer())
       .get("/v1/community/creators/ren")
       .expect(200);
-    expect(creator.body.creator).toMatchObject({ handle: "ren", stats: { repositories: 1, forks: 1 } });
+    expect(creator.body.creator).toMatchObject({
+      handle: "ren",
+      displayName: "ren",
+      stats: { repositories: 1, forks: 1 },
+    });
 
     const creatorRepositories = await request(app.getHttpServer())
       .get("/v1/community/creators/ren/repositories")
