@@ -182,6 +182,8 @@ describe("community endpoints", () => {
     expect(detail.body.repository).toMatchObject({
       assetCounts: { archive: 0, seeds: 0, conflicts: 0 },
     });
+    expect(detail.body.repository.latestRelease).toBeNull();
+    expect(detail.body.repository.releaseHistory).toEqual([]);
 
     const assets = await request(app.getHttpServer())
       .get(`/v1/community/repositories/${visible.id}/assets`)

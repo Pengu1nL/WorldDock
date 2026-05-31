@@ -35,10 +35,12 @@ export class CommunityService {
       this.findLatestSnapshot(repository.id),
     ]);
 
+    const publicReleaseHistory = releaseHistory.filter((release) => release.status === "published");
+
     return {
       ...repository,
-      latestRelease: releaseHistory[0] ?? null,
-      releaseHistory,
+      latestRelease: publicReleaseHistory[0] ?? null,
+      releaseHistory: publicReleaseHistory,
       assetCounts: countSnapshotAssets(latestSnapshot?.snapshot),
       forkGraph: {
         repositoryId: repository.id,
