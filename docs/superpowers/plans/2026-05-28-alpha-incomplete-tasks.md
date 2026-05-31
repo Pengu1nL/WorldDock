@@ -6,9 +6,9 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 2 与 Phase 3 验证，Phase 2、Phase 3 已可标记完成。除 Phase 2、Phase 3 外，本记录其余 Phase 的未完成判断保持不变。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 10 验证，Phase 2、Phase 3、Phase 10 已可标记完成。除 Phase 2、Phase 3、Phase 10 外，本记录其余 Phase 的未完成判断保持不变。
 
-当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。Phase 3 已进一步冻结 Cloud-only 范围、生产环境门禁和前端认证来源。但除已验证完成的 Phase 2、Phase 3 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
+当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。Phase 3 已进一步冻结 Cloud-only 范围、生产环境门禁和前端认证来源，Phase 10 已完成导入导出和数据权利收口。但除已验证完成的 Phase 2、Phase 3、Phase 10 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
 
 ## 判定标准
 
@@ -277,19 +277,34 @@
 
 ## Phase 10: 文件、导入导出和数据权利
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `packages/domain/src/worlds/world-package.ts`。
-- 缺少 `apps/api/src/modules/exports/*`。
-- 缺少 `apps/worker/src/export-jobs.ts`。
-- 缺少 `apps/web/src/features/account/data-rights-page.tsx`。
-- 缺少 `apps/web/src/features/worlds/import-export-panel.tsx`。
-- 缺少 world export/import 和 account data export API。
-- 缺少 `exports.integration-spec.ts` 和 `import-export.spec.ts`。
+完成依据：
 
-已有但不足：
+- `packages/domain/src/worlds/world-package.ts` 已定义 `worlddock.world-package.v1`，覆盖世界 metadata、资产列表和 release 摘要。
+- `apps/api/src/modules/exports/*` 已提供世界导出、export 读取、世界导入、账户数据导出和账户数据 export 读取 API，并复用认证 scope 和 owner 权限校验。
+- `apps/worker/src/export-jobs.ts` 已提供 `exports` BullMQ 队列、`account-data-export` job name、重试策略和 worker factory，保留账户导出异步化入口。
+- `apps/web/src/features/worlds/import-export-panel.tsx` 已在设置页提供世界包导出、JSON 预览和粘贴 JSON 导入。
+- `apps/web/src/features/account/data-rights-page.tsx` 已提供账户数据导出、导出 JSON 预览和删除账户前的确认流程。
+- `apps/web/src/features/worlddock/view-settings.tsx` 已把导入导出和数据权利接入 `导入导出` tab。
+- `apps/api/test/exports.integration-spec.ts` 和 `apps/web/tests/e2e/import-export.spec.ts` 已覆盖 Phase 10 主路径。
 
-- 已有对象存储模块和 signed upload/download 能力，但未形成导入导出产品闭环。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/domain lint`：通过。
+- `pnpm --filter @worlddock/api test:integration -- exports.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/worker lint`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- import-export.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+- `rg -n "后端接入后|占位|待接入|待补充" apps/api/src/modules/exports apps/web/src/features/account apps/web/src/features/worlds apps/web/src/features/worlddock/view-settings.tsx`：通过，无命中。
+
+剩余说明：
+
+- Phase 10 不实现批量附件压缩包、长期对象存储下载页、数据可携带性异步通知或硬删除执行器。
+- Alpha 账户删除仍是软删除排期；用户必须先生成账户数据导出，Beta 后再补正式数据保留、恢复窗口和硬删除审计流程。
 
 ## Phase 11: 站内通知、活动流和 Alpha 反馈入口
 
@@ -352,11 +367,11 @@
 ## 建议执行顺序
 
 1. 先完成 Phase 1，移除静态导出假设，补 CI、Docker、生产 env gate 和运维 runbook。
-2. Phase 2 和 Phase 3 已完成，后续保持其验收测试作为回归门禁。
+2. Phase 2、Phase 3 和 Phase 10 已完成，后续保持其验收测试作为回归门禁。
 3. 在 Phase 4 中统一 world assets，消除前端本地 CRUD。
 4. 然后推进 Phase 5 和 Phase 7，因为 Agent、账本、计费和发布验收互相依赖。
-5. 再按社区、治理、导入导出、通知、官网、运维和 CLI 的依赖顺序推进后续 Phase。
+5. 再按通知、官网、运维和 CLI 的依赖顺序推进后续 Phase。
 
 ## 本次执行说明
 
-本记录最初来自静态调查和文档整理；Phase 3 收口时已补充执行定向验证，并在 `docs/superpowers/plans/2026-05-27-phase-3-cloud-only-main-path.md` 中记录完整验证命令。其余未完成 Phase 仍保持静态调查结论，尚未运行对应全量验收。
+本记录最初来自静态调查和文档整理；Phase 3 收口时已补充执行定向验证，并在 `docs/superpowers/plans/2026-05-27-phase-3-cloud-only-main-path.md` 中记录完整验证命令。Phase 10 收口时已运行本记录中的定向与全量回归验收。除已完成 Phase 外，其余未完成 Phase 仍保持静态调查结论，尚未运行对应全量验收。
