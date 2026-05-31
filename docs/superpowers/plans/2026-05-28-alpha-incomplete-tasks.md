@@ -209,19 +209,35 @@
 
 ## Phase 8: 社区发现、创作者主页和完整 Repository Detail
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `apps/api/src/modules/community/*`。
-- 缺少 `apps/web/src/features/community/*` 独立页面。
-- 缺少 `/v1/community/repositories?cursor=&q=&tag=&sort=` 等计划中的 community API。
-- 缺少 creator profile、creator repositories、collections API。
-- Repository detail 的 Archive/Seeds/Conflicts/Forks 标签页仍是“后端接入后按分页加载”的占位文案。
-- 缺少 `community.integration-spec.ts` 和 `community-product-flow.spec.ts`。
+完成依据：
 
-已有但不足：
+- `apps/api/src/modules/community/*` 已提供 community repositories、repository detail、snapshot assets、creator profile、creator repositories 和 collections API。
+- `/v1/community/repositories?cursor=&q=&tag=&sort=` 支持搜索、标签、排序和 cursor 分页，并过滤 `removed` 仓库。
+- `GET /v1/community/repositories/:owner/:slug` 聚合 latest release、release history、asset counts 和 fork graph，并在可选登录态下标记当前用户拥有的 fork。
+- `GET /v1/community/repositories/:repositoryId/assets?kind=&cursor=` 只从最新 published release snapshot 返回 Archive、Seeds、Conflicts 公开资产，并支持分页；draft 和 rolled_back snapshot 不会公开。
+- `apps/web/src/features/community/*` 已提供 Explore、Repository Detail、Creator Profile 和 Collections 独立页面。
+- `apps/web/src/features/worlddock/view-community.tsx` 已把社区主路径接入真实 community API，并提供 Star、Fork、收藏和举报入口。
+- Repository Detail 的 Overview、Archive、Seeds、Conflicts、Releases、Forks 标签页已从后端数据渲染，不再显示“后端接入后按分页加载”占位文案。
+- Forks 标签页默认只读，只有后端返回 `ownedByCurrentUser` 或等价 owner 标记时才显示同步和 detach 操作。
+- `apps/api/test/community.integration-spec.ts` 与 `apps/web/tests/e2e/community-product-flow.spec.ts` 覆盖社区发现产品流。
 
-- 已有 `/v1/repositories`、`/v1/repositories/search`、repository detail、releases、Star、Fork。
-- 前端 `view-community.tsx` 有 Explore、Star、Fork、举报入口雏形。
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test:integration -- community.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- community-product-flow.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+- `rg -n "mock|fixture|后端接入后|占位" apps/web/src/features/community apps/web/src/features/worlddock/view-community.tsx apps/api/src/modules/community apps/api/test/community.integration-spec.ts apps/web/tests/e2e/community-product-flow.spec.ts`：通过，无命中。
+
+剩余说明：
+
+- Phase 8 不包含 creator profile report 的治理闭环、管理员审核后台、真实通知或模板库。
+- Fork sync 的冲突应用能力由 Phase 6 提供；Phase 8 只要求公开 repository detail 展示 fork graph，并在当前登录用户拥有 fork 时进入已存在 Fork 同步主路径。
 
 ## Phase 9: Alpha 举报、人工治理 Runbook 和反滥用
 
