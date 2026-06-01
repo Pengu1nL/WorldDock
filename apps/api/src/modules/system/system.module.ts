@@ -5,6 +5,7 @@ import { RedisHealthChecker } from "./redis-health.checker";
 import { SearchHealthChecker } from "./search-health.checker";
 import { SystemController } from "./system.controller";
 import { WorkerHealthController } from "./worker-health.controller";
+import { WORKER_QUEUE_READERS, WorkerHealthService, createBullMqWorkerQueueReaders } from "./worker-health.service";
 
 @Module({
   controllers: [SystemController, WorkerHealthController],
@@ -13,6 +14,11 @@ import { WorkerHealthController } from "./worker-health.controller";
     RedisHealthChecker,
     SearchHealthChecker,
     ReadinessService,
+    WorkerHealthService,
+    {
+      provide: WORKER_QUEUE_READERS,
+      useFactory: () => createBullMqWorkerQueueReaders(),
+    },
     {
       provide: DEPENDENCY_HEALTH_CHECKERS,
       useFactory: (database: DatabaseHealthChecker, redis: RedisHealthChecker, search: SearchHealthChecker) => [database, redis, search],
