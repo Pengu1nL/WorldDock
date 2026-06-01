@@ -326,7 +326,7 @@
 
 - Domain 已定义产品分析事件契约，覆盖 Alpha 申请、计费占位点击和 Alpha 反馈提交。
 - Prisma 已加入 `ProductAnalyticsEvent` 模型和迁移，支持匿名 ID、用户 ID、route、context 和 occurredAt。
-- API 已提供 analytics events 写入接口，并用 integration spec 验证事件落库。
+- API 已提供 analytics events 写入接口，并用 integration spec 验证事件写入契约；Prisma 写入映射由 `analytics.service.spec.ts` 覆盖。
 - Web 已提供 `product-events` 客户端，统一发送产品事件和浏览器匿名 ID。
 - 官网首页和定价页已上线，包含 Alpha 申请、反馈入口、公开仓库说明、非 Stripe 定价说明和候补 CTA。
 - `SupportEntry` 已接入设置页用量 tab，提交 Alpha 反馈后记录 `alpha_feedback_submitted` 激活事件。
@@ -336,6 +336,7 @@
 验收证据：
 
 - `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test -- analytics.service.spec.ts`：通过。
 - `pnpm --filter @worlddock/api test:integration -- analytics.integration-spec.ts`：通过。
 - `pnpm --filter @worlddock/web test -- product-events.test.ts`：通过。
 - `pnpm --filter @worlddock/web test:e2e -- marketing-and-activation.spec.ts`：通过。
