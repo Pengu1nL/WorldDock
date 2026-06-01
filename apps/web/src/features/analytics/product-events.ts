@@ -64,6 +64,7 @@ export async function sendProductEvent(
 
   return fetcher(`${resolveApiBaseUrl(options.baseUrl)}/v1/analytics/events`, {
     method: "POST",
+    keepalive: true,
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name,

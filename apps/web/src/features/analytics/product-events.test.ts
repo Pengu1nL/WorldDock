@@ -26,6 +26,7 @@ describe("product events analytics client", () => {
 
     expect(fetcher).toHaveBeenCalledWith("https://api.worlddock.test/v1/analytics/events", {
       method: "POST",
+      keepalive: true,
       headers: { "content-type": "application/json" },
       body: expect.any(String),
     });

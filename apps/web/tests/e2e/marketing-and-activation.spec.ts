@@ -14,7 +14,18 @@ test("marketing pages explain alpha pricing and record activation events", async
   await expect(page.getByRole("link", { name: "申请 Alpha" })).toHaveAttribute("href", "/register");
   await expect(page.getByRole("link", { name: "反馈 Alpha 方向" })).toHaveAttribute("href", "/register?intent=feedback");
 
-  await page.getByRole("link", { name: "查看定价" }).click();
+  await page.getByRole("link", { name: "申请 Alpha" }).click();
+  await expect(page).toHaveURL(/\/register$/);
+  await expect.poll(() => events.some((event) => event.name === "alpha_application_clicked")).toBe(true);
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      name: "alpha_application_clicked",
+      context: { source: "marketing_home", intent: "apply_alpha" },
+      route: "/",
+    }),
+  );
+
+  await page.goto("/pricing");
   await expect(page.getByRole("heading", { name: "Alpha 免费试用 / Beta 后开放付费" })).toBeVisible();
   await expect(page.getByText("Alpha 阶段不提供 Stripe")).toBeVisible();
 

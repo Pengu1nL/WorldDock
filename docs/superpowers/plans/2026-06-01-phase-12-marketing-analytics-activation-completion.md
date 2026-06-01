@@ -214,6 +214,7 @@ import { z } from "zod";
 
 export const PRODUCT_EVENTS = {
   signedUp: "signed_up",
+  alphaApplicationClicked: "alpha_application_clicked",
   onboardingCompleted: "onboarding_completed",
   worldCreated: "world_created",
   agentRunStarted: "agent_run_started",
@@ -226,6 +227,7 @@ export const PRODUCT_EVENTS = {
 
 export const productEventNameSchema = z.enum([
   PRODUCT_EVENTS.signedUp,
+  PRODUCT_EVENTS.alphaApplicationClicked,
   PRODUCT_EVENTS.onboardingCompleted,
   PRODUCT_EVENTS.worldCreated,
   PRODUCT_EVENTS.agentRunStarted,
@@ -693,14 +695,14 @@ export default function MarketingHomePage() {
             <Link
               className="btn primary"
               href="/register"
-              onClick={() => trackProductEvent(PRODUCT_EVENTS.signedUp, { source: "marketing_home", intent: "apply_alpha" })}
+              onClick={() => trackProductEvent(PRODUCT_EVENTS.alphaApplicationClicked, { source: "marketing_home", intent: "apply_alpha" })}
             >
               申请 Alpha
             </Link>
             <Link
               className="btn"
               href="/register?intent=feedback"
-              onClick={() => trackProductEvent(PRODUCT_EVENTS.signedUp, { source: "marketing_home", intent: "feedback" })}
+              onClick={() => trackProductEvent(PRODUCT_EVENTS.alphaApplicationClicked, { source: "marketing_home", intent: "feedback" })}
             >
               反馈 Alpha 方向
             </Link>
