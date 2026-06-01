@@ -688,7 +688,7 @@ Expected: commit succeeds and Author/Committer do not contain the user's real na
 - Modify: `apps/worker/src/observability.ts`
 - Modify: `apps/worker/test/queue-dashboard.test.ts`
 
-- [ ] **Step 1: Write failing API observability unit test**
+- [x] **Step 1: Write failing API observability unit test**
 
 Create `apps/api/src/modules/system/worker-health.controller.spec.ts`:
 
@@ -753,7 +753,7 @@ describe("captureUnhealthyQueueMessages", () => {
 });
 ```
 
-- [ ] **Step 2: Run API unit test and confirm failure**
+- [x] **Step 2: Run API unit test and confirm failure**
 
 Run:
 
@@ -763,7 +763,7 @@ pnpm --filter @worlddock/api test -- worker-health.controller.spec.ts
 
 Expected: FAIL until `captureUnhealthyQueueMessages` is exported from the controller module with the exact behavior above.
 
-- [ ] **Step 3: Add Worker queue-health capture assertion**
+- [x] **Step 3: Add Worker queue-health capture assertion**
 
 Append this test to `apps/worker/test/queue-dashboard.test.ts`:
 
@@ -787,7 +787,7 @@ describe("worker queue observability", () => {
 
 If the import block in `apps/worker/test/queue-dashboard.test.ts` already imports from `../src/observability`, merge the import into the existing import block instead of creating a duplicate.
 
-- [ ] **Step 4: Run observability verification**
+- [x] **Step 4: Run observability verification**
 
 Run:
 
@@ -798,7 +798,7 @@ pnpm --filter @worlddock/worker test -- queue-dashboard.test.ts
 
 Expected: both commands pass, proving API emits events for non-healthy queues and Worker queue health capture keeps returning the classified status.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run the identity check from this plan, then:
 
