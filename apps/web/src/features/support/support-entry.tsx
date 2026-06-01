@@ -18,9 +18,9 @@ export function SupportEntry({ sessionToken, context, onToast }: SupportEntryPro
     try {
       await submitSupportFeedback({ message: message.trim(), context }, { sessionToken });
       trackProductEvent(PRODUCT_EVENTS.alphaFeedbackSubmitted, {
+        ...context,
         source: "support_entry",
         messageLength: message.trim().length,
-        ...context,
       });
       setMessage("");
       onToast({ kind: "save", text: "反馈已提交" });
