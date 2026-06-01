@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { BillingController } from "./billing.controller";
 import { BILLING_REPOSITORY } from "./billing.repository";
 import { BillingService } from "./billing.service";
@@ -7,7 +8,7 @@ import { EntitlementsService } from "./entitlements.service";
 import { PrismaBillingRepository } from "./prisma-billing.repository";
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationsModule],
   controllers: [BillingController],
   providers: [
     BillingService,

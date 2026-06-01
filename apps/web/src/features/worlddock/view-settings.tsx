@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
 import { DataRightsPage } from "../account/data-rights-page";
 import { BillingPage } from "../billing/billing-page";
+import { NotificationCenter } from "../notifications/notification-center";
+import { SupportEntry } from "../support/support-entry";
 import { ImportExportPanel } from "../worlds/import-export-panel";
 import {
   captureBillingPlaceholderIntent,
@@ -43,6 +45,7 @@ export function SettingsView({
   const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [billingBusy, setBillingBusy] = useState(false);
   const [billingWaitlistPendingPlan, setBillingWaitlistPendingPlan] = useState<"creator" | "studio" | "team" | null>(null);
+  const [notificationRefreshKey, setNotificationRefreshKey] = useState(0);
   const billingWaitlistPendingRef = useRef(false);
 
   const sessionToken = useCallback(() => readStoredSessionToken(), []);
@@ -177,6 +180,7 @@ export function SettingsView({
           ["model", "模型"],
           ["community", "社区连接"],
           ["data", "导入导出"],
+          ["notifications", "通知反馈"],
         ].map(([id, label]) => (
           <button key={id} className={"sb-btn " + (tab === id ? "primary" : "")} onClick={() => setTab(id)}>
             {label}
@@ -282,6 +286,22 @@ export function SettingsView({
               <h2 className="title-font" style={{ marginTop: 0 }}>数据权利</h2>
               <DataRightsPage sessionToken={sessionToken()} onToast={onToast} />
             </div>
+          </section>
+        )}
+        {tab === "notifications" && (
+          <section style={{ display: "grid", gap: 18 }}>
+            <NotificationCenter sessionToken={sessionToken()} refreshKey={notificationRefreshKey} />
+            <SupportEntry
+              sessionToken={sessionToken()}
+              context={{
+                route: "/app/settings",
+                mode,
+                currentWorldId: currentWorld?.id ?? null,
+                currentWorldName: currentWorld?.name ?? null,
+              }}
+              onSubmitted={() => setNotificationRefreshKey((key) => key + 1)}
+              onToast={onToast}
+            />
           </section>
         )}
       </div>

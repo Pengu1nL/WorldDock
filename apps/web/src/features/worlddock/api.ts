@@ -1,4 +1,5 @@
 import type {
+  ActivityEvent,
   ForkSyncPreview,
   ForkSyncResult,
   Notification,
@@ -300,6 +301,10 @@ export type NotificationList = {
   unreadCount: number;
 };
 
+export type ActivityList = {
+  activity: ActivityEvent[];
+};
+
 export async function createAccessToken(
   input: { name: string; scopes: AccessTokenScope[] },
   options: ApiClientOptions,
@@ -366,6 +371,16 @@ export async function listNotifications(options: ApiClientOptions): Promise<Noti
   });
 }
 
+export async function listActivity(options: ApiClientOptions): Promise<ActivityList> {
+  return requestJson("/v1/activity", {
+    method: "GET",
+    sessionToken: options.sessionToken,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
+  });
+}
+
 export async function markNotificationRead(notificationId: string, options: ApiClientOptions): Promise<{ notification: Notification }> {
   return requestJson(`/v1/notifications/${notificationId}/read`, {
     method: "POST",
@@ -379,7 +394,16 @@ export async function markNotificationRead(notificationId: string, options: ApiC
 export async function submitSupportFeedback(
   input: { message: string; context?: Record<string, unknown> },
   options: ApiClientOptions,
-) {
+): Promise<{
+  feedback: {
+    id: string;
+    message: string;
+    context: Record<string, unknown>;
+    status: "open" | "closed";
+    createdAt: string;
+  };
+  notification: Notification | null;
+}> {
   return requestJson("/v1/support/feedback", {
     method: "POST",
     sessionToken: options.sessionToken,

@@ -6,7 +6,7 @@ import type { AuthSubject } from "../auth/auth.service";
 import { NotificationsService } from "./notifications.service";
 
 const feedbackSchema = z.object({
-  message: z.string().min(6).max(2000),
+  message: z.string().trim().min(6).max(2000),
   context: z.record(z.string(), z.unknown()).default({}),
 });
 
@@ -19,6 +19,12 @@ export class NotificationsController {
   @RequireScopes("world:read")
   list(@CurrentSubject() subject: AuthSubject) {
     return this.notifications.list(subject);
+  }
+
+  @Get("activity")
+  @RequireScopes("world:read")
+  listActivity(@CurrentSubject() subject: AuthSubject) {
+    return this.notifications.listActivity(subject);
   }
 
   @Post("notifications/:notificationId/read")
