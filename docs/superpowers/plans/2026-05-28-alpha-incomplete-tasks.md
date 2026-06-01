@@ -6,9 +6,9 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 13 验证，Phase 2、Phase 3、Phase 10、Phase 13 已可标记完成。除已标记完成的 Phase 外，本记录其余 Phase 的未完成判断保持不变。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，截至本轮 Phase 13 验证，Phase 2 至 Phase 13 已可标记完成。Phase 1 和 Phase 14 的早期静态缺口已有明显变化，但本轮未执行对应完整验收，因此仍保留为待重新验收状态。
 
-当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。Phase 3 已进一步冻结 Cloud-only 范围、生产环境门禁和前端认证来源，Phase 10 已完成导入导出和数据权利收口，Phase 13 已完成 Worker 队列健康、告警 runbook 和发布 checklist 收口。但除已验证完成的 Phase 2、Phase 3、Phase 10、Phase 13 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
+当前代码库已经具备 Cloud Alpha 主要产品闭环，包括个人账户认证和 onboarding、世界创建、资产编辑、pi Agent、发布/Fork、创作点账本、社区发现、治理、导入导出、站内通知、官网分析和 Worker 运维。Phase 1 与 Phase 14 的缺口判断需要后续按各自计划重新运行定向与全量验收后再更新完成状态。
 
 ## 判定标准
 
@@ -20,14 +20,18 @@
 
 ## Phase 1: 生产工程闸门和环境基线
 
-未完成：
+完成状态：待重新验收。
 
-- `apps/web/next.config.ts` 仍在非开发环境设置 `output: "export"` 和 `assetPrefix: "."`，未移除生产静态导出假设。
-- `packages/config/src/env.ts` 未实现计划中的生产门禁：`BETTER_AUTH_SECRET` 仍是 16 位最小长度，缺少 `BETTER_AUTH_URL`，未按计划拒绝 production mock/pi 配置缺失。
+待重新验收：
+
+- 本轮未重新执行 Phase 1 的完整验收命令，因此暂不把 Phase 1 标记为完成。
+- 需按 Phase 1 计划复核 CI、Dockerfile、生产 env gate、静态导出移除、系统集成测试和运维 runbook 是否全部满足验收标准。
 
 已有但不足：
 
-- `.github/workflows/ci.yml`、`apps/api/Dockerfile`、`apps/web/Dockerfile`、`apps/worker/Dockerfile`、`docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md` 已存在；Phase 1 仍需按生产静态导出和 env gate 剩余项单独收口。
+- `.github/workflows/ci.yml`、`apps/api/Dockerfile`、`apps/web/Dockerfile`、`apps/worker/Dockerfile`、`docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md` 已存在；Phase 1 仍需按完整验收流程重新确认。
+- `apps/web/next.config.ts` 当前只保留 `transpilePackages`，早期静态导出缺口已不再适用；仍需结合 Phase 1 验收命令重新确认生产构建行为。
+- `packages/config/src/env.ts` 当前已要求 32 位 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`，并拒绝 production mock/pi 配置缺失；仍需结合 Phase 1 验收命令重新确认完整生产门禁。
 - `apps/api/test/system.integration-spec.ts` 存在并覆盖基础 health/readiness/metrics。
 - API 和 Worker 已有部分 observability 代码。
 
@@ -404,29 +408,25 @@
 
 ## Phase 14: 世界包 CLI、个人访问令牌和轻量生态
 
-未完成：
+完成状态：待重新验收。
 
-- 缺少 `packages/domain/src/developer-access/index.ts`。
-- 缺少 `apps/api/src/modules/developer-access/*`。
-- 缺少 `packages/worlddock-cli/*`。
-- 缺少 `docs/product/api.md`。
-- 个人访问令牌 scope 与计划不一致：当前已有 `world:read`、`world:write`、`repository:push`，计划要求 `world:read`、`world:write`、`repository:read`、`billing:read`。
-- 缺少 CLI 命令：`worlddock login`、`worlddock worlds list`、`worlddock worlds export`、`worlddock worlds import`、`worlddock repositories pull`。
-- 缺少 `public-api.integration-spec.ts` 和 `packages/worlddock-cli/test/cli.test.ts`。
+待重新验收：
+
+- 本轮未执行 Phase 14 的定向验收命令，因此暂不把 Phase 14 标记为完成。
+- 需复跑 public API integration、CLI test、CLI lint/build 和相关文档检查，确认个人访问令牌 scope、CLI 命令和世界包 API 全部满足 Phase 14 验收标准。
 
 已有但不足：
 
-- 已有 access token 创建、列表、撤销 API。
-- 已有 Local Push 用的 `repository:push` scope，但 Cloud Alpha 计划把本地部署和 Local Push 放在 Alpha 后的独立计划里。
+- `packages/domain/src/developer-access/index.ts`、`apps/api/src/modules/developer-access/*`、`packages/worlddock-cli/*`、`docs/product/api.md`、`apps/api/test/public-api.integration-spec.ts` 和 `packages/worlddock-cli/test/cli.test.ts` 已存在；早期“缺少文件/测试”的静态判断已不再适用。
+- 当前 developer access scope 已包含 `world:read`、`world:write`、`repository:read` 和 `billing:read`；仍需通过 Phase 14 验收确认 API、CLI 和文档一致性。
+- 当前 CLI 已包含 `login`、`worlds list`、`worlds export`、`worlds import` 和 `repositories pull` 主命令；仍需通过 CLI test 和端到端 API contract 复核。
 
 ## 建议执行顺序
 
-1. 先完成 Phase 1，移除静态导出假设，补 CI、Docker、生产 env gate 和运维 runbook。
-2. Phase 2、Phase 3 和 Phase 10 已完成，后续保持其验收测试作为回归门禁。
-3. 在 Phase 4 中统一 world assets，消除前端本地 CRUD。
-4. 然后推进 Phase 5 和 Phase 7，因为 Agent、账本、计费和发布验收互相依赖。
-5. 再按通知、官网、运维和 CLI 的依赖顺序推进后续 Phase。
+1. 先重新验收 Phase 1，确认 CI、Docker、生产 env gate、静态导出移除、系统集成测试和运维 runbook 全部满足计划标准。
+2. 保持 Phase 2 至 Phase 13 的验收测试作为回归门禁。
+3. 再重新验收 Phase 14，确认个人访问令牌、public API、世界包 CLI 和文档 contract 全部满足计划标准。
 
 ## 本次执行说明
 
-本记录最初来自静态调查和文档整理；Phase 3 收口时已补充执行定向验证，并在 `docs/superpowers/plans/2026-05-27-phase-3-cloud-only-main-path.md` 中记录完整验证命令。Phase 10 收口时已运行本记录中的定向与全量回归验收。除已完成 Phase 外，其余未完成 Phase 仍保持静态调查结论，尚未运行对应全量验收。
+本记录最初来自静态调查和文档整理；后续 Phase 收口已逐步补充定向验证和完成依据。Phase 1 与 Phase 14 的早期静态缺口已有明显变化，但本轮未运行对应完整验收，因此本记录只将其标为待重新验收，不再保留明显过期的“缺少文件”断言。
