@@ -15,7 +15,6 @@ export const PRODUCT_EVENTS = [
 export const productEventNameSchema = z.enum(PRODUCT_EVENTS);
 
 export const productEventInputSchema = z.object({
-  userId: z.string().min(1).optional(),
   name: productEventNameSchema,
   context: z.record(z.string(), z.unknown()).default({}),
   anonymousId: z.string().min(1).optional(),
@@ -25,7 +24,6 @@ export const productEventInputSchema = z.object({
 
 export const productEventSchema = z.object({
   id: z.string().min(1),
-  userId: z.string().min(1).nullable(),
   name: productEventNameSchema,
   context: z.record(z.string(), z.unknown()),
   anonymousId: z.string().min(1).nullable(),

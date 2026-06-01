@@ -49,6 +49,23 @@ describe("analytics endpoints", () => {
     expect(repository.events[0]?.context).toEqual({ plan: "creator", source: "pricing_card" });
   });
 
+  it("ignores public userId values instead of storing or returning them", async () => {
+    const repository = createInMemoryAnalyticsRepository();
+    app = await createTestApp(repository);
+
+    const response = await request(app.getHttpServer())
+      .post("/v1/analytics/events")
+      .send({
+        userId: "spoofed_user",
+        name: "signed_up",
+      })
+      .expect(201);
+
+    expect(response.body.event).not.toHaveProperty("userId");
+    expect(repository.events).toHaveLength(1);
+    expect(repository.events[0]).not.toHaveProperty("userId");
+  });
+
   it("rejects unknown product events without storing them", async () => {
     const repository = createInMemoryAnalyticsRepository();
     app = await createTestApp(repository);

@@ -1,5 +1,5 @@
-import { Inject, Injectable, type OnModuleDestroy } from "@nestjs/common";
-import { createPrismaClient, type PrismaClient } from "@worlddock/db";
+import { Inject, Injectable, Optional, type OnModuleDestroy } from "@nestjs/common";
+import { createPrismaClient } from "@worlddock/db";
 import {
   productEventNameSchema,
   type ProductEvent,
@@ -21,10 +21,38 @@ export type ProductEventRecord = {
   createdAt: Date;
 };
 
-export type ProductEventCreateInput = Omit<ProductEventRecord, "id" | "createdAt">;
+export type ProductEventCreateInput = Omit<ProductEventRecord, "id" | "createdAt" | "userId">;
 
 export type AnalyticsRepository = {
   createEvent(input: ProductEventCreateInput): Promise<ProductEventRecord>;
+};
+
+type ProductAnalyticsEventCreateData = {
+  name: ProductEventName;
+  context: Record<string, unknown>;
+  anonymousId: string | null;
+  route: string | null;
+  userAgent: string | null;
+  occurredAt: Date;
+};
+
+type PrismaAnalyticsClient = {
+  productAnalyticsEvent: {
+    create(args: { data: ProductAnalyticsEventCreateData }): Promise<PrismaProductAnalyticsEventRecord>;
+  };
+  $disconnect(): Promise<void>;
+};
+
+type PrismaProductAnalyticsEventRecord = {
+  id: string;
+  userId: string | null;
+  name: string;
+  context: unknown;
+  anonymousId: string | null;
+  route: string | null;
+  userAgent: string | null;
+  occurredAt: Date;
+  createdAt: Date;
 };
 
 @Injectable()
@@ -33,7 +61,6 @@ export class AnalyticsService {
 
   async record(input: ProductEventInput, userAgent?: string | null) {
     const event = await this.repository.createEvent({
-      userId: input.userId ?? null,
       name: input.name,
       context: input.context,
       anonymousId: input.anonymousId ?? null,
@@ -47,14 +74,17 @@ export class AnalyticsService {
 
 @Injectable()
 export class PrismaAnalyticsRepository implements AnalyticsRepository, OnModuleDestroy {
-  private readonly prisma: PrismaClient = createPrismaClient();
+  private readonly prisma: PrismaAnalyticsClient;
+
+  constructor(@Optional() prisma?: PrismaAnalyticsClient) {
+    this.prisma = prisma ?? (createPrismaClient() as unknown as PrismaAnalyticsClient);
+  }
 
   async createEvent(input: ProductEventCreateInput) {
     const event = await this.prisma.productAnalyticsEvent.create({
       data: {
-        userId: input.userId ?? null,
         name: input.name,
-        context: input.context as never,
+        context: input.context,
         anonymousId: input.anonymousId ?? null,
         route: input.route ?? null,
         userAgent: input.userAgent ?? null,
@@ -95,7 +125,6 @@ function normalizeContext(value: unknown): Record<string, unknown> {
 function toProductEventResponse(event: ProductEventRecord): ProductEvent {
   return {
     id: event.id,
-    userId: event.userId ?? null,
     name: event.name,
     context: event.context,
     anonymousId: event.anonymousId ?? null,
