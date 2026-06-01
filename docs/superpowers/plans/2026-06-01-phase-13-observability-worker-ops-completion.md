@@ -817,7 +817,7 @@ Expected: commit succeeds and Author/Committer do not contain the user's real na
 - Modify: `docs/operations/production_release_checklist.md`
 - Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Run current documentation checks and confirm the gap**
+- [x] **Step 1: Run current documentation checks and confirm the gap**
 
 Run:
 
@@ -829,7 +829,7 @@ rg -n "## Phase 13: 可观测性、Worker 运维和生产发布闭环|完成状�
 
 Expected: first command still finds English headings, second command finds checklist fields, third command does not yet find Phase 13 completion evidence.
 
-- [ ] **Step 2: Replace Worker alerts runbook with Chinese operations guidance**
+- [x] **Step 2: Replace Worker alerts runbook with Chinese operations guidance**
 
 Replace `docs/operations/worker_alerts.md` with:
 
@@ -875,7 +875,7 @@ pnpm --filter @worlddock/api test:integration -- worker-health.integration-spec.
 ```
 ````
 
-- [ ] **Step 3: Ensure release checklist fields are present**
+- [x] **Step 3: Ensure release checklist fields are present**
 
 Verify `docs/operations/production_release_checklist.md` contains these items exactly once:
 
@@ -900,7 +900,7 @@ Verify `docs/operations/production_release_checklist.md` contains these items ex
 
 If any item is missing, add it in the production readiness section. If an item exists but lacks Owner/Evidence/Command, update it to match the block above.
 
-- [ ] **Step 4: Update Phase 13 in incomplete-tasks after verification passes**
+- [x] **Step 4: Update Phase 13 in incomplete-tasks after verification passes**
 
 After Task 5 verification passes, replace the Phase 13 section in `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` with:
 
@@ -938,7 +938,7 @@ After Task 5 verification passes, replace the Phase 13 section in `docs/superpow
 - Worker 队列健康 API 依赖 `REDIS_URL` 读取 BullMQ；本地和测试通过 provider override 注入 fake queue readers，避免依赖真实 Redis。
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run the identity check from this plan, then:
 
