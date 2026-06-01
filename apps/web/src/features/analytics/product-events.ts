@@ -1,22 +1,87 @@
-export const PRODUCT_EVENTS = {
-  signedUp: "signed_up",
-  onboardingCompleted: "onboarding_completed",
-  worldCreated: "world_created",
-  agentRunStarted: "agent_run_started",
-  suggestionSaved: "suggestion_saved",
-  worldPublished: "world_published",
-  repositoryForked: "repository_forked",
-  alphaFeedbackSubmitted: "alpha_feedback_submitted",
-  billingPlaceholderClicked: "billing_placeholder_clicked",
-} as const;
+import { PRODUCT_EVENTS } from "@worlddock/domain";
+import type { ProductEventName } from "@worlddock/domain";
 
-export type ProductEventName = typeof PRODUCT_EVENTS[keyof typeof PRODUCT_EVENTS];
+export { PRODUCT_EVENTS };
+export type { ProductEventName };
 
-export function trackProductEvent(name: ProductEventName, context: Record<string, unknown> = {}) {
-  if (typeof window === "undefined") return;
-  void fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/v1/analytics/events`, {
+const ANONYMOUS_ID_KEY = "worlddock.anonymousId";
+
+type ProductEventContext = Record<string, unknown>;
+
+type ProductEventOptions = {
+  fetcher?: typeof fetch;
+  baseUrl?: string;
+  anonymousId?: string;
+  route?: string;
+};
+
+function resolveApiBaseUrl(baseUrl?: string) {
+  return (
+    baseUrl ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL ??
+    "http://localhost:4000"
+  ).replace(/\/$/, "");
+}
+
+function createAnonymousId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `anon_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
+
+function readBrowserAnonymousId() {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const existingAnonymousId = window.localStorage.getItem(ANONYMOUS_ID_KEY);
+    if (existingAnonymousId) return existingAnonymousId;
+
+    const anonymousId = createAnonymousId();
+    window.localStorage.setItem(ANONYMOUS_ID_KEY, anonymousId);
+    return anonymousId;
+  } catch {
+    return createAnonymousId();
+  }
+}
+
+function readBrowserRoute() {
+  if (typeof window === "undefined") return undefined;
+  return window.location.pathname;
+}
+
+export async function sendProductEvent(
+  name: ProductEventName,
+  context: ProductEventContext = {},
+  options: ProductEventOptions = {},
+) {
+  const fetcher = options.fetcher ?? fetch;
+
+  return fetcher(`${resolveApiBaseUrl(options.baseUrl)}/v1/analytics/events`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name, context, occurredAt: new Date().toISOString() }),
+    body: JSON.stringify({
+      name,
+      context,
+      anonymousId: options.anonymousId,
+      route: options.route,
+      occurredAt: new Date().toISOString(),
+    }),
+  });
+}
+
+export function trackProductEvent(
+  name: ProductEventName,
+  context: ProductEventContext = {},
+  options: ProductEventOptions = {},
+) {
+  if (typeof window === "undefined") return;
+
+  void sendProductEvent(name, context, {
+    ...options,
+    anonymousId: options.anonymousId ?? readBrowserAnonymousId(),
+    route: options.route ?? readBrowserRoute(),
   }).catch(() => {});
 }
