@@ -6,8 +6,8 @@ describe("product events analytics client", () => {
   const originalWorldDockApiBaseUrl = process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL;
 
   afterEach(() => {
-    process.env.NEXT_PUBLIC_API_BASE_URL = originalApiBaseUrl;
-    process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL = originalWorldDockApiBaseUrl;
+    restoreEnv("NEXT_PUBLIC_API_BASE_URL", originalApiBaseUrl);
+    restoreEnv("NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL", originalWorldDockApiBaseUrl);
   });
 
   it("sends product events to the analytics endpoint", async () => {
@@ -48,3 +48,12 @@ describe("product events analytics client", () => {
     expect(fetcher.mock.calls[0][0]).toBe("https://worlddock-api.test/v1/analytics/events");
   });
 });
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+
+  process.env[name] = value;
+}
