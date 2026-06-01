@@ -31,6 +31,7 @@ model User {
   storageObjects StorageObject[]
   profile       UserProfile?
   notifications Notification[]
+  activityEvents ActivityEvent[]
   supportFeedback SupportFeedback[]
   analyticsEvents ProductAnalyticsEvent[]
 
@@ -613,6 +614,26 @@ model Notification {
   @@index([userId, readAt, createdAt])
   @@index([type])
   @@map("notifications")
+}
+
+model ActivityEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  body       String
+  targetType String
+  targetId   String?
+  metadata   Json
+  dedupeKey  String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([targetType, targetId])
+  @@map("activity_events")
 }
 
 model SupportFeedback {

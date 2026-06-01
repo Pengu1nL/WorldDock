@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { BillingModule } from "../billing/billing.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { WorldsModule } from "../worlds/worlds.module";
 import { PrismaRepositoryRepository } from "./prisma-repository.repository";
@@ -10,7 +11,7 @@ import { MeilisearchRepositorySearchClient, REPOSITORY_SEARCH_CLIENT } from "./r
 import { RepositoryService } from "./repository.service";
 
 @Module({
-  imports: [AuthModule, BillingModule, OutboxModule, WorldsModule],
+  imports: [AuthModule, BillingModule, NotificationsModule, OutboxModule, WorldsModule],
   controllers: [RepositoryController],
   providers: [
     RepositoryService,

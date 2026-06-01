@@ -22,5 +22,31 @@ export const notificationSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
+export const activityTargetTypeSchema = z.enum([
+  "account",
+  "agent_run",
+  "billing",
+  "fork",
+  "release",
+  "repository",
+  "report",
+  "support",
+  "world",
+]);
+
+export const activityEventSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  type: notificationTypeSchema,
+  title: z.string().min(1),
+  body: z.string().min(1),
+  targetType: activityTargetTypeSchema,
+  targetId: z.string().min(1).nullable(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.string().datetime(),
+});
+
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 export type Notification = z.infer<typeof notificationSchema>;
+export type ActivityTargetType = z.infer<typeof activityTargetTypeSchema>;
+export type ActivityEvent = z.infer<typeof activityEventSchema>;

@@ -308,15 +308,38 @@
 
 ## Phase 11: 站内通知、活动流和 Alpha 反馈入口
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `packages/domain/src/notifications/index.ts`。
-- 缺少 `apps/api/src/modules/notifications/*`。
-- 缺少 `apps/web/src/features/notifications/notification-center.tsx`。
-- 缺少 `apps/web/src/features/support/support-entry.tsx`。
-- 缺少 `docs/product/beta-email.md`。
-- 缺少通知表、未读数、mark as read、反馈提交和活动流。
-- 缺少 `notifications.integration-spec.ts`。
+完成依据：
+
+- `packages/domain/src/notifications/index.ts` 已定义通知类型、活动目标类型、站内通知 schema 和活动事件 schema。
+- `packages/db/prisma/schema.prisma` 与 `packages/db/prisma/migrations/20260601090000_phase11_activity_events/migration.sql` 已支持通知、活动流和 Alpha 反馈持久化。
+- `apps/api/src/modules/notifications/*` 已提供 `GET /v1/notifications`、`POST /v1/notifications/:notificationId/read`、`GET /v1/activity` 和 `POST /v1/support/feedback`。
+- `NotificationsService.emitUserEvent()` 已统一处理通知和活动幂等投递；`safeEmitUserEvent()` 确保通知失败不污染已成功的主业务路径。
+- Billing、Agent、Repository 和 Moderation 主路径已投递低余额、Agent Run 失败、世界发布、Release 发布、Repository Fork、举报收到和 Beta 支付候补登记事件。
+- `apps/web/src/features/notifications/notification-center.tsx` 已提供未读数、mark as read、通知列表和活动流。
+- `apps/web/src/features/support/support-entry.tsx` 已提供 Alpha 反馈入口，并保留 route、mode 和当前世界上下文。
+- `apps/web/src/features/worlddock/view-settings.tsx` 已把通知中心、活动流和反馈入口接入设置页 `通知反馈` tab。
+- `docs/product/beta-email.md` 已明确 Alpha 不发送事务邮件或营销邮件，邮箱验证、密码找回和邮件通知推迟到 Beta。
+- `apps/api/test/notifications.integration-spec.ts` 与 `apps/web/tests/e2e/notifications-support.spec.ts` 已覆盖 Phase 11 主路径。
+
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/domain lint`：通过。
+- `pnpm --filter @worlddock/api test:integration -- notifications.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/api build`：通过。
+- `pnpm --filter @worlddock/web test -- api.test.ts runtime-no-mock.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- notifications-support.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+- `rg -n "sendEmail|email worker|password reset|verify email|verification email|welcome email|mailgun|postmark|resend|smtp|nodemailer" apps packages docs/product/beta-email.md`：通过，仅命中 Beta 邮件边界说明。
+
+剩余说明：
+
+- Phase 11 不实现邮件通知、邮箱注册验证、密码找回邮件、客服工单系统、通知偏好设置或实时 WebSocket 推送。
+- Alpha 活动流为站内只读时间线，后续版本再引入筛选、聚合、通知偏好和外部投递渠道。
 
 ## Phase 12: 产品分析、官网和 Alpha 申请/反馈
 

@@ -1,5 +1,7 @@
 import { HttpException, Inject, Injectable } from "@nestjs/common";
 import { calculateModelRunCostCents, type ModelPrice, type TokenUsage } from "@worlddock/domain";
+import { captureException } from "../../common/observability";
+import { NotificationsService } from "../notifications/notifications.service";
 import { BILLING_REPOSITORY, type AgentRunTerminalUpdateInput, type BillingAccountRecord, type BillingRepository, type UsageLedgerEntryRecord } from "./billing.repository";
 
 export const INITIAL_FREE_CREDIT_CENTS = 10_000;
@@ -8,7 +10,10 @@ export const AGENT_RUN_RESERVE_CENTS = 100;
 
 @Injectable()
 export class BillingService {
-  constructor(@Inject(BILLING_REPOSITORY) private readonly billing: BillingRepository) {}
+  constructor(
+    @Inject(BILLING_REPOSITORY) private readonly billing: BillingRepository,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async getBalance(userId: string) {
     const account = await this.ensureAccount(userId);
@@ -139,12 +144,22 @@ export class BillingService {
 
   async capturePlaceholderIntent(userId: string, plan: string) {
     const account = await this.ensureAccount(userId);
-    return this.billing.createPlaceholderIntent({
+    const intent = await this.billing.createPlaceholderIntent({
       accountId: account.id,
       userId,
       plan,
       source: "alpha_ui",
     });
+    await this.notifications.safeEmitUserEvent(userId, {
+      type: "billing_placeholder_clicked",
+      title: "Beta 支付候补已记录",
+      body: `你已登记 ${plan} 方案，Alpha 阶段不会发起真实扣款。`,
+      targetType: "billing",
+      targetId: intent.id,
+      metadata: { plan, intentId: intent.id },
+      dedupeKey: `billing-placeholder:${intent.id}`,
+    });
+    return intent;
   }
 
   private async settleAgentRunAndUpdateStatus(
@@ -171,6 +186,7 @@ export class BillingService {
       expectedRunStatus: "running",
       runUpdate,
     });
+    if (terminalEntry?.type === "model_run_settled") await this.safeEmitLowBalanceIfNeeded(userId, agentRunId);
     return terminalEntry?.type === "model_run_settled" ? terminalEntry : null;
   }
 
@@ -245,6 +261,34 @@ export class BillingService {
     return -entries
       .filter((entry) => entry.type === "model_run_reserved")
       .reduce((total, entry) => total + entry.amountCents, 0);
+  }
+
+  private async emitLowBalanceIfNeeded(userId: string, agentRunId: string) {
+    const balance = await this.getBalance(userId);
+    if (balance.balanceCents > balance.lowBalanceThresholdCents) return;
+    await this.notifications.safeEmitUserEvent(userId, {
+      type: "low_balance",
+      title: "创作点余额偏低",
+      body: `当前余额为 ¥${(balance.balanceCents / 100).toFixed(2)}，Alpha 阶段不会自动扣款。`,
+      targetType: "billing",
+      targetId: agentRunId,
+      metadata: {
+        balanceCents: balance.balanceCents,
+        lowBalanceThresholdCents: balance.lowBalanceThresholdCents,
+      },
+      dedupeKey: `low-balance:${userId}:${agentRunId}`,
+    });
+  }
+
+  private async safeEmitLowBalanceIfNeeded(userId: string, agentRunId: string) {
+    try {
+      await this.emitLowBalanceIfNeeded(userId, agentRunId);
+    } catch (error) {
+      captureException(error, {
+        tags: { feature: "billing", notificationType: "low_balance" },
+        extra: { userId, agentRunId },
+      });
+    }
   }
 }
 

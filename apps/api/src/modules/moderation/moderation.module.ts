@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { OutboxModule } from "../outbox/outbox.module";
 import { RepositoryModule } from "../repositories/repository.module";
 import { ModerationController } from "./moderation.controller";
@@ -8,7 +9,7 @@ import { ModerationService } from "./moderation.service";
 import { PrismaModerationRepository } from "./prisma-moderation.repository";
 
 @Module({
-  imports: [AuthModule, OutboxModule, RepositoryModule],
+  imports: [AuthModule, NotificationsModule, OutboxModule, RepositoryModule],
   controllers: [ModerationController],
   providers: [
     ModerationService,

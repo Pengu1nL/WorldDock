@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nest
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldSuggestion } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
 import { BillingService } from "../billing/billing.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { WORLD_REPOSITORY, type WorldRepository, type WorldRecord } from "../worlds/world.repository";
 import { selectInitialWorldContext } from "./context-builder";
 import { describeWorldTools } from "./pi/world-tool-registry";
@@ -17,6 +18,7 @@ export class AgentService {
     @Inject(AGENT_PROVIDER) private readonly provider: AgentProvider,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     private readonly billing: BillingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async createRun(subject: AuthSubject, worldId: string, input: { prompt: string; mode: "expand" | "challenge" | "fork" | "polish" }) {
@@ -135,6 +137,15 @@ export class AgentService {
       const failure = agentFailureFromError(error);
       const refund = await this.billing.refundAgentRunAndFail(run.userId, run.id, failure.reason, failure);
       if (!refund) return;
+      await this.notifications.safeEmitUserEvent(run.userId, {
+        type: "agent_run_failed",
+        title: "Agent Run 失败",
+        body: failure.message,
+        targetType: "agent_run",
+        targetId: run.id,
+        metadata: { code: failure.code, reason: failure.reason, worldId: run.worldId },
+        dedupeKey: `agent-run-failed:${run.id}`,
+      });
       yield await this.append(run.id, sequence++, "run.failed", { code: failure.code, message: failure.message });
     }
   }

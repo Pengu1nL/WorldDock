@@ -5,7 +5,7 @@ import type { BillingAccountRecord, BillingRepository, UsageLedgerEntryRecord } 
 describe("BillingService", () => {
   it("settles an agent run once when concurrent callers race", async () => {
     const repository = createRacyBillingRepository();
-    const service = new BillingService(repository);
+    const service = new BillingService(repository, createNotificationsServiceStub());
 
     await Promise.all([
       service.settleAgentRun("user_1", "run_1", { inputTokens: 12, outputTokens: 30, totalTokens: 42 }, { provider: "openai-compatible", model: "qwen3-32b" }),
@@ -18,7 +18,7 @@ describe("BillingService", () => {
 
   it("creates only one terminal entry when settlement and refund race", async () => {
     const repository = createRacyBillingRepository();
-    const service = new BillingService(repository);
+    const service = new BillingService(repository, createNotificationsServiceStub());
 
     await Promise.all([
       service.settleAgentRun("user_1", "run_1", { inputTokens: 12, outputTokens: 30, totalTokens: 42 }, { provider: "openai-compatible", model: "qwen3-32b" }),
@@ -33,7 +33,7 @@ describe("BillingService", () => {
 
   it("does not settle a run that already has a refund terminal entry", async () => {
     const repository = createRacyBillingRepository({ synchronizeFirstRunLists: false });
-    const service = new BillingService(repository);
+    const service = new BillingService(repository, createNotificationsServiceStub());
 
     const refund = await service.refundAgentRun("user_1", "run_1", "provider_failed");
     const settlement = await service.settleAgentRun(
@@ -52,7 +52,7 @@ describe("BillingService", () => {
 
   it("does not refund a run that already has a settlement terminal entry", async () => {
     const repository = createRacyBillingRepository({ synchronizeFirstRunLists: false });
-    const service = new BillingService(repository);
+    const service = new BillingService(repository, createNotificationsServiceStub());
 
     const settlement = await service.settleAgentRun(
       "user_1",
@@ -71,7 +71,7 @@ describe("BillingService", () => {
 
   it("does not write a terminal ledger entry when completion cannot claim the running run", async () => {
     const repository = createRacyBillingRepository({ synchronizeFirstRunLists: false, runStatus: "cancelled" });
-    const service = new BillingService(repository);
+    const service = new BillingService(repository, createNotificationsServiceStub());
 
     const settlement = await service.settleAgentRunAndComplete(
       "user_1",
@@ -173,4 +173,10 @@ function createRacyBillingRepository(options: { synchronizeFirstRunLists?: boole
 
 function isTerminalEntry(entry: UsageLedgerEntryRecord) {
   return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
+}
+
+function createNotificationsServiceStub() {
+  return {
+    async safeEmitUserEvent() {},
+  } as never;
 }

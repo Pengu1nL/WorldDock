@@ -1,12 +1,20 @@
-# Beta Email
+# Beta 邮件能力
 
-Alpha does not send transactional or marketing email.
+Cloud Alpha 不发送事务邮件或营销邮件。产品内只提供站内通知、活动流和 Alpha 反馈入口。
 
-Deferred to Beta:
-- Email signup verification
-- Password reset email
-- Welcome email
-- Low balance email
-- Payment failed email
-- Publish success email
-- Moderation action email
+推迟到 Beta 的邮件能力：
+
+- 邮箱注册验证
+- 密码找回邮件
+- 欢迎邮件
+- 低余额邮件
+- 支付失败邮件
+- 发布成功邮件
+- 审核动作邮件
+
+Alpha 验收边界：
+
+- 不新增 email worker。
+- 不新增邮箱验证流程。
+- 不新增邮件投递服务配置。
+- 低余额、发布成功、举报收到和反馈收到都通过站内通知呈现。

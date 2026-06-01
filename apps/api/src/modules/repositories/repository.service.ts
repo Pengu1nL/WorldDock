@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { licenseSchema, releaseSnapshotSchema, type ReleaseChange, type ReleaseDiff, type ReleaseSnapshot } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
 import { EntitlementsService } from "../billing/entitlements.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { OUTBOX_REPOSITORY, type OutboxRepository } from "../outbox/outbox.repository";
 import { WORLD_REPOSITORY, type WorldRecord, type WorldRepository } from "../worlds/world.repository";
 import { REPOSITORY_REPOSITORY, type ForkRecord, type PublicRepositoryRecord, type ReleaseRecord, type RepositoryRepository } from "./repository.repository";
@@ -16,6 +17,7 @@ export class RepositoryService {
     @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
     @Inject(REPOSITORY_SEARCH_CLIENT) private readonly searchClient: RepositorySearchClient,
     private readonly entitlements: EntitlementsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async listPublicRepositories() {
@@ -170,6 +172,26 @@ export class RepositoryService {
       });
     }
     await this.emitRepositoryEvent("repository.forked", repository.id, { repositoryId: repository.id, forkId: fork.id, userId: subject.user.id });
+    await this.notifications.safeEmitUserEvent(subject.user.id, {
+      type: "repository_forked",
+      title: "Fork 已创建",
+      body: `${repository.name} 已复制到你的世界列表。`,
+      targetType: "fork",
+      targetId: fork.id,
+      metadata: { repositoryId: repository.id, worldId: world.id, sourceReleaseId: latestRelease.id },
+      dedupeKey: `repository-forked:${fork.id}:actor`,
+    });
+    if (repository.ownerId !== subject.user.id) {
+      await this.notifications.safeEmitUserEvent(repository.ownerId, {
+        type: "repository_forked",
+        title: "你的仓库被 Fork",
+        body: `${repository.name} 被一位 Alpha 用户 Fork。`,
+        targetType: "repository",
+        targetId: repository.id,
+        metadata: { forkId: fork.id, sourceReleaseId: latestRelease.id },
+        dedupeKey: `repository-forked:${fork.id}:owner`,
+      });
+    }
 
     return { world, fork };
   }
@@ -292,6 +314,24 @@ export class RepositoryService {
     await this.worlds.updateWorld(world.id, { status: "published", visibility: "public" });
     await this.emitRepositoryEvent("repository.published", repository.id, { repositoryId: repository.id, releaseId: release.id, worldId: world.id });
     await this.emitRepositoryEvent("repository.moderation_scan_requested", repository.id, { repositoryId: repository.id, releaseId: release.id, worldId: world.id, source: "cloud-publish" });
+    await this.notifications.safeEmitUserEvent(subject.user.id, {
+      type: "world_published",
+      title: "世界已发布",
+      body: `${world.name} 已发布到界仓。`,
+      targetType: "world",
+      targetId: world.id,
+      metadata: { repositoryId: repository.id, releaseId: release.id },
+      dedupeKey: `world-published:${release.id}`,
+    });
+    await this.notifications.safeEmitUserEvent(subject.user.id, {
+      type: "release_published",
+      title: "Release 已生成",
+      body: `${repository.name} ${release.version} 已生成公开快照。`,
+      targetType: "release",
+      targetId: release.id,
+      metadata: { repositoryId: repository.id, version: release.version },
+      dedupeKey: `release-published:${release.id}`,
+    });
 
     return {
       repository: await this.toRepositoryDetail(repository),

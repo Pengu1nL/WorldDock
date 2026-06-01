@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { CreateReportInput, ModerateReportInput, ModerationAction, ModerationStatus, ReportStatus, ReportTargetType } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { OUTBOX_REPOSITORY, type OutboxRepository } from "../outbox/outbox.repository";
 import { REPOSITORY_REPOSITORY, type PublicRepositoryRecord, type RepositoryRepository } from "../repositories/repository.repository";
 import { MODERATION_REPOSITORY, type ModerationRepository } from "./moderation.repository";
@@ -13,6 +14,7 @@ export class ModerationService {
     @Inject(MODERATION_REPOSITORY) private readonly moderation: ModerationRepository,
     @Inject(REPOSITORY_REPOSITORY) private readonly repositories: RepositoryRepository,
     @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async reportRepository(subject: AuthSubject, repositoryId: string, input: CreateReportInput) {
@@ -37,6 +39,7 @@ export class ModerationService {
         },
       });
     }
+    await this.emitReportReceived(subject, report);
     return this.toReportResponse(report.record);
   }
 
@@ -51,7 +54,23 @@ export class ModerationService {
       reason: input.reason,
       detail: input.detail,
     });
+    await this.emitReportReceived(subject, report);
     return this.toReportResponse(report.record);
+  }
+
+  private async emitReportReceived(
+    subject: AuthSubject,
+    report: Awaited<ReturnType<ModerationService["createIdempotentReport"]>>,
+  ) {
+    await this.notifications.safeEmitUserEvent(subject.user.id, {
+      type: "report_received",
+      title: "举报已收到",
+      body: "Alpha 团队会按人工治理 runbook 处理这条举报。",
+      targetType: "report",
+      targetId: report.record.id,
+      metadata: { targetType: report.record.targetType, targetId: report.record.targetId, duplicate: report.duplicate },
+      dedupeKey: `report-received:${report.record.id}`,
+    });
   }
 
   private async createIdempotentReport(subject: AuthSubject, input: {

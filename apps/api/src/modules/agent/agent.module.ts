@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { BillingModule } from "../billing/billing.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldsModule } from "../worlds/worlds.module";
 import { AgentController } from "./agent.controller";
@@ -15,7 +16,7 @@ import { createWorldToolRegistry } from "./pi/world-tools";
 import { PrismaAgentRepository } from "./prisma-agent.repository";
 
 @Module({
-  imports: [AuthModule, BillingModule, WorldsModule],
+  imports: [AuthModule, BillingModule, NotificationsModule, WorldsModule],
   controllers: [AgentController],
   providers: [
     AgentService,
