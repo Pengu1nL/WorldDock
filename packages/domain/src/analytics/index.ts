@@ -1,18 +1,28 @@
 import { z } from "zod";
 
-export const PRODUCT_EVENTS = [
-  "signed_up",
-  "onboarding_completed",
-  "world_created",
-  "agent_run_started",
-  "suggestion_saved",
-  "world_published",
-  "repository_forked",
-  "alpha_feedback_submitted",
-  "billing_placeholder_clicked",
-] as const;
+export const PRODUCT_EVENTS = {
+  signedUp: "signed_up",
+  onboardingCompleted: "onboarding_completed",
+  worldCreated: "world_created",
+  agentRunStarted: "agent_run_started",
+  suggestionSaved: "suggestion_saved",
+  worldPublished: "world_published",
+  repositoryForked: "repository_forked",
+  alphaFeedbackSubmitted: "alpha_feedback_submitted",
+  billingPlaceholderClicked: "billing_placeholder_clicked",
+} as const;
 
-export const productEventNameSchema = z.enum(PRODUCT_EVENTS);
+export const productEventNameSchema = z.enum([
+  PRODUCT_EVENTS.signedUp,
+  PRODUCT_EVENTS.onboardingCompleted,
+  PRODUCT_EVENTS.worldCreated,
+  PRODUCT_EVENTS.agentRunStarted,
+  PRODUCT_EVENTS.suggestionSaved,
+  PRODUCT_EVENTS.worldPublished,
+  PRODUCT_EVENTS.repositoryForked,
+  PRODUCT_EVENTS.alphaFeedbackSubmitted,
+  PRODUCT_EVENTS.billingPlaceholderClicked,
+]);
 
 export const productEventInputSchema = z.object({
   name: productEventNameSchema,
