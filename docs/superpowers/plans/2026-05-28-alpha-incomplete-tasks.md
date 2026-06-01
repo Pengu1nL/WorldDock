@@ -375,19 +375,35 @@
 
 ## Phase 13: 可观测性、Worker 运维和生产发布闭环
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `apps/worker/src/queue-dashboard.ts`。
-- 缺少 `apps/api/src/modules/system/worker-health.controller.ts`。
-- 缺少 `docs/operations/worker_alerts.md`。
-- Release checklist 没有 owner/evidence/command。
-- API 未暴露 queue health。
-- 缺少 `worker-health.integration-spec.ts` 和 `queue-dashboard.test.ts`。
+完成依据：
 
-已有但不足：
+- `packages/domain/src/operations/queue-health.ts` 定义 Worker 队列名称、健康状态、快照 schema、状态分类和生产发布门禁 helper。
+- `apps/worker/src/queue-dashboard.ts` 复用共享 Worker queue health 契约，避免 Worker 侧另写队列状态分类。
+- `apps/api/src/modules/system/worker-health.service.ts` 读取 BullMQ 队列 `repository-search-indexing`、`moderation-scan`、`exports`，并提供有界队列读取与 fallback degraded snapshot。
+- `apps/api/src/modules/system/worker-health.controller.ts` 暴露 `/v1/system/worker-health`，返回 `status`、`ready`、`generatedAt`、`requestId` 和 queue health。
+- API 和 Worker observability 会针对 unhealthy queue 发出带具体队列 tag 的 Sentry event/tag。
+- `docs/operations/worker_alerts.md` 已更新为中文 Worker 队列告警 Runbook，`docs/operations/production_release_checklist.md` 已校准 Worker health、失败告警、staging 冒烟和发布后观察窗口条目。
+- Phase 13 测试覆盖 `worker-health.integration-spec.ts`、`worker-health.controller.spec.ts` 和 `queue-dashboard.test.ts`。
 
-- Worker 已有 search indexing、moderation scan、storage cleanup 和 Sentry capture 雏形。
-- API/Worker 已有基础 observability 初始化。
+验收证据：
+
+- `pnpm --filter @worlddock/domain lint`：通过（Task 4 复跑）。
+- `pnpm --filter @worlddock/worker test -- queue-dashboard.test.ts`：通过（Task 4 复跑，4 个 test file、18 个 test）。
+- `pnpm --filter @worlddock/worker lint`：Task 4 复跑未通过，当前报错为 `apps/worker/test/queue-dashboard.test.ts(22,34) TS2502: 'scope' is referenced directly or indirectly in its own type annotation.`；发布前需由 Task 5 或实现任务修正后补跑。
+- `pnpm --filter @worlddock/api test -- worker-health.controller.spec.ts`：通过（Task 4 复跑，9 个 test file、33 个 test）。
+- `pnpm --filter @worlddock/api test:integration -- worker-health.integration-spec.ts`：通过（Task 4 复跑，19 个 test file 通过、1 个 skipped；79 个 test 通过、1 个 skipped）。
+- `pnpm --filter @worlddock/api lint`：通过（Task 4 复跑）。
+- `pnpm lint`：待 Task 5 全仓验收后补齐。
+- `pnpm test`：待 Task 5 全仓验收后补齐。
+- `pnpm build`：待 Task 5 全仓验收后补齐。
+
+剩余说明：
+
+- Phase 13 不新增托管 queue panel、admin dashboard 或一键发布自动化。
+- Worker health API 依赖 `REDIS_URL`；测试通过 provider override fake readers 覆盖，不需要 Redis。
+- 当前 Task 4 只做文档收口；最终发布 ready 状态仍以后续 Task 5 全量验证结果为准。
 
 ## Phase 14: 世界包 CLI、个人访问令牌和轻量生态
 
