@@ -368,7 +368,7 @@ Expected: commit succeeds and Author/Committer do not contain the user's real na
 - Modify: `apps/api/src/modules/system/system.module.ts`
 - Test: `apps/api/test/worker-health.integration-spec.ts`
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 Replace `apps/api/test/worker-health.integration-spec.ts` with:
 
@@ -494,7 +494,7 @@ function queueReader(name: string, counts: { waiting: number; active: number; co
 }
 ```
 
-- [ ] **Step 2: Run integration test and confirm failure**
+- [x] **Step 2: Run integration test and confirm failure**
 
 Run:
 
@@ -504,7 +504,7 @@ pnpm --filter @worlddock/api test:integration -- worker-health.integration-spec.
 
 Expected: FAIL because `WORKER_QUEUE_READERS` and `worker-health.service.ts` do not exist, and the current controller still reads `WORKER_QUEUE_HEALTH_JSON`.
 
-- [ ] **Step 3: Add BullMQ dependency and WorkerHealthService**
+- [x] **Step 3: Add BullMQ dependency and WorkerHealthService**
 
 Modify `apps/api/package.json` dependencies to include:
 
@@ -570,7 +570,7 @@ export function createRedisConnection(redisUrl: string): ConnectionOptions {
 }
 ```
 
-- [ ] **Step 4: Refactor controller and module**
+- [x] **Step 4: Refactor controller and module**
 
 Replace `apps/api/src/modules/system/worker-health.controller.ts` with:
 
@@ -657,7 +657,7 @@ import { WorkerHealthController } from "./worker-health.controller";
 export class SystemModule {}
 ```
 
-- [ ] **Step 5: Run focused API verification**
+- [x] **Step 5: Run focused API verification**
 
 Run:
 
@@ -668,7 +668,7 @@ pnpm --filter @worlddock/api lint
 
 Expected: integration spec and API TypeScript lint pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run the identity check from this plan, then:
 
