@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { captureWorkerQueueHealth } from "../src/observability";
 import {
   WORKER_QUEUE_DESCRIPTORS,
@@ -8,6 +8,26 @@ import {
   readQueueHealth,
   summarizeQueueHealth,
 } from "../src/queue-dashboard";
+
+const sentryMocks = vi.hoisted(() => {
+  const scope = {
+    setExtras: vi.fn(),
+    setTag: vi.fn(),
+  };
+
+  return {
+    captureException: vi.fn(),
+    init: vi.fn(),
+    scope,
+    withScope: vi.fn((callback: (scope: typeof scope) => void) => callback(scope)),
+  };
+});
+
+vi.mock("@sentry/node", () => ({
+  captureException: sentryMocks.captureException,
+  init: sentryMocks.init,
+  withScope: sentryMocks.withScope,
+}));
 
 describe("queue dashboard", () => {
   it("exposes canonical Alpha worker queues", () => {
@@ -87,8 +107,25 @@ describe("queue dashboard", () => {
 });
 
 describe("worker queue observability", () => {
-  it("returns queue status from captureWorkerQueueHealth", () => {
-    expect(captureWorkerQueueHealth({
+  const originalSentryDsn = process.env.SENTRY_DSN;
+
+  afterEach(() => {
+    sentryMocks.captureException.mockClear();
+    sentryMocks.init.mockClear();
+    sentryMocks.scope.setExtras.mockClear();
+    sentryMocks.scope.setTag.mockClear();
+    sentryMocks.withScope.mockClear();
+
+    if (originalSentryDsn === undefined) {
+      delete process.env.SENTRY_DSN;
+    } else {
+      process.env.SENTRY_DSN = originalSentryDsn;
+    }
+  });
+
+  it("captures degraded queue alerts with worker tags and extra data", () => {
+    process.env.SENTRY_DSN = "https://public@example.com/1";
+    const queue = {
       name: "moderation-scan",
       waiting: 0,
       active: 0,
@@ -96,6 +133,36 @@ describe("worker queue observability", () => {
       failed: 1,
       delayed: 0,
       paused: false,
-    })).toBe("degraded");
+    };
+
+    expect(captureWorkerQueueHealth(queue)).toBe("degraded");
+
+    expect(sentryMocks.withScope).toHaveBeenCalledTimes(1);
+    expect(sentryMocks.scope.setTag).toHaveBeenCalledTimes(3);
+    expect(sentryMocks.scope.setTag).toHaveBeenNthCalledWith(1, "component", "worker");
+    expect(sentryMocks.scope.setTag).toHaveBeenNthCalledWith(2, "queue", "moderation-scan");
+    expect(sentryMocks.scope.setTag).toHaveBeenNthCalledWith(3, "queue_status", "degraded");
+    expect(sentryMocks.scope.setExtras).toHaveBeenCalledWith(queue);
+    expect(sentryMocks.captureException).toHaveBeenCalledTimes(1);
+    expect((sentryMocks.captureException.mock.calls[0]?.[0] as Error).message).toBe("Worker queue moderation-scan is degraded");
+  });
+
+  it("does not capture healthy queue alerts", () => {
+    process.env.SENTRY_DSN = "https://public@example.com/1";
+
+    expect(captureWorkerQueueHealth({
+      name: "repository-search-indexing",
+      waiting: 0,
+      active: 0,
+      completed: 3,
+      failed: 0,
+      delayed: 0,
+      paused: false,
+    })).toBe("healthy");
+
+    expect(sentryMocks.withScope).not.toHaveBeenCalled();
+    expect(sentryMocks.captureException).not.toHaveBeenCalled();
+    expect(sentryMocks.scope.setTag).not.toHaveBeenCalled();
+    expect(sentryMocks.scope.setExtras).not.toHaveBeenCalled();
   });
 });
