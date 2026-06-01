@@ -1,5 +1,25 @@
-# Data And IP Policy
+# 数据与 IP 政策
 
-Creators retain their worldbuilding IP. World packages are exportable JSON records containing world metadata, assets, and release notes.
+创作者保留自己的世界观 IP。WorldDock Cloud Alpha 只提供结构化管理、AI 协作、发布、Fork 和导出工具，不因用户上传、编辑、发布或导出内容而取得其原创世界观的所有权。
 
-Alpha does not include template licensing, marketplace revenue share, or paid asset libraries.
+## 私有与公开边界
+
+- 私有世界 owner-only：未发布的世界、草稿、资产、笔记和 AI 协作记录只允许世界 owner 访问。
+- 公开仓库只暴露主动发布的 release snapshot：公开访问范围以用户主动发布的快照为准，不自动暴露私有草稿、历史编辑区或未发布资产。
+- Fork 复制公开 snapshot：Fork 只复制公开 release snapshot 中的内容，不读取、复制或推断原作者的私有草稿。
+
+## 导出
+
+Alpha 支持世界包和账户数据导出。世界包用于携带世界元数据、结构化资产、发布说明和必要关系；账户数据导出用于帮助用户备份与迁移个人账户相关记录。导出能力不代表长期对象存储下载页或永久公开托管承诺。
+
+## AI 使用边界
+
+AI 协作用于整理、解释、扩写和提出修改建议。用户保留对最终设定的选择权和发布权。AI 不应默认把私有世界内容用于公开展示、模板分发、市场售卖或训练承诺；涉及模型改进、日志留存或人工排障的内部使用边界需要在产品隐私政策中另行说明。
+
+## Alpha 不包含
+
+Alpha 不包含模板授权、模板市场收入分成、付费资产库、硬删除执行器、长期对象存储下载页或法务申诉工作流。相关流程如需进入 Beta，必须先补齐授权、下架、申诉、保留期限和审计规则。
+
+## 公开发布提示
+
+发布前应提示用户：公开 release snapshot 可能被他人浏览、引用或 Fork；请确认其中不包含尚未准备公开的剧情、设定、商业秘密、第三方素材或个人敏感信息。发布行为只改变该 snapshot 的可见性，不改变创作者对原创世界观 IP 的保留。
