@@ -320,16 +320,34 @@
 
 ## Phase 12: 产品分析、官网和 Alpha 申请/反馈
 
-未完成：
+完成状态：已完成。
 
-- 缺少 `apps/web/src/app/(marketing)/page.tsx`。
-- 缺少 `apps/web/src/app/(marketing)/pricing/page.tsx`。
-- 缺少 `apps/web/src/features/analytics/product-events.ts`。
-- 缺少 `apps/api/src/modules/analytics/*`。
-- 缺少 `docs/product/beta-template-library.md`。
-- 缺少 `docs/product/positioning.md`、`pricing.md`、`permissions.md`、`data-and-ip-policy.md`。
-- 缺少 Alpha waitlist/feedback CTA、非支付定价页、无模板库保证。
-- 缺少 `marketing-and-activation.spec.ts`。
+完成依据：
+
+- Domain 已定义产品分析事件契约，覆盖 Alpha 申请、计费占位点击和 Alpha 反馈提交。
+- Prisma 已加入 `ProductAnalyticsEvent` 模型和迁移，支持匿名 ID、用户 ID、route、context 和 occurredAt。
+- API 已提供 analytics events 写入接口，并用 integration spec 验证事件落库。
+- Web 已提供 `product-events` 客户端，统一发送产品事件和浏览器匿名 ID。
+- 官网首页和定价页已上线，包含 Alpha 申请、反馈入口、公开仓库说明、非 Stripe 定价说明和候补 CTA。
+- `SupportEntry` 已接入设置页用量 tab，提交 Alpha 反馈后记录 `alpha_feedback_submitted` 激活事件。
+- 产品文档已补齐 Beta 模板库、定位、定价、权限、数据与 IP 政策说明。
+- 测试已覆盖 domain/API/Web client/营销页/设置页反馈激活链路。
+
+验收证据：
+
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/api test:integration -- analytics.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock/web test -- product-events.test.ts`：通过。
+- `pnpm --filter @worlddock/web test:e2e -- marketing-and-activation.spec.ts`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+
+剩余说明：
+
+- Phase 12 不实现真实 Stripe checkout、customer portal、webhook、subscription、invoice 或 tax。
+- Phase 12 不实现模板库、邮件营销、邮箱验证、管理员后台、团队权限或产品分析 dashboard UI。
+- 当前产品事件用于 Alpha 激活采集；报表、分析 workbench 和运营看板留待后续阶段。
 
 ## Phase 13: 可观测性、Worker 运维和生产发布闭环
 
