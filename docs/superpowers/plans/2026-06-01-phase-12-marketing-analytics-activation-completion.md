@@ -21,42 +21,42 @@
 
 ## 文件结构
 
-- Create: `packages/domain/src/analytics/index.ts`  
+- Create: `packages/domain/src/analytics/index.ts`
   统一产品事件名称、事件输入 schema 和事件响应 schema。
-- Modify: `packages/domain/src/index.ts`  
+- Modify: `packages/domain/src/index.ts`
   导出 analytics contract。
-- Modify: `packages/db/prisma/schema.prisma`  
+- Modify: `packages/db/prisma/schema.prisma`
   增加 `ProductAnalyticsEvent`，并在 `User` 上挂可选关系。
-- Create: `packages/db/prisma/migrations/20260601090000_product_analytics_events/migration.sql`  
+- Create: `packages/db/prisma/migrations/20260601090000_product_analytics_events/migration.sql`
   创建产品事件表和索引。
-- Modify: `apps/api/src/modules/analytics/analytics.controller.ts`  
+- Modify: `apps/api/src/modules/analytics/analytics.controller.ts`
   使用 domain schema 校验请求，记录 user agent。
-- Modify: `apps/api/src/modules/analytics/analytics.service.ts`  
+- Modify: `apps/api/src/modules/analytics/analytics.service.ts`
   增加仓储接口、Prisma 仓储和响应 mapper。
-- Modify: `apps/api/src/modules/analytics/analytics.module.ts`  
+- Modify: `apps/api/src/modules/analytics/analytics.module.ts`
   绑定 Prisma 仓储 provider。
-- Create: `apps/api/test/analytics.integration-spec.ts`  
+- Create: `apps/api/test/analytics.integration-spec.ts`
   覆盖合法事件、上下文保留、未知事件拒绝。
-- Modify: `apps/web/src/features/analytics/product-events.ts`  
+- Modify: `apps/web/src/features/analytics/product-events.ts`
   复用 domain contract，生成匿名 ID，暴露可测试的 `sendProductEvent`。
-- Modify: `apps/web/src/app/(marketing)/page.tsx`  
+- Modify: `apps/web/src/app/(marketing)/page.tsx`
   明确 Alpha 申请和反馈引导，不增加邮件或模板入口。
-- Modify: `apps/web/src/app/(marketing)/pricing/page.tsx`  
+- Modify: `apps/web/src/app/(marketing)/pricing/page.tsx`
   强化非支付定价文案和候补事件。
-- Modify: `apps/web/src/features/support/support-entry.tsx`  
+- Modify: `apps/web/src/features/support/support-entry.tsx`
   反馈提交成功后记录 `alpha_feedback_submitted`。
-- Modify: `apps/web/src/features/worlddock/view-settings.tsx`  
+- Modify: `apps/web/src/features/worlddock/view-settings.tsx`
   在设置页接入 `SupportEntry`，让已登录创作者可以提交 Alpha 反馈。
-- Modify: `apps/web/tests/e2e/helpers.ts`  
+- Modify: `apps/web/tests/e2e/helpers.ts`
   让 App E2E mock 支持 support feedback 和 analytics events。
-- Modify: `apps/web/tests/e2e/marketing-and-activation.spec.ts`  
+- Modify: `apps/web/tests/e2e/marketing-and-activation.spec.ts`
   覆盖营销页、定价页、无模板路由、候补事件和站内反馈事件。
 - Modify: `docs/product/beta-template-library.md`
 - Modify: `docs/product/positioning.md`
 - Modify: `docs/product/pricing.md`
 - Modify: `docs/product/permissions.md`
 - Modify: `docs/product/data-and-ip-policy.md`
-- Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`  
+- Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
   执行完成并通过验收后再把 Phase 12 标为完成。
 
 ## 提交身份检查

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const PRODUCT_EVENTS = {
   signedUp: "signed_up",
+  alphaApplicationClicked: "alpha_application_clicked",
   onboardingCompleted: "onboarding_completed",
   worldCreated: "world_created",
   agentRunStarted: "agent_run_started",
@@ -14,6 +15,7 @@ export const PRODUCT_EVENTS = {
 
 export const productEventNameSchema = z.enum([
   PRODUCT_EVENTS.signedUp,
+  PRODUCT_EVENTS.alphaApplicationClicked,
   PRODUCT_EVENTS.onboardingCompleted,
   PRODUCT_EVENTS.worldCreated,
   PRODUCT_EVENTS.agentRunStarted,

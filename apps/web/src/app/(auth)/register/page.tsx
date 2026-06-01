@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PRODUCT_EVENTS, trackProductEvent } from "@/features/analytics/product-events";
 import { writeStoredSessionToken } from "@/features/worlddock/api";
 
 export default function RegisterPage() {
@@ -30,6 +31,7 @@ export default function RegisterPage() {
     if (typeof token === "string") {
       writeStoredSessionToken(token);
     }
+    trackProductEvent(PRODUCT_EVENTS.signedUp, { source: "register_page" });
     window.location.href = "/onboarding";
   }
 

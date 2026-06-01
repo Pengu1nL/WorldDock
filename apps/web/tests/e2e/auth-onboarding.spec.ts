@@ -1,6 +1,16 @@
 import { expect, test } from "playwright/test";
 
 test("new user can register, complete onboarding, and enter the app", async ({ page }) => {
+  const events: any[] = [];
+  await page.route("**/v1/analytics/events", async (route) => {
+    events.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({ event: { id: `event_${events.length}` } }),
+    });
+  });
+
   await page.route("**/api/auth/sign-up/email", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -32,6 +42,14 @@ test("new user can register, complete onboarding, and enter the app", async ({ p
 
   await expect(page).toHaveURL(/\/onboarding$/);
   await expect.poll(() => page.evaluate(() => window.localStorage.getItem("worlddock.sessionToken"))).toBe("session_alpha");
+  await expect.poll(() => events.some((event) => event.name === "signed_up")).toBe(true);
+  expect(events).toContainEqual(
+    expect.objectContaining({
+      name: "signed_up",
+      context: expect.objectContaining({ source: "register_page" }),
+      route: "/register",
+    }),
+  );
 
   await page.getByRole("button", { name: "小说世界观" }).click();
   await page.getByRole("button", { name: "下一步" }).click();
