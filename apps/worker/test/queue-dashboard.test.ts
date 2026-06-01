@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { captureWorkerQueueHealth } from "../src/observability";
 import {
   WORKER_QUEUE_DESCRIPTORS,
   assertWorkerReleaseReady,
@@ -82,5 +83,19 @@ describe("queue dashboard", () => {
     ], generatedAt);
 
     expect(() => assertWorkerReleaseReady({ snapshot: healthy, stagingSmokeCompleted: true })).not.toThrow();
+  });
+});
+
+describe("worker queue observability", () => {
+  it("returns queue status from captureWorkerQueueHealth", () => {
+    expect(captureWorkerQueueHealth({
+      name: "moderation-scan",
+      waiting: 0,
+      active: 0,
+      completed: 3,
+      failed: 1,
+      delayed: 0,
+      paused: false,
+    })).toBe("degraded");
   });
 });
