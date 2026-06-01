@@ -22,14 +22,12 @@
 
 未完成：
 
-- 缺少 `.github/workflows/ci.yml`。
-- 缺少 `apps/api/Dockerfile`、`apps/web/Dockerfile`、`apps/worker/Dockerfile`。
-- 缺少 `docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md`。
 - `apps/web/next.config.ts` 仍在非开发环境设置 `output: "export"` 和 `assetPrefix: "."`，未移除生产静态导出假设。
 - `packages/config/src/env.ts` 未实现计划中的生产门禁：`BETTER_AUTH_SECRET` 仍是 16 位最小长度，缺少 `BETTER_AUTH_URL`，未按计划拒绝 production mock/pi 配置缺失。
 
 已有但不足：
 
+- `.github/workflows/ci.yml`、`apps/api/Dockerfile`、`apps/web/Dockerfile`、`apps/worker/Dockerfile`、`docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md` 已存在；Phase 1 仍需按生产静态导出和 env gate 剩余项单独收口。
 - `apps/api/test/system.integration-spec.ts` 存在并覆盖基础 health/readiness/metrics。
 - API 和 Worker 已有部分 observability 代码。
 
@@ -382,7 +380,7 @@
 - `apps/worker/src/queue-dashboard.ts` 复用共享 Worker queue health 契约，避免 Worker 侧另写队列状态分类。
 - `apps/api/src/modules/system/worker-health.service.ts` 读取 BullMQ 队列 `repository-search-indexing`、`moderation-scan`、`exports`，并提供有界队列读取与 fallback degraded snapshot。
 - `apps/api/src/modules/system/worker-health.controller.ts` 暴露 `/v1/system/worker-health`，返回 `status`、`ready`、`generatedAt`、`requestId` 和 queue health。
-- API 和 Worker observability 会针对 unhealthy queue 发出带具体队列 tag 的 Sentry event/tag。
+- API worker-health endpoint 会针对 unhealthy queue 发出带具体队列 tag 的 Sentry event；Worker observability 提供同一队列健康告警 helper 并有测试覆盖 tag/extra 行为。
 - `docs/operations/worker_alerts.md` 已更新为中文 Worker 队列告警 Runbook，`docs/operations/production_release_checklist.md` 已校准 Worker health、失败告警、staging 冒烟和发布后观察窗口条目。
 - Phase 13 测试覆盖 `worker-health.integration-spec.ts`、`worker-health.controller.spec.ts` 和 `queue-dashboard.test.ts`。
 
