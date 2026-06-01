@@ -1,7 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRODUCT_EVENTS, sendProductEvent } from "./product-events";
 
 describe("product events analytics client", () => {
+  const originalApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const originalWorldDockApiBaseUrl = process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL;
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = originalApiBaseUrl;
+    process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL = originalWorldDockApiBaseUrl;
+  });
+
   it("sends product events to the analytics endpoint", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
 
@@ -28,5 +36,15 @@ describe("product events analytics client", () => {
       route: "/pricing",
       occurredAt: expect.any(String),
     });
+  });
+
+  it("skips blank API base URL values when resolving the endpoint", async () => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = "";
+    process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL = "https://worlddock-api.test/";
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+
+    await sendProductEvent(PRODUCT_EVENTS.signedUp, {}, { fetcher });
+
+    expect(fetcher.mock.calls[0][0]).toBe("https://worlddock-api.test/v1/analytics/events");
   });
 });

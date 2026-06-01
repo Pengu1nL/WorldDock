@@ -16,12 +16,15 @@ type ProductEventOptions = {
 };
 
 function resolveApiBaseUrl(baseUrl?: string) {
-  return (
-    baseUrl ??
-    process.env.NEXT_PUBLIC_API_BASE_URL ??
-    process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL ??
-    "http://localhost:4000"
-  ).replace(/\/$/, "");
+  return (firstConfigured(
+    baseUrl,
+    process.env.NEXT_PUBLIC_API_BASE_URL,
+    process.env.NEXT_PUBLIC_WORLD_DOCK_API_BASE_URL,
+  ) ?? "http://localhost:4000").replace(/\/$/, "");
+}
+
+function firstConfigured(...values: Array<string | undefined>) {
+  return values.find((value) => value && value.trim().length > 0);
 }
 
 function createAnonymousId() {
