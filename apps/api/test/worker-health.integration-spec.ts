@@ -10,7 +10,7 @@ import {
   DEPENDENCY_HEALTH_CHECKERS,
   type DependencyHealthChecker,
 } from "../src/modules/system/readiness.service";
-import { WORKER_QUEUE_READERS } from "../src/modules/system/worker-health.service";
+import { WORKER_QUEUE_READERS, WorkerHealthService } from "../src/modules/system/worker-health.service";
 
 describe("worker health endpoint", () => {
   let app: INestApplication | undefined;
@@ -80,6 +80,73 @@ describe("worker health endpoint", () => {
       "exports",
     ]);
   });
+
+  it("returns degraded when a queue reader rejects", async () => {
+    app = await createTestApp([
+      queueReader("repository-search-indexing", { waiting: 0, active: 0, completed: 12, failed: 0, delayed: 0, paused: false }),
+      rejectingQueueReader("moderation-scan"),
+      queueReader("exports", { waiting: 0, active: 0, completed: 3, failed: 0, delayed: 0, paused: false }),
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get("/v1/system/worker-health")
+      .expect(200);
+
+    expect(response.body.status).toBe("degraded");
+    expect(response.body.ready).toBe(false);
+    expect(response.body.queues[1]).toMatchObject({
+      name: "moderation-scan",
+      status: "degraded",
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 1,
+      delayed: 0,
+      paused: false,
+    });
+  });
+
+  it("returns degraded when a queue reader times out", async () => {
+    app = await createTestApp([
+      neverResolvingQueueReader("repository-search-indexing"),
+      queueReader("moderation-scan", { waiting: 0, active: 0, completed: 5, failed: 0, delayed: 0, paused: false }),
+      queueReader("exports", { waiting: 0, active: 0, completed: 3, failed: 0, delayed: 0, paused: false }),
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get("/v1/system/worker-health")
+      .timeout({ deadline: 2_200 })
+      .expect(200);
+
+    expect(response.body.status).toBe("degraded");
+    expect(response.body.ready).toBe(false);
+    expect(response.body.queues[0]).toMatchObject({
+      name: "repository-search-indexing",
+      status: "degraded",
+      waiting: 0,
+      active: 0,
+      completed: 0,
+      failed: 1,
+      delayed: 0,
+      paused: false,
+    });
+  });
+});
+
+describe("WorkerHealthService", () => {
+  it("closes queue readers on module destroy", async () => {
+    const close = vi.fn(async () => undefined);
+    const service = new WorkerHealthService([
+      {
+        ...queueReader("repository-search-indexing", { waiting: 0, active: 0, completed: 0, failed: 0, delayed: 0, paused: false }),
+        close,
+      },
+    ]);
+
+    await service.onModuleDestroy();
+
+    expect(close).toHaveBeenCalledTimes(1);
+  });
 });
 
 async function createTestApp(queueReaders: QueueMetricReader[]) {
@@ -115,5 +182,23 @@ function queueReader(name: string, counts: { waiting: number; active: number; co
       delayed: counts.delayed,
     })),
     isPaused: vi.fn(async () => counts.paused),
+  };
+}
+
+function rejectingQueueReader(name: string): QueueMetricReader {
+  return {
+    name,
+    getJobCounts: vi.fn(async () => {
+      throw new Error("queue unavailable");
+    }),
+    isPaused: vi.fn(async () => false),
+  };
+}
+
+function neverResolvingQueueReader(name: string): QueueMetricReader {
+  return {
+    name,
+    getJobCounts: vi.fn(() => new Promise<Awaited<ReturnType<QueueMetricReader["getJobCounts"]>>>(() => undefined)),
+    isPaused: vi.fn(async () => false),
   };
 }
