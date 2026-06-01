@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,39 @@ describe("worlddock cli", () => {
   afterEach(async () => {
     await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
     tempDirs.length = 0;
+  });
+
+  it("prints explicit auth guidance when token is missing", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}));
+    const stderr: string[] = [];
+
+    await expect(runWorldDockCli(["worlds", "list"], {
+      env: { WORLD_DOCK_API_URL: "https://api.worlddock.test" },
+      fetch: fetchMock as typeof fetch,
+      stderr: (line) => stderr.push(line),
+    })).resolves.toBe(1);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stderr[0]).toBe("WORLD_DOCK_TOKEN is required.");
+  });
+
+  it("accepts login tokens without writing local files", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}));
+    const stdout: string[] = [];
+    const homeDir = await mkdtemp(join(tmpdir(), "worlddock-cli-home-"));
+    const configDir = await mkdtemp(join(tmpdir(), "worlddock-cli-config-"));
+    tempDirs.push(homeDir, configDir);
+
+    await expect(runWorldDockCli(["login", "--token", "wdl_login_token"], {
+      env: { HOME: homeDir, XDG_CONFIG_HOME: configDir },
+      fetch: fetchMock as typeof fetch,
+      stdout: (line) => stdout.push(line),
+    })).resolves.toBe(0);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stdout[0]).toBe("WorldDock token detected. Export WORLD_DOCK_TOKEN for subsequent commands.");
+    expect(await readdir(homeDir)).toEqual([]);
+    expect(await readdir(configDir)).toEqual([]);
   });
 
   it("lists worlds with a bearer token", async () => {
@@ -81,6 +114,20 @@ describe("worlddock cli", () => {
       headers: expect.objectContaining({ authorization: "Bearer wdl_test_token" }),
     }));
     expect(JSON.parse(stdout[0]).assets[0]).toMatchObject({ kind: "setting", title: "记忆交易法" });
+  });
+
+  it.each(["memory-market", "ren/memory-market/typo"])("validates repository pull spec %s before calling the API", async (spec) => {
+    const fetchMock = vi.fn(async () => jsonResponse({}));
+    const stderr: string[] = [];
+
+    await expect(runWorldDockCli(["repositories", "pull", spec], {
+      env,
+      fetch: fetchMock as typeof fetch,
+      stderr: (line) => stderr.push(line),
+    })).resolves.toBe(1);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(stderr[0]).toBe("Repository must be formatted as <owner>/<slug>.");
   });
 });
 

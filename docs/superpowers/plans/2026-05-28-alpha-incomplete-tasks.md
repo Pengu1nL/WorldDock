@@ -6,9 +6,10 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，截至本轮 Phase 13 验证，Phase 2 至 Phase 13 已可标记完成。Phase 1 和 Phase 14 的早期静态缺口已有明显变化，但本轮未执行对应完整验收，因此仍保留为待重新验收状态。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，截至本轮 Phase 14 验证，Phase 2 至 Phase 14 已可标记完成。
+Phase 1 的早期静态缺口已有明显变化，但本轮未执行对应完整验收，因此仍保留为待重新验收状态。
 
-当前代码库已经具备 Cloud Alpha 主要产品闭环，包括个人账户认证和 onboarding、世界创建、资产编辑、pi Agent、发布/Fork、创作点账本、社区发现、治理、导入导出、站内通知、官网分析和 Worker 运维。Phase 1 与 Phase 14 的缺口判断需要后续按各自计划重新运行定向与全量验收后再更新完成状态。
+当前代码库已经具备 Cloud Alpha 主要产品闭环，包括个人账户认证和 onboarding、世界创建、资产编辑、pi Agent、发布/Fork、创作点账本、社区发现、治理、导入导出、站内通知、官网分析、Worker 运维、世界包 CLI 和个人访问令牌。Phase 1 的缺口判断需要后续按计划重新运行定向与全量验收后再更新完成状态。
 
 ## 判定标准
 
@@ -408,25 +409,40 @@
 
 ## Phase 14: 世界包 CLI、个人访问令牌和轻量生态
 
-完成状态：待重新验收。
+完成状态：已完成。
 
-待重新验收：
+完成依据：
 
-- 本轮未执行 Phase 14 的定向验收命令，因此暂不把 Phase 14 标记为完成。
-- 需复跑 public API integration、CLI test、CLI lint/build 和相关文档检查，确认个人访问令牌 scope、CLI 命令和世界包 API 全部满足 Phase 14 验收标准。
+- `packages/domain/src/developer-access/index.ts` 已定义 Alpha Personal Access Token scope：`world:read`、`world:write`、`repository:read` 和 `billing:read`，并提供创建 token 的 Zod schema。
+- `apps/api/src/modules/developer-access/*` 已提供 Developer Access API：scope 列表、session-only PAT 签发和公开仓库世界包 pull。
+- `apps/api/src/modules/exports/*` 已提供 Cloud 世界包导出、下载、导入和账户数据导出，并用 `world:read` / `world:write` 保护 PAT 访问。
+- `packages/worlddock-cli/*` 已提供 `login`、`worlds list`、`worlds export`、`worlds import` 和 `repositories pull` 主命令，所有命令只依赖 Cloud API 和 bearer PAT，不要求本地部署。
+- `docs/product/api.md` 已记录 Alpha public API scope、Developer Access endpoint 和 CLI 使用方式，且未把 Local Push scope 纳入 Phase 14 public API 文档。
+- `apps/api/test/public-api.integration-spec.ts`、`apps/api/test/exports.integration-spec.ts` 和 `packages/worlddock-cli/test/cli.test.ts` 已覆盖 PAT scope、Repository Pull、世界包导入导出和 CLI contract。
 
-已有但不足：
+验收证据：
 
-- `packages/domain/src/developer-access/index.ts`、`apps/api/src/modules/developer-access/*`、`packages/worlddock-cli/*`、`docs/product/api.md`、`apps/api/test/public-api.integration-spec.ts` 和 `packages/worlddock-cli/test/cli.test.ts` 已存在；早期“缺少文件/测试”的静态判断已不再适用。
-- 当前 developer access scope 已包含 `world:read`、`world:write`、`repository:read` 和 `billing:read`；仍需通过 Phase 14 验收确认 API、CLI 和文档一致性。
-- 当前 CLI 已包含 `login`、`worlds list`、`worlds export`、`worlds import` 和 `repositories pull` 主命令；仍需通过 CLI test 和端到端 API contract 复核。
+- `pnpm --filter @worlddock/domain lint`：通过。
+- `pnpm --filter @worlddock/domain test`：通过。
+- `pnpm --filter @worlddock/api test:integration -- public-api.integration-spec.ts exports.integration-spec.ts`：通过。
+- `pnpm --filter @worlddock-cli test`：通过。
+- `pnpm --filter @worlddock-cli lint`：通过。
+- `pnpm --filter @worlddock-cli build`：通过。
+- `pnpm --filter @worlddock/api lint`：通过。
+- `pnpm lint`：通过。
+- `pnpm test`：通过。
+- `pnpm build`：通过。
+
+剩余说明：
+
+- Phase 14 不包含本地 Docker 部署、Local 模型配置、真实 OAuth 设备登录、SDK 包发布或 Local Push 产品化。
+- `repository:push` 仍是 Local Push 兼容能力，不属于 Alpha public API 文档和 Developer Access scope endpoint。
 
 ## 建议执行顺序
 
 1. 先重新验收 Phase 1，确认 CI、Docker、生产 env gate、静态导出移除、系统集成测试和运维 runbook 全部满足计划标准。
-2. 保持 Phase 2 至 Phase 13 的验收测试作为回归门禁。
-3. 再重新验收 Phase 14，确认个人访问令牌、public API、世界包 CLI 和文档 contract 全部满足计划标准。
+2. 保持 Phase 2 至 Phase 14 的验收测试作为回归门禁。
 
 ## 本次执行说明
 
-本记录最初来自静态调查和文档整理；后续 Phase 收口已逐步补充定向验证和完成依据。Phase 1 与 Phase 14 的早期静态缺口已有明显变化，但本轮未运行对应完整验收，因此本记录只将其标为待重新验收，不再保留明显过期的“缺少文件”断言。
+本记录最初来自静态调查和文档整理；后续 Phase 收口已逐步补充定向验证和完成依据。Phase 1 的早期静态缺口已有明显变化，但本轮未运行对应完整验收，因此本记录只将其标为待重新验收，不再保留明显过期的“缺少文件”断言。

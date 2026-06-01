@@ -101,11 +101,11 @@ function createApiClient(input: { apiUrl: string; token?: string; fetch: typeof 
 }
 
 function parseRepositorySpec(spec: string) {
-  const [owner, slug] = spec.split("/");
-  if (!owner || !slug) {
+  const parts = spec.split("/");
+  if (parts.length !== 2 || parts.some((part) => !part)) {
     throw new Error("Repository must be formatted as <owner>/<slug>.");
   }
-  return [owner, slug] as const;
+  return parts as [string, string];
 }
 
 function readOption(argv: string[], name: string) {

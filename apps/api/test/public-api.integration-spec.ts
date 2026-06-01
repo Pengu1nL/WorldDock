@@ -77,6 +77,19 @@ describe("public developer API", () => {
       assets: [{ kind: "setting", title: "记忆交易法" }],
     });
   });
+
+  it("requires a user session to issue developer access tokens", async () => {
+    const auth = createInMemoryAuthRepository();
+    auth.users.set("user_1", { id: "user_1", email: "writer@example.com", name: "Writer", role: "user" });
+    addAccessToken(auth, "wdl_repo_read", "user_1", ["repository:read"]);
+    app = await createTestApp(auth, createInMemoryRepositoryRepository());
+
+    await request(app.getHttpServer())
+      .post("/v1/developer-access/access-tokens")
+      .set("authorization", "Bearer wdl_repo_read")
+      .send({ name: "Nested Token", scopes: ["repository:read"] })
+      .expect(403);
+  });
 });
 
 async function createTestApp(authRepository: ReturnType<typeof createInMemoryAuthRepository>, repositoryRepository: RepositoryRepository) {

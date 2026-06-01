@@ -1,6 +1,6 @@
 # WorldDock Alpha API
 
-WorldDock Alpha exposes a small cloud-first API for personal creators and lightweight ecosystem tools. Local deployment, Local Push productization, email delivery, and real payments stay outside Alpha.
+WorldDock Alpha exposes a small cloud-first API for personal creators and lightweight ecosystem tools. Local deployment, email delivery, and real payments stay outside Alpha.
 
 ## Authentication
 

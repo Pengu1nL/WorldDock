@@ -4,7 +4,7 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { configureApiApp } from "../src/configure-api-app";
-import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
+import { AUTH_REPOSITORY, hashToken, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
 import { ExportsModule } from "../src/modules/exports/exports.module";
 import { OUTBOX_REPOSITORY, type OutboxRepository } from "../src/modules/outbox/outbox.repository";
 import {
@@ -95,6 +95,61 @@ describe("exports endpoints", () => {
     });
     expect(accountData.body.data.worlds).toHaveLength(2);
   });
+
+  it("enforces world package access token scopes", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const repositories = createInMemoryRepositoryRepository();
+    addAccessToken(auth, "wdl_world_read", "user_1", "ren", ["world:read"]);
+    addAccessToken(auth, "wdl_world_write", "user_1", "ren", ["world:write"]);
+    const world = await worlds.createWorld({
+      ownerId: "user_1",
+      name: "Scoped Export World",
+      type: "奇幻",
+      summary: "验证 PAT scope 的世界。",
+      tags: ["scope"],
+      mode: "cloud",
+      maturity: 51,
+    });
+    app = await createTestApp(auth, worlds, repositories);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/export`)
+      .set("authorization", "Bearer wdl_world_read")
+      .expect(201);
+
+    const loaded = await request(app.getHttpServer())
+      .get(`/v1/exports/${created.body.export.id}`)
+      .set("authorization", "Bearer wdl_world_read")
+      .expect(200);
+
+    expect(loaded.body.package).toMatchObject({
+      format: "worlddock.world-package.v1",
+      world: { name: "Scoped Export World" },
+    });
+
+    await request(app.getHttpServer())
+      .post("/v1/worlds/import")
+      .set("authorization", "Bearer wdl_world_read")
+      .send({ package: loaded.body.package })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/export`)
+      .set("authorization", "Bearer wdl_world_write")
+      .expect(403);
+
+    const imported = await request(app.getHttpServer())
+      .post("/v1/worlds/import")
+      .set("authorization", "Bearer wdl_world_write")
+      .send({ package: loaded.body.package })
+      .expect(201);
+
+    expect(imported.body.world).toMatchObject({
+      name: "Scoped Export World",
+      visibility: "private",
+    });
+  });
 });
 
 async function createTestApp(
@@ -129,6 +184,23 @@ function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>,
   repository.sessions.set(token, { token, userId, expiresAt: new Date(Date.now() + 60_000) });
 }
 
+function addAccessToken(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string, name: string, scopes: string[]) {
+  const now = new Date();
+  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name, role: "user" });
+  repository.accessTokens.set(`at_${token}`, {
+    id: `at_${token}`,
+    userId,
+    name: token,
+    tokenHash: hashToken(token),
+    prefix: token.slice(0, 8),
+    scopes,
+    lastUsedAt: null,
+    expiresAt: null,
+    revokedAt: null,
+    createdAt: now,
+  });
+}
+
 function createInMemoryAuthRepository() {
   const users = new Map<string, StoredUser>();
   const sessions = new Map<string, StoredSession>();
@@ -136,15 +208,21 @@ function createInMemoryAuthRepository() {
   return {
     users,
     sessions,
+    accessTokens,
     async findUserById(id: string) { return users.get(id) ?? null; },
     async findSessionByToken(token: string) { return sessions.get(token) ?? null; },
     async deleteSession(token: string) { sessions.delete(token); },
     async listAccessTokens() { return []; },
     async createAccessToken(input: StoredAccessToken) { accessTokens.set(input.id, input); return input; },
-    async findAccessTokenByHash() { return null; },
-    async markAccessTokenUsed() {},
+    async findAccessTokenByHash(tokenHash: string) {
+      return [...accessTokens.values()].find((token) => token.tokenHash === tokenHash) ?? null;
+    },
+    async markAccessTokenUsed(id: string, usedAt: Date) {
+      const token = accessTokens.get(id);
+      if (token) token.lastUsedAt = usedAt;
+    },
     async revokeAccessToken() { return null; },
-  } satisfies AuthRepository & { users: typeof users; sessions: typeof sessions };
+  } satisfies AuthRepository & { users: typeof users; sessions: typeof sessions; accessTokens: typeof accessTokens };
 }
 
 function createInMemoryWorldRepository() {
