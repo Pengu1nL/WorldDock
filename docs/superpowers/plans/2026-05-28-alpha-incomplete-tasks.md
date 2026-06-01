@@ -396,15 +396,15 @@
 - `pnpm --filter @worlddock/api test -- worker-health.controller.spec.ts`：通过（Task 4 复跑，9 个 test file、33 个 test）。
 - `pnpm --filter @worlddock/api test:integration -- worker-health.integration-spec.ts`：通过（Task 4 复跑，19 个 test file 通过、1 个 skipped；79 个 test 通过、1 个 skipped）。
 - `pnpm --filter @worlddock/api lint`：通过（Task 4 复跑）。
-- `pnpm lint`：待 Task 5 全仓验收后补齐。
-- `pnpm test`：待 Task 5 全仓验收后补齐。
-- `pnpm build`：待 Task 5 全仓验收后补齐。
+- `pnpm lint`：通过（Task 5 复跑）。
+- `pnpm test`：通过（Task 5 复跑）。
+- `pnpm build`：通过（Task 5 复跑）。
 
 剩余说明：
 
 - Phase 13 不新增托管 queue panel、admin dashboard 或一键发布自动化。
 - Worker health API 依赖 `REDIS_URL`；测试通过 provider override fake readers 覆盖，不需要 Redis。
-- 当前 Task 4 只做文档收口；最终发布 ready 状态仍以后续 Task 5 全量验证结果为准。
+- Task 5 已完成全仓 `pnpm lint`、`pnpm test` 和 `pnpm build` 验证。
 
 ## Phase 14: 世界包 CLI、个人访问令牌和轻量生态
 

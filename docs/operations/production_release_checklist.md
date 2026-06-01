@@ -1,16 +1,16 @@
 # 生产发布 Checklist
 
-- [ ] `pnpm lint`
+- [x] `pnpm lint`
   - Owner: release driver
-  - Evidence: CI run URL or local command output timestamp for the target commit
+  - Evidence: local command passed at 2026-06-01 16:33 CST on target branch
   - Command: `pnpm lint`
-- [ ] `pnpm test`
+- [x] `pnpm test`
   - Owner: release driver
-  - Evidence: CI run URL or local command output timestamp for the target commit
+  - Evidence: local command passed at 2026-06-01 16:33 CST on target branch
   - Command: `pnpm test`
-- [ ] `pnpm build`
+- [x] `pnpm build`
   - Owner: release driver
-  - Evidence: CI run URL or local command output timestamp for the target commit
+  - Evidence: local command passed at 2026-06-01 16:33 CST on target branch
   - Command: `pnpm build`
 - [ ] API integration tests
   - Owner: API owner

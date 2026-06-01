@@ -955,7 +955,7 @@ Expected: commit succeeds and Author/Committer do not contain the user's real na
 **Files:**
 - Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Run Phase 13 focused verification**
+- [x] **Step 1: Run Phase 13 focused verification**
 
 Run:
 
@@ -970,7 +970,7 @@ pnpm --filter @worlddock/api lint
 
 Expected: all commands pass.
 
-- [ ] **Step 2: Run repository-level verification**
+- [x] **Step 2: Run repository-level verification**
 
 Run:
 
@@ -982,7 +982,7 @@ pnpm build
 
 Expected: all commands pass.
 
-- [ ] **Step 3: Verify no stale Phase 13 incomplete claims remain**
+- [x] **Step 3: Verify no stale Phase 13 incomplete claims remain**
 
 Run:
 
@@ -992,7 +992,7 @@ rg -n "Phase 13|queue-dashboard.ts|worker-health.controller.ts|worker_alerts.md|
 
 Expected: output shows Phase 13 completion status, completion evidence, verification commands and remaining non-goals only; it must not show old "未完成" bullets for Phase 13.
 
-- [ ] **Step 4: Final commit**
+- [x] **Step 4: Final commit**
 
 Only if Task 4 did not already commit the updated incomplete-tasks file after final verification, run the identity check from this plan, then:
 
