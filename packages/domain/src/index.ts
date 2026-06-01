@@ -6,6 +6,7 @@ export * from "./billing";
 export * from "./developer-access";
 export * from "./moderation";
 export * from "./notifications";
+export * from "./operations/queue-health";
 export * from "./repository";
 export * from "./releases";
 export * from "./storage";
