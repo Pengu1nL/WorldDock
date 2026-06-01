@@ -6,9 +6,9 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 10 验证，Phase 2、Phase 3、Phase 10 已可标记完成。除 Phase 2、Phase 3、Phase 10 外，本记录其余 Phase 的未完成判断保持不变。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，经本轮 Phase 13 验证，Phase 2、Phase 3、Phase 10、Phase 13 已可标记完成。除已标记完成的 Phase 外，本记录其余 Phase 的未完成判断保持不变。
 
-当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。Phase 3 已进一步冻结 Cloud-only 范围、生产环境门禁和前端认证来源，Phase 10 已完成导入导出和数据权利收口。但除已验证完成的 Phase 2、Phase 3、Phase 10 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
+当前代码库已经具备一些早期后端能力，例如个人账户认证和 onboarding、世界创建、档案/种子/冲突持久化、基础发布、Fork、用量账本、举报和 Worker 扫描雏形。Phase 3 已进一步冻结 Cloud-only 范围、生产环境门禁和前端认证来源，Phase 10 已完成导入导出和数据权利收口，Phase 13 已完成 Worker 队列健康、告警 runbook 和发布 checklist 收口。但除已验证完成的 Phase 2、Phase 3、Phase 10、Phase 13 外，这些能力大多没有达到 Alpha 主计划定义的完整产品闭环、文件结构和验收测试要求。
 
 ## 判定标准
 
@@ -27,7 +27,6 @@
 - 缺少 `docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md`。
 - `apps/web/next.config.ts` 仍在非开发环境设置 `output: "export"` 和 `assetPrefix: "."`，未移除生产静态导出假设。
 - `packages/config/src/env.ts` 未实现计划中的生产门禁：`BETTER_AUTH_SECRET` 仍是 16 位最小长度，缺少 `BETTER_AUTH_URL`，未按计划拒绝 production mock/pi 配置缺失。
-- `docs/operations/production_release_checklist.md` 仍是普通 checklist，没有 owner、evidence、command 结构。
 
 已有但不足：
 
