@@ -391,7 +391,7 @@
 
 - `pnpm --filter @worlddock/domain lint`：通过（Task 4 复跑）。
 - `pnpm --filter @worlddock/worker test -- queue-dashboard.test.ts`：通过（Task 4 复跑，4 个 test file、18 个 test）。
-- `pnpm --filter @worlddock/worker lint`：Task 4 复跑未通过，当前报错为 `apps/worker/test/queue-dashboard.test.ts(22,34) TS2502: 'scope' is referenced directly or indirectly in its own type annotation.`；发布前需由 Task 5 或实现任务修正后补跑。
+- `pnpm --filter @worlddock/worker lint`：通过（Task 4 后修复 `queue-dashboard.test.ts` Sentry mock 类型自引用后复跑）。
 - `pnpm --filter @worlddock/api test -- worker-health.controller.spec.ts`：通过（Task 4 复跑，9 个 test file、33 个 test）。
 - `pnpm --filter @worlddock/api test:integration -- worker-health.integration-spec.ts`：通过（Task 4 复跑，19 个 test file 通过、1 个 skipped；79 个 test 通过、1 个 skipped）。
 - `pnpm --filter @worlddock/api lint`：通过（Task 4 复跑）。
