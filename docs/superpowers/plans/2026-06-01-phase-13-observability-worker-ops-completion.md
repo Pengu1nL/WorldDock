@@ -80,7 +80,7 @@ Expected: Author 和 Committer 都不包含真实姓名或个人邮箱。
 - Modify: `apps/worker/src/queue-dashboard.ts`
 - Test: `apps/worker/test/queue-dashboard.test.ts`
 
-- [ ] **Step 1: Write the failing Worker queue dashboard test**
+- [x] **Step 1: Write the failing Worker queue dashboard test**
 
 Replace `apps/worker/test/queue-dashboard.test.ts` with:
 
@@ -173,7 +173,7 @@ describe("queue dashboard", () => {
 });
 ```
 
-- [ ] **Step 2: Run the Worker test and confirm failure**
+- [x] **Step 2: Run the Worker test and confirm failure**
 
 Run:
 
@@ -183,7 +183,7 @@ pnpm --filter @worlddock/worker test -- queue-dashboard.test.ts
 
 Expected: FAIL because `WORKER_QUEUE_DESCRIPTORS` is not exported from `apps/worker/src/queue-dashboard.ts`, and queue name expectations still do not use the canonical repository search queue.
 
-- [ ] **Step 3: Add shared queue health contract**
+- [x] **Step 3: Add shared queue health contract**
 
 Create `packages/domain/src/operations/queue-health.ts`:
 
@@ -335,7 +335,7 @@ export {
 } from "@worlddock/domain";
 ```
 
-- [ ] **Step 4: Run focused Worker/domain verification**
+- [x] **Step 4: Run focused Worker/domain verification**
 
 Run:
 
@@ -347,7 +347,7 @@ pnpm --filter @worlddock/worker lint
 
 Expected: all commands pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run the identity check from this plan, then:
 
