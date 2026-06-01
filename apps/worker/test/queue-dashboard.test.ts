@@ -10,7 +10,7 @@ import {
 } from "../src/queue-dashboard";
 
 const sentryMocks = vi.hoisted(() => {
-  const scope = {
+  const scopeMock = {
     setExtras: vi.fn(),
     setTag: vi.fn(),
   };
@@ -18,8 +18,8 @@ const sentryMocks = vi.hoisted(() => {
   return {
     captureException: vi.fn(),
     init: vi.fn(),
-    scope,
-    withScope: vi.fn((callback: (scope: typeof scope) => void) => callback(scope)),
+    scope: scopeMock,
+    withScope: vi.fn((callback: (scope: typeof scopeMock) => void) => callback(scopeMock)),
   };
 });
 
