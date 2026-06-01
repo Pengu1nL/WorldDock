@@ -95,7 +95,7 @@ Expected: Author 和 Committer 都不包含真实姓名或个人邮箱。
 - Modify: `apps/api/src/modules/analytics/analytics.module.ts`
 - Test: `apps/api/test/analytics.integration-spec.ts`
 
-- [ ] **Step 1: Write the failing integration test**
+- [x] **Step 1: Write the failing integration test**
 
 Create `apps/api/test/analytics.integration-spec.ts`:
 
@@ -195,7 +195,7 @@ function createInMemoryAnalyticsRepository() {
 }
 ```
 
-- [ ] **Step 2: Run test and confirm failure**
+- [x] **Step 2: Run test and confirm failure**
 
 Run:
 
@@ -205,7 +205,7 @@ pnpm --filter @worlddock/api test:integration -- analytics.integration-spec.ts
 
 Expected: FAIL because `ANALYTICS_REPOSITORY` does not exist and API still accepts non-allowlisted names.
 
-- [ ] **Step 3: Add shared product event contract**
+- [x] **Step 3: Add shared product event contract**
 
 Create `packages/domain/src/analytics/index.ts`:
 
@@ -280,7 +280,7 @@ export * from "./world";
 export * from "./worlds/world-package";
 ```
 
-- [ ] **Step 4: Add Prisma model and migration**
+- [x] **Step 4: Add Prisma model and migration**
 
 Modify the `User` model in `packages/db/prisma/schema.prisma` by adding this relation:
 
@@ -337,7 +337,7 @@ FOREIGN KEY ("userId") REFERENCES "users"("id")
 ON DELETE SET NULL ON UPDATE CASCADE;
 ```
 
-- [ ] **Step 5: Implement analytics API repository and controller**
+- [x] **Step 5: Implement analytics API repository and controller**
 
 Replace `apps/api/src/modules/analytics/analytics.service.ts`:
 
@@ -491,7 +491,7 @@ import {
 export class AnalyticsModule {}
 ```
 
-- [ ] **Step 6: Run API and DB verification**
+- [x] **Step 6: Run API and DB verification**
 
 Run:
 
@@ -502,7 +502,7 @@ pnpm --filter @worlddock/api test:integration -- analytics.integration-spec.ts
 
 Expected: both commands PASS. Unknown product event names return `400 VALIDATION_FAILED`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -524,7 +524,7 @@ Expected: commit succeeds and Author/Committer do not expose a personal identity
 - Modify: `apps/web/src/app/(marketing)/pricing/page.tsx`
 - Test: `apps/web/src/features/analytics/product-events.test.ts`
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 Create `apps/web/src/features/analytics/product-events.test.ts`:
 
@@ -569,7 +569,7 @@ describe("product event client", () => {
 });
 ```
 
-- [ ] **Step 2: Run test and confirm failure**
+- [x] **Step 2: Run test and confirm failure**
 
 Run:
 
@@ -579,7 +579,7 @@ pnpm --filter @worlddock/web test -- product-events.test.ts
 
 Expected: FAIL because `sendProductEvent` and domain-exported `PRODUCT_EVENTS` are not wired.
 
-- [ ] **Step 3: Replace the Web analytics client**
+- [x] **Step 3: Replace the Web analytics client**
 
 Replace `apps/web/src/features/analytics/product-events.ts`:
 
@@ -661,7 +661,7 @@ function firstConfigured(...values: Array<string | undefined>) {
 }
 ```
 
-- [ ] **Step 4: Update the public marketing pages**
+- [x] **Step 4: Update the public marketing pages**
 
 Replace `apps/web/src/app/(marketing)/page.tsx`:
 
@@ -772,7 +772,7 @@ export default function PricingPage() {
 }
 ```
 
-- [ ] **Step 5: Run Web unit test**
+- [x] **Step 5: Run Web unit test**
 
 Run:
 
@@ -782,7 +782,7 @@ pnpm --filter @worlddock/web test -- product-events.test.ts
 
 Expected: PASS and request body contains the allowlisted event name, route and anonymous id.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -803,7 +803,7 @@ Expected: commit succeeds and Author/Committer do not expose a personal identity
 - Modify: `apps/web/src/features/worlddock/view-settings.tsx`
 - Modify: `apps/web/tests/e2e/helpers.ts`
 
-- [ ] **Step 1: Update support feedback tracking**
+- [x] **Step 1: Update support feedback tracking**
 
 Replace `apps/web/src/features/support/support-entry.tsx`:
 
@@ -860,7 +860,7 @@ export function SupportEntry({ sessionToken, context, onToast }: SupportEntryPro
 }
 ```
 
-- [ ] **Step 2: Render SupportEntry in settings**
+- [x] **Step 2: Render SupportEntry in settings**
 
 Modify `apps/web/src/features/worlddock/view-settings.tsx` imports:
 
@@ -894,7 +894,7 @@ Replace the billing tab body in `SettingsView` with:
         )}
 ```
 
-- [ ] **Step 3: Extend E2E mocks for support feedback and analytics**
+- [x] **Step 3: Extend E2E mocks for support feedback and analytics**
 
 In `apps/web/tests/e2e/helpers.ts`, replace the `gotoApp` signature and the `installApiMocks` signature:
 
@@ -946,7 +946,7 @@ Then add these handlers inside `installApiMocks`, before the final unhandled rou
     }
 ```
 
-- [ ] **Step 4: Run focused Web checks**
+- [x] **Step 4: Run focused Web checks**
 
 Run:
 
@@ -957,7 +957,7 @@ pnpm --filter @worlddock/web test:e2e -- marketing-and-activation.spec.ts
 
 Expected: product event unit test PASS; E2E can submit Alpha feedback from settings and does not hit unhandled mock routes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -980,7 +980,7 @@ Expected: commit succeeds and Author/Committer do not expose a personal identity
 - Modify: `docs/product/permissions.md`
 - Modify: `docs/product/data-and-ip-policy.md`
 
-- [ ] **Step 1: Replace product docs with Alpha-ready copy**
+- [x] **Step 1: Replace product docs with Alpha-ready copy**
 
 Replace `docs/product/beta-template-library.md`:
 
@@ -1125,7 +1125,7 @@ WorldDock Cloud Alpha 的默认原则是：创作者保留自己的世界观 IP�
 创作者发布公开仓库前，需要确认 release note、授权方式和公开内容。公开仓库被 Fork 后，Fork 用户会获得该 release snapshot 的副本；源仓库后续更新需要通过同步流程进入 Fork。
 ```
 
-- [ ] **Step 2: Verify docs contain required policy language**
+- [x] **Step 2: Verify docs contain required policy language**
 
 Run:
 
@@ -1135,7 +1135,7 @@ rg -n "Alpha 不包含|Alpha 免费试用|不处理真实付款|模板库|创作
 
 Expected: output includes all five product docs and the Alpha no-payment/no-template/IP/permission language.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 Run:
 
@@ -1155,7 +1155,7 @@ Expected: commit succeeds and Author/Committer do not expose a personal identity
 - Modify: `apps/web/tests/e2e/marketing-and-activation.spec.ts`
 - Modify: `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md`
 
-- [ ] **Step 1: Replace marketing and activation E2E spec**
+- [x] **Step 1: Replace marketing and activation E2E spec**
 
 Replace `apps/web/tests/e2e/marketing-and-activation.spec.ts`:
 
@@ -1216,7 +1216,7 @@ test("authenticated settings page submits alpha feedback and records feedback ev
 });
 ```
 
-- [ ] **Step 2: Run focused acceptance**
+- [x] **Step 2: Run focused acceptance**
 
 Run:
 
@@ -1229,7 +1229,7 @@ pnpm --filter @worlddock/web test:e2e -- marketing-and-activation.spec.ts
 
 Expected: all commands PASS.
 
-- [ ] **Step 3: Run full regression gate**
+- [x] **Step 3: Run full regression gate**
 
 Run:
 
@@ -1241,7 +1241,7 @@ pnpm build
 
 Expected: all commands PASS.
 
-- [ ] **Step 4: Update incomplete-tasks completion record**
+- [x] **Step 4: Update incomplete-tasks completion record**
 
 Modify the `## Phase 12: 产品分析、官网和 Alpha 申请/反馈` section in `docs/superpowers/plans/2026-05-28-alpha-incomplete-tasks.md` to:
 
@@ -1278,7 +1278,7 @@ Modify the `## Phase 12: 产品分析、官网和 Alpha 申请/反馈` section i
 - 产品事件当前只作为 Alpha 激活分析采集面；聚合报表和增长运营工作台进入后续计划。
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
