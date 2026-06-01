@@ -1,9 +1,16 @@
 import { Module } from "@nestjs/common";
 import { AnalyticsController } from "./analytics.controller";
-import { AnalyticsService } from "./analytics.service";
+import { ANALYTICS_REPOSITORY, AnalyticsService, PrismaAnalyticsRepository } from "./analytics.service";
 
 @Module({
   controllers: [AnalyticsController],
-  providers: [AnalyticsService],
+  providers: [
+    AnalyticsService,
+    PrismaAnalyticsRepository,
+    {
+      provide: ANALYTICS_REPOSITORY,
+      useExisting: PrismaAnalyticsRepository,
+    },
+  ],
 })
 export class AnalyticsModule {}

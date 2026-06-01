@@ -32,8 +32,27 @@ model User {
   profile       UserProfile?
   notifications Notification[]
   supportFeedback SupportFeedback[]
+  analyticsEvents ProductAnalyticsEvent[]
 
   @@map("users")
+}
+
+model ProductAnalyticsEvent {
+  id          String   @id @default(cuid())
+  userId      String?
+  name        String
+  context     Json     @default("{}")
+  anonymousId String?
+  route       String?
+  userAgent   String?
+  occurredAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name, occurredAt])
+  @@index([anonymousId, occurredAt])
+  @@index([userId, occurredAt])
+  @@map("product_analytics_events")
 }
 
 model UserProfile {

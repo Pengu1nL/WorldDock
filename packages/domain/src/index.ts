@@ -1,5 +1,6 @@
 export * from "./assets";
 export * from "./agent";
+export * from "./analytics";
 export * from "./api";
 export * from "./billing";
 export * from "./developer-access";
