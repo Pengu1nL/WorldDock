@@ -2,6 +2,10 @@ import type { Page, Route } from "playwright/test";
 
 const sessionToken = "session_valid";
 
+type ApiMockOptions = {
+  onAnalyticsEvent?: (event: Record<string, any>) => void;
+};
+
 const tideWorld = {
   id: "tide",
   name: "潮汐之书",
@@ -70,9 +74,9 @@ const tideRepository = {
   ],
 };
 
-export async function gotoApp(page: Page, options: { installMocks?: boolean } = {}) {
+export async function gotoApp(page: Page, options: { installMocks?: boolean; onAnalyticsEvent?: (event: Record<string, any>) => void } = {}) {
   if (options.installMocks ?? true) {
-    await installApiMocks(page);
+    await installApiMocks(page, { onAnalyticsEvent: options.onAnalyticsEvent });
     await page.addInitScript((token) => {
       window.localStorage.setItem("worlddock.sessionToken", token);
     }, sessionToken);
@@ -81,7 +85,7 @@ export async function gotoApp(page: Page, options: { installMocks?: boolean } = 
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
 }
 
-async function installApiMocks(page: Page) {
+async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -358,6 +362,41 @@ async function installApiMocks(page: Page) {
           createdAt: "2026-05-28T10:00:00.000Z",
         },
       });
+    }
+
+    if (method === "POST" && path === "/v1/support/feedback") {
+      const input = postData(request);
+      return json(route, {
+        feedback: {
+          id: "feedback_e2e",
+          userId: "user_1",
+          message: input.message,
+          context: input.context ?? {},
+          status: "open",
+          createdAt: "2026-06-01T10:00:00.000Z",
+        },
+        notification: {
+          id: "notification_feedback_e2e",
+          userId: "user_1",
+          type: "support_feedback_submitted",
+          title: "反馈已收到",
+          body: input.message,
+          readAt: null,
+          createdAt: "2026-06-01T10:00:00.000Z",
+        },
+      }, 201);
+    }
+
+    if (method === "POST" && path === "/v1/analytics/events") {
+      const input = postData(request);
+      options.onAnalyticsEvent?.(input);
+      return json(route, {
+        event: {
+          id: "event_e2e",
+          ...input,
+          createdAt: "2026-06-01T10:00:00.000Z",
+        },
+      }, 201);
     }
 
     if (method === "DELETE" && /\/v1\/access-tokens\/[^/]+$/.test(path)) {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { WorldMode } from "@worlddock/domain";
 import { DataRightsPage } from "../account/data-rights-page";
 import { BillingPage } from "../billing/billing-page";
+import { SupportEntry } from "../support/support-entry";
 import { ImportExportPanel } from "../worlds/import-export-panel";
 import {
   captureBillingPlaceholderIntent,
@@ -186,14 +187,21 @@ export function SettingsView({
 
       <div style={{ padding: "20px 32px 40px", maxWidth: 860 }}>
         {tab === "billing" && (
-          <BillingPage
-            balanceCents={Math.round(balance * 100)}
-            usage={billingUsage}
-            busy={billingBusy}
-            waitlistPendingPlan={billingWaitlistPendingPlan}
-            onRefresh={refreshBilling}
-            onWaitlist={joinBillingWaitlist}
-          />
+          <section style={{ display: "grid", gap: 18 }}>
+            <BillingPage
+              balanceCents={Math.round(balance * 100)}
+              usage={billingUsage}
+              busy={billingBusy}
+              waitlistPendingPlan={billingWaitlistPendingPlan}
+              onRefresh={refreshBilling}
+              onWaitlist={joinBillingWaitlist}
+            />
+            <SupportEntry
+              sessionToken={sessionToken()}
+              context={{ route: "/app/settings", tab: "billing", worldId: currentWorld?.id ?? null }}
+              onToast={onToast}
+            />
+          </section>
         )}
         {tab === "model" && (
           <section className="card" style={{ padding: 18 }}>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PRODUCT_EVENTS, trackProductEvent } from "../analytics/product-events";
 import { submitSupportFeedback } from "../worlddock/api";
 
 type SupportEntryProps = {
@@ -16,6 +17,11 @@ export function SupportEntry({ sessionToken, context, onToast }: SupportEntryPro
     setBusy(true);
     try {
       await submitSupportFeedback({ message: message.trim(), context }, { sessionToken });
+      trackProductEvent(PRODUCT_EVENTS.alphaFeedbackSubmitted, {
+        source: "support_entry",
+        messageLength: message.trim().length,
+        ...context,
+      });
       setMessage("");
       onToast({ kind: "save", text: "反馈已提交" });
     } catch {
