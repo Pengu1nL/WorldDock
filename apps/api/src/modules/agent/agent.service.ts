@@ -1,15 +1,22 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldSuggestion } from "@worlddock/domain";
+import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
 import type { AuthSubject } from "../auth/auth.service";
 import { BillingService } from "../billing/billing.service";
 import { NotificationsService } from "../notifications/notifications.service";
-import { WORLD_REPOSITORY, type WorldRepository, type WorldRecord } from "../worlds/world.repository";
+import {
+  WORLD_REPOSITORY,
+  type ArchiveEntryRecord,
+  type ConflictRecord,
+  type StorySeedRecord,
+  type WorldRepository,
+  type WorldRecord,
+} from "../worlds/world.repository";
 import { selectInitialWorldContext } from "./context-builder";
 import { describeWorldTools } from "./pi/world-tool-registry";
 import { loadWorldDockPiSkills } from "./pi/skill-loader";
 import { buildDisclosureBriefs, buildDisclosureCards, buildDisclosureManifest } from "./pi/world-tools";
 import { AGENT_PROVIDER, type AgentProvider } from "./agent.provider";
-import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord } from "./agent.repository";
+import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord } from "./agent.repository";
 
 @Injectable()
 export class AgentService {
@@ -164,10 +171,22 @@ export class AgentService {
 
   async saveSuggestion(subject: AuthSubject, suggestionId: string) {
     const suggestion = await this.requireOwnedSuggestion(subject, suggestionId);
-    if (suggestion.status === "saved") return suggestion;
+    if (suggestion.status === "saved") {
+      return {
+        suggestion,
+        asset: await this.findSavedSuggestionAsset(suggestion),
+      };
+    }
 
-    const savedAssetId = await this.saveSuggestionAsset(suggestion.worldId, suggestion.suggestion);
-    return this.agents.updateSuggestion(suggestion.id, { status: "saved", savedAssetId });
+    const saved = await this.saveSuggestionAsset(suggestion.worldId, suggestion.suggestion);
+    const updated = await this.agents.updateSuggestion(suggestion.id, {
+      status: "saved",
+      savedAssetId: saved.asset.id,
+    });
+    return {
+      suggestion: updated ?? { ...suggestion, status: "saved" as const, savedAssetId: saved.asset.id },
+      asset: saved.asset,
+    };
   }
 
   async editSuggestion(subject: AuthSubject, suggestionId: string, input: { suggestion: unknown }) {
@@ -184,7 +203,7 @@ export class AgentService {
     return this.agents.updateSuggestion(suggestion.id, { status: "discarded" });
   }
 
-  private async saveSuggestionAsset(worldId: string, suggestion: WorldSuggestion) {
+  private async saveSuggestionAsset(worldId: string, suggestion: WorldSuggestion): Promise<{ asset: WorldAsset }> {
     if (suggestion.kind === "setting") {
       const entry = await this.worlds.createArchiveEntry({
         worldId,
@@ -194,7 +213,7 @@ export class AgentService {
         body: suggestion.body,
         relations: suggestion.relations ?? [],
       });
-      return entry.id;
+      return { asset: archiveEntryToWorldAsset(entry) };
     }
 
     if (suggestion.kind === "seed") {
@@ -207,7 +226,7 @@ export class AgentService {
         protagonists: suggestion.protagonists,
         questions: suggestion.questions,
       });
-      return seed.id;
+      return { asset: storySeedToWorldAsset(seed) };
     }
 
     const conflict = await this.worlds.createConflict({
@@ -218,7 +237,27 @@ export class AgentService {
       related: suggestion.related ?? [],
       derivedSeeds: suggestion.derivedSeeds ?? [],
     });
-    return conflict.id;
+    return { asset: conflictToWorldAsset(conflict) };
+  }
+
+  private async findSavedSuggestionAsset(suggestion: AgentSuggestionRecord): Promise<WorldAsset | null> {
+    if (!suggestion.savedAssetId) return null;
+
+    if (suggestion.suggestion.kind === "setting") {
+      const entry = (await this.worlds.listArchiveEntries(suggestion.worldId))
+        .find((item) => item.id === suggestion.savedAssetId);
+      return entry ? archiveEntryToWorldAsset(entry) : null;
+    }
+
+    if (suggestion.suggestion.kind === "seed") {
+      const seed = (await this.worlds.listStorySeeds(suggestion.worldId))
+        .find((item) => item.id === suggestion.savedAssetId);
+      return seed ? storySeedToWorldAsset(seed) : null;
+    }
+
+    const conflict = (await this.worlds.listConflicts(suggestion.worldId))
+      .find((item) => item.id === suggestion.savedAssetId);
+    return conflict ? conflictToWorldAsset(conflict) : null;
   }
 
   private async requireOwnedRun(subject: AuthSubject, runId: string): Promise<AgentRunRecord> {
@@ -300,4 +339,61 @@ function resolveBillingModel(provider: AgentRunRecord["provider"], model: string
   if (model.startsWith("gpt-")) return { provider: "openai", model };
   if (model.startsWith("claude")) return { provider: "anthropic", model };
   return { provider: "openai-compatible", model };
+}
+
+function archiveEntryToWorldAsset(entry: ArchiveEntryRecord): WorldAsset {
+  return {
+    id: entry.id,
+    worldId: entry.worldId,
+    kind: "setting",
+    title: entry.title,
+    category: entry.category,
+    summary: entry.summary,
+    body: entry.body,
+    payload: { relations: entry.relations ?? [] },
+    position: entry.position ?? 0,
+    createdAt: entry.createdAt.toISOString(),
+    updatedAt: entry.updatedAt.toISOString(),
+  };
+}
+
+function storySeedToWorldAsset(seed: StorySeedRecord): WorldAsset {
+  return {
+    id: seed.id,
+    worldId: seed.worldId,
+    kind: "seed",
+    title: seed.title,
+    category: "故事种子",
+    summary: seed.hook,
+    body: seed.conflict,
+    payload: {
+      hook: seed.hook,
+      trigger: seed.trigger,
+      conflict: seed.conflict,
+      protagonists: seed.protagonists,
+      questions: seed.questions ?? [],
+    },
+    position: seed.position ?? 0,
+    createdAt: seed.createdAt.toISOString(),
+    updatedAt: seed.updatedAt.toISOString(),
+  };
+}
+
+function conflictToWorldAsset(conflict: ConflictRecord): WorldAsset {
+  return {
+    id: conflict.id,
+    worldId: conflict.worldId,
+    kind: "conflict",
+    title: conflict.title,
+    category: "冲突",
+    summary: conflict.summary,
+    body: conflict.body,
+    payload: {
+      related: conflict.related ?? [],
+      derivedSeeds: conflict.derivedSeeds ?? [],
+    },
+    position: conflict.position ?? 0,
+    createdAt: conflict.createdAt.toISOString(),
+    updatedAt: conflict.updatedAt.toISOString(),
+  };
 }

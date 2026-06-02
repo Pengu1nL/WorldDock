@@ -6,10 +6,10 @@
 
 ## 结论
 
-按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，截至本轮 Phase 14 验证，Phase 2 至 Phase 14 已可标记完成。
-Phase 1 的早期静态缺口已有明显变化，但本轮未执行对应完整验收，因此仍保留为待重新验收状态。
+按“整项 Task 的文件、行为、测试和验收条件都满足才可勾选”的标准，截至 2026-06-02 本轮复核，Phase 1 至 Phase 14 已可标记完成。
+本轮补齐 Phase 1 定向验收、Docker 构建验收和 CI 等价全量验收，并修复 Agent suggestion 保存后档案可见性回归。
 
-当前代码库已经具备 Cloud Alpha 主要产品闭环，包括个人账户认证和 onboarding、世界创建、资产编辑、pi Agent、发布/Fork、创作点账本、社区发现、治理、导入导出、站内通知、官网分析、Worker 运维、世界包 CLI 和个人访问令牌。Phase 1 的缺口判断需要后续按计划重新运行定向与全量验收后再更新完成状态。
+当前代码库已经具备 Cloud Alpha 主要产品闭环，包括生产工程闸门、个人账户认证和 onboarding、世界创建、资产编辑、pi Agent、发布/Fork、创作点账本、社区发现、治理、导入导出、站内通知、官网分析、Worker 运维、世界包 CLI 和个人访问令牌。
 
 ## 判定标准
 
@@ -21,20 +21,27 @@ Phase 1 的早期静态缺口已有明显变化，但本轮未执行对应完整
 
 ## Phase 1: 生产工程闸门和环境基线
 
-完成状态：待重新验收。
+完成状态：已完成。
 
-待重新验收：
+完成依据：
 
-- 本轮未重新执行 Phase 1 的完整验收命令，因此暂不把 Phase 1 标记为完成。
-- 需按 Phase 1 计划复核 CI、Dockerfile、生产 env gate、静态导出移除、系统集成测试和运维 runbook 是否全部满足验收标准。
+- `.github/workflows/ci.yml` 已存在，并通过 `pnpm verify:ci` 串联 Prisma generate/validate、lint、unit、build、API integration 和 Web E2E。
+- `apps/api/Dockerfile`、`apps/web/Dockerfile` 和 `apps/worker/Dockerfile` 已通过本轮 Docker build 验证。
+- `apps/web/next.config.ts` 不再设置 `output: "export"` 或 `assetPrefix: "."`，生产构建保留服务端能力。
+- `packages/config/src/env.ts` 已要求 32 位 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`、production `SENTRY_DSN`，并拒绝 production mock provider、非 cloud edition 和缺失真实模型配置。
+- `apps/api/test/system.integration-spec.ts` 覆盖 health、readiness、metrics 和 unsafe production env gate。
+- `docs/operations/incident_runbook.md`、`docs/operations/queue_runbook.md` 与 `docs/operations/production_release_checklist.md` 已提供生产事故、队列和发布门禁基线。
 
-已有但不足：
+验收证据：
 
-- `.github/workflows/ci.yml`、`apps/api/Dockerfile`、`apps/web/Dockerfile`、`apps/worker/Dockerfile`、`docs/operations/incident_runbook.md` 和 `docs/operations/queue_runbook.md` 已存在；Phase 1 仍需按完整验收流程重新确认。
-- `apps/web/next.config.ts` 当前只保留 `transpilePackages`，早期静态导出缺口已不再适用；仍需结合 Phase 1 验收命令重新确认生产构建行为。
-- `packages/config/src/env.ts` 当前已要求 32 位 `BETTER_AUTH_SECRET`、`BETTER_AUTH_URL`，并拒绝 production mock/pi 配置缺失；仍需结合 Phase 1 验收命令重新确认完整生产门禁。
-- `apps/api/test/system.integration-spec.ts` 存在并覆盖基础 health/readiness/metrics。
-- API 和 Worker 已有部分 observability 代码。
+- `pnpm --filter @worlddock/db prisma:validate`：通过。
+- `pnpm --filter @worlddock/config test -- env.test.ts`：通过。
+- `pnpm --filter @worlddock/web test -- src/config/next-config.test.ts`：通过。
+- `pnpm --filter @worlddock/api test:integration -- system.integration-spec.ts`：通过。
+- `pnpm verify:ci`：通过。
+- `docker build -f apps/api/Dockerfile -t worlddock-api:alpha-verification .`：通过。
+- `docker build -f apps/web/Dockerfile -t worlddock-web:alpha-verification .`：通过。
+- `docker build -f apps/worker/Dockerfile -t worlddock-worker:alpha-verification .`：通过。
 
 ## Phase 2: 个人账户认证、账户和 Onboarding
 
@@ -440,9 +447,9 @@ Phase 1 的早期静态缺口已有明显变化，但本轮未执行对应完整
 
 ## 建议执行顺序
 
-1. 先重新验收 Phase 1，确认 CI、Docker、生产 env gate、静态导出移除、系统集成测试和运维 runbook 全部满足计划标准。
-2. 保持 Phase 2 至 Phase 14 的验收测试作为回归门禁。
+1. 保持 `pnpm verify:ci` 作为 Alpha 回归门禁。
+2. 生产发布前仍需按 `docs/operations/production_release_checklist.md` 记录真实 CI URL、镜像 digest、staging smoke 和发布后观察窗口。
 
 ## 本次执行说明
 
-本记录最初来自静态调查和文档整理；后续 Phase 收口已逐步补充定向验证和完成依据。Phase 1 的早期静态缺口已有明显变化，但本轮未运行对应完整验收，因此本记录只将其标为待重新验收，不再保留明显过期的“缺少文件”断言。
+本记录最初来自静态调查和文档整理；后续 Phase 收口已逐步补充定向验证和完成依据。2026-06-02 本轮复核已补齐 Phase 1 完整验收，并修复 Agent suggestion 保存后档案可见性回归，因此本记录将 Phase 1 至 Phase 14 统一标记为已完成。生产发布前仍需按发布 checklist 记录真实外部证据，而不是复用本地验收输出。

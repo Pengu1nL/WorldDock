@@ -74,6 +74,20 @@ const tideRepository = {
   ],
 };
 
+const memoryTradeLawAsset = {
+  id: "archive_1",
+  worldId: "world_created",
+  kind: "setting",
+  title: "《记忆交易法》",
+  category: "世界规则",
+  summary: "认证机构可以托管、估价并转让记忆，但亲属记忆交易必须经过冷静期。",
+  body: "所有记忆交易都必须由认证机构托管，亲属关系内的交易需要七日冷静期和独立见证。",
+  payload: { relations: [] },
+  position: 0,
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+};
+
 export async function gotoApp(page: Page, options: { installMocks?: boolean; onAnalyticsEvent?: (event: Record<string, any>) => void } = {}) {
   if (options.installMocks ?? true) {
     await installApiMocks(page, { onAnalyticsEvent: options.onAnalyticsEvent });
@@ -115,6 +129,14 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
           mode: "cloud",
           hasUnsaved: true,
         },
+      });
+    }
+
+    if (method === "GET" && /\/v1\/worlds\/[^/]+\/assets$/.test(path)) {
+      const worldId = path.split("/")[3];
+      return json(route, {
+        assets: worldId === "world_created" ? [memoryTradeLawAsset] : [],
+        nextCursor: null,
       });
     }
 
@@ -208,7 +230,10 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
     }
 
     if (method === "POST" && /\/v1\/agent-suggestions\/[^/]+\/save$/.test(path)) {
-      return json(route, { suggestion: { id: "ags_1", status: "saved" } });
+      return json(route, {
+        suggestion: { id: "ags_1", status: "saved", savedAssetId: memoryTradeLawAsset.id },
+        asset: memoryTradeLawAsset,
+      }, 201);
     }
 
     if (method === "POST" && /\/v1\/agent-suggestions\/[^/]+\/discard$/.test(path)) {

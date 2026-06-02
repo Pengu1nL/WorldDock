@@ -100,7 +100,28 @@ describe("agent run endpoints", () => {
       .expect(201);
 
     expect(saved.body.suggestion).toMatchObject({ status: "saved", savedAssetId: "archive_1" });
-    expect(saved.body.asset).toBeUndefined();
+    expect(saved.body.asset).toMatchObject({
+      id: "archive_1",
+      worldId: world.id,
+      kind: "setting",
+      title: "《记忆交易法》修订版",
+      category: "世界规则",
+      summary: "修订后的法律地位。",
+      body: "仅认证机构可以主持交易，并需要保留撤销机制。",
+      payload: { relations: [] },
+      position: 0,
+    });
+    expect(saved.body.asset.createdAt).toEqual(expect.any(String));
+    expect(saved.body.asset.updatedAt).toEqual(expect.any(String));
+    expect((await worlds.countAssets(world.id)).archive).toBe(1);
+
+    const savedAgain = await request(app.getHttpServer())
+      .post(`/v1/agent-suggestions/${suggestionId}/save`)
+      .set("authorization", "Bearer session_user_1")
+      .expect(201);
+
+    expect(savedAgain.body.suggestion).toMatchObject({ status: "saved", savedAssetId: "archive_1" });
+    expect(savedAgain.body.asset).toMatchObject({ id: "archive_1", kind: "setting" });
     expect((await worlds.countAssets(world.id)).archive).toBe(1);
   });
 

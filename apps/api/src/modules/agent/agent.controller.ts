@@ -61,7 +61,7 @@ export class AgentController {
   @Post("agent-suggestions/:suggestionId/save")
   @RequireScopes("world:write")
   async save(@CurrentSubject() subject: AuthSubject, @Param("suggestionId") suggestionId: string) {
-    return { suggestion: await this.agentService.saveSuggestion(subject, suggestionId) };
+    return this.agentService.saveSuggestion(subject, suggestionId);
   }
 
   @Patch("agent-suggestions/:suggestionId")
