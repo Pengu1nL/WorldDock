@@ -132,6 +132,31 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
       });
     }
 
+    if (method === "POST" && path === "/v1/world-drafts") {
+      const input = postData(request);
+      return json(route, {
+        draft: {
+          suggestedName: input.name || "回忆所",
+          suggestedType: input.type || "近未来 / 软科幻 / 社会派",
+          styles: input.styleKw ? String(input.styleKw).split(/\s+/).filter(Boolean) : ["冷静观察", "制度细节", "道德灰度"],
+          coreSetting: "在一个允许记忆作为资产交易的近未来社会，个人最私密的体验成为了可估值、可转让、可继承的财产。",
+          coreConflict: "记忆是不可让渡的人格延伸，还是可以定价的私有财产？",
+          directions: [
+            "深入《记忆交易法》的制度细节与监管漏洞",
+            "聚焦黑市与「完整人生」打包交易",
+            "探讨记忆植入后宿主的身份连续性",
+          ],
+          firstQuestion: "你倾向于让记忆交易是成熟合法市场，还是刚被立法承认、仍在制造伦理震荡的新行业？",
+          tools: [
+            { id: "ctx", label: "分析灵感主题", detail: "提取核心概念、类型线索与世界运行规则" },
+            { id: "model", label: "调用真实 Agent", detail: "用当前模型生成名称、设定、矛盾与追问" },
+            { id: "shape", label: "整理世界雏形", detail: "收束为可确认的创建草稿" },
+          ],
+        },
+        tokenUsage: { inputTokens: 120, outputTokens: 260, totalTokens: 380 },
+      }, 201);
+    }
+
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/assets$/.test(path)) {
       const worldId = path.split("/")[3];
       return json(route, {

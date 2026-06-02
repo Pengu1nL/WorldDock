@@ -1,46 +1,14 @@
 // view-worlds.tsx — Worlds list page + Create flow
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { generateWorldDraft, type GenerateWorldDraftResponse, type WorldCreationDraft, type WorldDraftTool } from "./api";
 import { Icon, Maturity } from "./components";
 
-const CREATION_SEEDS = {
-  memory: {
-    tools: [
-      { id: "ctx", label: "分析灵感主题", detail: "提取核心概念：记忆 / 交易 / 财产权 / 身份" },
-      { id: "rules", label: "检索相关规则模板", detail: "近未来法律体系 · 经济制度 · 神经科技伦理" },
-      { id: "shape", label: "生成世界雏形", detail: "收束名称、类型、核心设定与第一轮问题" },
-    ],
-    suggestedName: "回忆所",
-    suggestedType: "近未来 / 软科幻 / 社会派",
-    styles: ["冷静观察", "制度细节", "道德灰度"],
-    coreSetting: "在一个允许记忆作为资产交易的近未来社会，个人最私密的体验成为了可估值、可转让、可继承的财产。",
-    coreConflict: "记忆是不可让渡的人格延伸，还是可以定价的私有财产？",
-    directions: [
-      "深入《记忆交易法》的制度细节与监管漏洞",
-      "聚焦黑市与「完整人生」打包交易",
-      "探讨记忆植入后宿主的身份连续性",
-    ],
-    firstQuestion: "你倾向于让记忆交易是成熟合法市场，还是刚被立法承认、仍在制造伦理震荡的新行业？",
-  },
-  city: {
-    tools: [
-      { id: "ctx", label: "分析灵感主题", detail: "提取核心概念：意识 / 城市 / 居民" },
-      { id: "rules", label: "检索相关规则模板", detail: "都市奇幻 · 集体意识 · 拟人化制度" },
-      { id: "shape", label: "生成世界雏形", detail: "收束名称、类型、核心设定与第一轮问题" },
-    ],
-    suggestedName: "市声",
-    suggestedType: "都市奇幻 / 思辨",
-    styles: ["拟人化制度", "建筑学诗意", "缓慢张力"],
-    coreSetting: "城市拥有集体意识，居民同时是它的细胞、它的语言、它的食物。",
-    coreConflict: "城市的福祉与个体居民的福祉何时一致，何时撕裂？",
-    directions: [
-      "城市的「神经系统」如何通过交通、电力和广播表达",
-      "失语城市与流亡居民的关系",
-      "两座有意识城市之间的外交",
-    ],
-    firstQuestion: "城市的意识是单一的「她」，还是由街区议会争吵出来的「我们」？",
-  },
-};
+const DRAFT_GENERATION_TOOLS: WorldDraftTool[] = [
+  { id: "ctx", label: "分析灵感主题", detail: "提取核心概念、类型线索与世界运行规则" },
+  { id: "model", label: "调用真实 Agent", detail: "用当前模型生成名称、设定、矛盾与追问" },
+  { id: "shape", label: "整理世界雏形", detail: "收束为可确认的创建草稿" },
+];
 
 // ────────── World card ──────────
 const WorldCard = ({ world, onOpen, onDelete, onDuplicate }: any) => {
@@ -288,41 +256,53 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
 };
 
 // ────────── Create World view ──────────
-export const CreateView = ({ initialInspiration, seedKey, onConfirm, onCancel }: any) => {
+export const CreateView = ({ initialInspiration, sessionToken, onConfirm, onCancel }: any) => {
   const [step, setStep] = useState("input");   // 'input' | 'generating' | 'confirm'
   const [inspiration, setInspiration] = useState(initialInspiration || "");
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [styleKw, setStyleKw] = useState("");
   const [avoid, setAvoid] = useState("");
-  const [seedData, setSeedData] = useState<any>(null);
+  const [seedData, setSeedData] = useState<WorldCreationDraft | null>(null);
+  const [draftTokenUsage, setDraftTokenUsage] = useState<GenerateWorldDraftResponse["tokenUsage"] | null>(null);
+  const [generationError, setGenerationError] = useState("");
   const [progressIdx, setProgressIdx] = useState(0);
-
-  const seed = (CREATION_SEEDS as Record<string, typeof CREATION_SEEDS.memory>)[seedKey] ?? CREATION_SEEDS.memory;
+  const generationTools = seedData?.tools?.length ? seedData.tools : DRAFT_GENERATION_TOOLS;
 
   useEffect(() => {
     if (step !== "generating") return;
-    const data = seed;
-    let i = 0;
-    const adv = () => {
-      if (i < data.tools.length) {
-        setProgressIdx(i + 1);
-        i++;
-        setTimeout(adv, 700);
-      } else {
-        setTimeout(() => {
-          setSeedData(data);
-          setStep("confirm");
-        }, 400);
-      }
-    };
-    adv();
-  }, [step, seedKey, seed]);
+    setProgressIdx(0);
+    const timer = window.setInterval(() => {
+      setProgressIdx((current) => Math.min(current + 1, generationTools.length));
+    }, 650);
+    return () => window.clearInterval(timer);
+  }, [step, generationTools.length]);
 
-  const startGen = () => {
-    if (!inspiration.trim()) return;
+  const startGen = async () => {
+    const nextInspiration = inspiration.trim();
+    if (!nextInspiration) return;
+    if (!sessionToken) {
+      setGenerationError("请先登录，再调用真实 Agent 生成世界雏形。");
+      return;
+    }
+    setGenerationError("");
+    setSeedData(null);
+    setDraftTokenUsage(null);
     setProgressIdx(0);
     setStep("generating");
+    try {
+      const result = await generateWorldDraft(
+        { inspiration: nextInspiration, name, type, styleKw, avoid },
+        { sessionToken },
+      );
+      setSeedData(result.draft);
+      setDraftTokenUsage(result.tokenUsage ?? null);
+      setProgressIdx(result.draft.tools?.length ?? DRAFT_GENERATION_TOOLS.length);
+      setStep("confirm");
+    } catch {
+      setStep("input");
+      setGenerationError("真实 Agent 生成失败，请检查模型服务配置或稍后重试。");
+    }
   };
 
   return (
@@ -374,12 +354,24 @@ export const CreateView = ({ initialInspiration, seedKey, onConfirm, onCancel }:
               <span style={{ fontSize: 12, color: "var(--fg-3)" }}>
                 Agent 会先生成一个可推演的雏形，让你确认再创建世界。
               </span>
-              <button className="btn primary lg" onClick={startGen} disabled={!inspiration.trim()}>
+              <button className="btn primary lg" onClick={() => void startGen()} disabled={!inspiration.trim()}>
                 <Icon name="spark" size={14}/>
                 <span>开始推演</span>
                 <span className="kbd">↵</span>
               </button>
             </div>
+            {generationError && (
+              <div role="status" style={{
+                padding: "10px 12px",
+                border: "1px solid var(--amber-dim)",
+                background: "var(--amber-bg)",
+                color: "var(--fg-1)",
+                borderRadius: 6,
+                fontSize: 12,
+              }}>
+                {generationError}
+              </div>
+            )}
           </div>
         )}
 
@@ -390,10 +382,10 @@ export const CreateView = ({ initialInspiration, seedKey, onConfirm, onCancel }:
                 <span className="dot sage pulse"/>
                 <span className="mono" style={{ fontSize: 12, color: "var(--sage)" }}>agent.run.started</span>
                 <span style={{ flex: 1 }}/>
-                <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{progressIdx}/{seed.tools.length}</span>
+                <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{progressIdx}/{generationTools.length}</span>
               </div>
               <div className="col" style={{ gap: 6 }}>
-                {seed.tools.map((t: any, i: number) => {
+                {generationTools.map((t: any, i: number) => {
                   const state = i < progressIdx ? "done" : i === progressIdx ? "running" : "queued";
                   return (
                     <div key={t.id} className="row gap-2" style={{
@@ -422,14 +414,15 @@ export const CreateView = ({ initialInspiration, seedKey, onConfirm, onCancel }:
             seed={seedData}
             overrideName={name}
             overrideType={type}
-            onRegenerate={() => { setSeedData(null); setStep("generating"); }}
+            tokenUsage={draftTokenUsage}
+            onRegenerate={() => { void startGen(); }}
             onConfirm={(finalName: any) => onConfirm({
               name: finalName || seedData.suggestedName,
               type: type || seedData.suggestedType,
               inspiration,
               styleKw,
               avoid,
-              seedKey,
+              draft: seedData,
             })}
           />
         )}
@@ -439,16 +432,19 @@ export const CreateView = ({ initialInspiration, seedKey, onConfirm, onCancel }:
 };
 
 // ────────── World seed confirmation card ──────────
-const ConfirmCard = ({ seed, overrideName, overrideType, onRegenerate, onConfirm }: any) => {
+const ConfirmCard = ({ seed, overrideName, overrideType, tokenUsage, onRegenerate, onConfirm }: any) => {
   const [name, setName] = useState(overrideName || seed.suggestedName);
   const [editing, setEditing] = useState(false);
+  const usageLabel = tokenUsage?.totalTokens
+    ? `agent.run.completed · ${tokenUsage.totalTokens.toLocaleString("en-US")} tokens`
+    : "agent.run.completed";
 
   return (
     <div className="col gap-4" style={{ gap: 14 }}>
       <div className="row gap-2">
         <span className="badge sage"><Icon name="check" size={10}/>&nbsp;雏形已生成</span>
         <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
-          agent.run.completed · 4.2s · 1,283 tokens
+          {usageLabel}
         </span>
       </div>
 

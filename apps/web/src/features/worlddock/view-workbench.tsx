@@ -3,6 +3,12 @@
 
 import React, { useState as useStateWB } from "react";
 import { Icon } from "./components";
+import {
+  getSuggestionKey,
+  getSuggestionPreviewText,
+  getSuggestionRenderKey,
+  normalizeSuggestionForSave,
+} from "./suggestion-utils";
 
 // Agent modes per PRD §8.3.2
 // 关键区分：
@@ -58,9 +64,9 @@ const SuggestionGroup = ({ title, kind, items, savedIds, onSave, onOpenDetail }:
       </button>
       {!collapsed && (
         <div className="col" style={{ padding: "0 8px 8px" }}>
-          {items.map((s: any) => (
-            <SuggestionRow key={s.id} item={s} accentClass={accentClass} saved={savedIds.includes(s.id)}
-              onSave={() => onSave(s)} onOpenDetail={() => onOpenDetail(s)}/>
+          {items.map((s: any, index: number) => (
+            <SuggestionRow key={getSuggestionRenderKey(s, index)} item={s} accentClass={accentClass} saved={savedIds.includes(getSuggestionKey(s))}
+              onSave={() => onSave(normalizeSuggestionForSave(s))} onOpenDetail={() => onOpenDetail(normalizeSuggestionForSave(s))}/>
           ))}
         </div>
       )}
@@ -83,7 +89,7 @@ const SuggestionRow = ({ item, accentClass, saved, onSave, onOpenDetail }: any) 
         fontSize: "var(--t-12)", color: "var(--fg-1)", marginTop: 3,
         lineHeight: 1.5,
       }}>
-        {item.summary || item.hook}
+        {getSuggestionPreviewText(item)}
       </div>
     </div>
     <div className="row gap-2" style={{ flex: "none", alignSelf: "flex-start" }}>
@@ -172,7 +178,7 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
 
       <div className="prose" style={{
         fontSize: "var(--t-14)", color: "var(--fg)", lineHeight: 1.7,
-        whiteSpace: "pre-wrap",
+        whiteSpace: "normal",
       }}>
         {renderMarkdownish(msg.text)}
         {isStreaming && <span className="caret"/>}
@@ -197,9 +203,161 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
   );
 };
 
-// Minimal markdown bold (**x**) renderer
 const renderMarkdownish = (text: string) => {
   if (!text) return null;
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const nodes: React.ReactNode[] = [];
+  let paragraph: string[] = [];
+  let list: string[] = [];
+  let listKind: "ul" | "ol" | null = null;
+  let table: string[][] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) return;
+    nodes.push(
+      <p key={`p-${nodes.length}`} style={{ margin: "0 0 10px" }}>
+        {renderInlineMarkdown(paragraph.join(" "))}
+      </p>,
+    );
+    paragraph = [];
+  };
+
+  const flushList = () => {
+    if (list.length === 0) return;
+    const ListTag = listKind === "ol" ? "ol" : "ul";
+    nodes.push(
+      <ListTag key={`${ListTag}-${nodes.length}`} style={{ margin: "6px 0 12px", paddingLeft: 18 }}>
+        {list.map((item, index) => (
+          <li key={`${index}-${item}`} style={{ marginBottom: 4 }}>
+            {renderInlineMarkdown(item)}
+          </li>
+        ))}
+      </ListTag>,
+    );
+    list = [];
+    listKind = null;
+  };
+
+  const flushTable = () => {
+    if (table.length === 0) return;
+    const rows = table.filter((row) => !row.every((cell) => /^:?-{2,}:?$/.test(cell.replace(/\s/g, ""))));
+    if (rows.length > 0) {
+      const [head, ...body] = rows;
+      nodes.push(
+        <table key={`table-${nodes.length}`} style={{ width: "100%", borderCollapse: "collapse", margin: "8px 0 12px", fontSize: 13 }}>
+          <thead>
+            <tr>
+              {head.map((cell, index) => (
+                <th key={`${index}-${cell}`} style={{ textAlign: "left", borderBottom: "1px solid var(--hairline)", padding: "4px 6px", color: "var(--fg-1)" }}>
+                  {renderInlineMarkdown(cell)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={`${cellIndex}-${cell}`} style={{ borderBottom: "1px solid var(--hairline)", padding: "4px 6px", color: "var(--fg-1)" }}>
+                    {renderInlineMarkdown(cell)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>,
+      );
+    }
+    table = [];
+  };
+
+  const flushBlocks = () => {
+    flushParagraph();
+    flushList();
+    flushTable();
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      flushBlocks();
+      continue;
+    }
+
+    const tableRow = parseMarkdownTableRow(trimmed);
+    if (tableRow) {
+      flushParagraph();
+      flushList();
+      table.push(tableRow);
+      continue;
+    }
+
+    flushTable();
+    if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      flushParagraph();
+      flushList();
+      nodes.push(
+        <hr key={`hr-${nodes.length}`} style={{
+          border: 0,
+          borderTop: "1px solid var(--hairline)",
+          margin: "14px 0",
+        }} />,
+      );
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
+    if (heading) {
+      flushParagraph();
+      flushList();
+      const level = Math.min(heading[1].length, 3);
+      const Tag = `h${level}` as "h1" | "h2" | "h3";
+      nodes.push(
+        <Tag key={`h-${nodes.length}`} style={{
+          margin: nodes.length === 0 ? "0 0 10px" : "16px 0 8px",
+          fontSize: level === 1 ? "var(--t-18)" : level === 2 ? "var(--t-16)" : "var(--t-14)",
+          lineHeight: 1.35,
+          color: "var(--fg)",
+          fontWeight: 650,
+        }}>
+          {renderInlineMarkdown(heading[2])}
+        </Tag>,
+      );
+      continue;
+    }
+
+    const unorderedListItem = trimmed.match(/^[-*+]\s+(.+)$/);
+    if (unorderedListItem) {
+      flushParagraph();
+      if (listKind === "ol") flushList();
+      listKind = "ul";
+      list.push(unorderedListItem[1]);
+      continue;
+    }
+
+    const orderedListItem = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    if (orderedListItem) {
+      flushParagraph();
+      if (listKind === "ul") flushList();
+      listKind = "ol";
+      list.push(orderedListItem[1]);
+      continue;
+    }
+
+    flushList();
+    paragraph.push(trimmed);
+  }
+
+  flushBlocks();
+  return nodes;
+};
+
+const parseMarkdownTableRow = (line: string) => {
+  if (!line.startsWith("|") || !line.endsWith("|")) return null;
+  return line.slice(1, -1).split("|").map((cell) => cell.trim());
+};
+
+const renderInlineMarkdown = (text: string) => {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((p, i) => {
     if (p.startsWith("**") && p.endsWith("**")) {
@@ -559,16 +717,16 @@ export const PendingDrawer = ({ pendingItems, onSave, onOpenDetail, onDiscard }:
         <p style={{ marginTop: 10, fontSize: 13 }}>没有待处理建议</p>
       </div>
     ) : (
-      pendingItems.map((s: any) => (
-        <div key={s.id} className="card" style={{ padding: 10 }}>
+      pendingItems.map((s: any, index: number) => (
+        <div key={getSuggestionRenderKey(s, index)} className="card" style={{ padding: 10 }}>
           <div className="row gap-2" style={{ marginBottom: 4 }}>
             <span className={"tag " + (s.kind === "setting" ? "sage" : s.kind === "conflict" ? "brick" : "violet")}>{s.category}</span>
           </div>
           <div style={{ fontSize: "var(--t-13)", fontWeight: 500, marginBottom: 4 }}>{s.title}</div>
-          <p className="prose" style={{ fontSize: 12, color: "var(--fg-1)", lineHeight: 1.5 }}>{s.summary || s.hook}</p>
+          <p className="prose" style={{ fontSize: 12, color: "var(--fg-1)", lineHeight: 1.5 }}>{getSuggestionPreviewText(s)}</p>
           <div className="row gap-2" style={{ marginTop: 8 }}>
-            <button className="btn sm" onClick={() => onOpenDetail(s)}><Icon name="eye" size={11}/><span>查看</span></button>
-            <button className="btn primary sm" onClick={() => onSave(s)}><Icon name="save" size={11}/><span>保存</span></button>
+            <button className="btn sm" onClick={() => onOpenDetail(normalizeSuggestionForSave(s))}><Icon name="eye" size={11}/><span>查看</span></button>
+            <button className="btn primary sm" onClick={() => onSave(normalizeSuggestionForSave(s))}><Icon name="save" size={11}/><span>保存</span></button>
             <div className="flex"/>
             <button className="btn ghost sm" onClick={() => onDiscard(s)}><Icon name="x" size={11}/></button>
           </div>

@@ -9,6 +9,8 @@ import { describeWorldTools, WorldToolRegistry } from "./pi/world-tool-registry"
 
 export const AGENT_PROVIDER = Symbol("AGENT_PROVIDER");
 
+type WorldToolDefinition = ReturnType<typeof describeWorldTools>[number];
+
 export type AgentProviderInput = {
   runId?: string;
   userId?: string;
@@ -19,7 +21,7 @@ export type AgentProviderInput = {
     summary: string;
   };
   context?: WorldContextRef[];
-  tools?: ReturnType<typeof describeWorldTools>;
+  tools?: readonly WorldToolDefinition[];
   skills?: Array<{ name: string; path: string; description: string }>;
   model?: string | null;
   mode: "expand" | "challenge" | "fork" | "polish";

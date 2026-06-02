@@ -27,6 +27,7 @@ import {
   WorldDockApiError,
   type AgentContextRef,
   type CreateWorldInput,
+  type WorldCreationDraft,
 } from "./api";
 import { AgentRunPanel } from "../agent/agent-run-panel";
 import { ContextInspector } from "../agent/context-inspector";
@@ -50,6 +51,7 @@ import {
 } from "./view-workbench";
 import { PublishView } from "./view-publish";
 import { SettingsView } from "./view-settings";
+import { getSuggestionKey, normalizeSuggestionForSave } from "./suggestion-utils";
 import { CreateView, WorldsView } from "./view-worlds";
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -547,7 +549,7 @@ function WorldDockRuntime() {
     pushToast({ kind: "save", text: `已复制 · ${copy.name}` });
   };
 
-  const handleCreateWorld = async ({ name, type, inspiration, styleKw, avoid }: any) => {
+  const handleCreateWorld = async ({ name, type, inspiration, styleKw, avoid, draft }: any) => {
     if (!sessionToken) {
       pushToast({ kind: "warn", text: "请先登录，再创建真实世界" });
       return;
@@ -555,7 +557,7 @@ function WorldDockRuntime() {
 
     try {
       const created: any = await createWorldRequest(
-        buildCreateWorldInput({ name, type, inspiration, styleKw, avoid, mode: t.mode }),
+        buildCreateWorldInput({ name, type, inspiration, styleKw, avoid, draft, mode: t.mode }),
         { sessionToken },
       );
       const newWorld = created.world;
@@ -581,13 +583,14 @@ function WorldDockRuntime() {
 
   // Save suggestion handler
   const handleSave = async (item: any) => {
-    const suggestionKey = getSuggestionKey(item);
+    const normalizedItem = normalizeSuggestionForSave(item);
+    const suggestionKey = getSuggestionKey(normalizedItem);
     if (savedIds.includes(suggestionKey)) return;
-    let savedItem = item;
+    let savedItem = normalizedItem;
     let appendSavedItem = true;
-    if (sessionToken && item.agentSuggestionId) {
+    if (sessionToken && normalizedItem.agentSuggestionId) {
       try {
-        const saved = await saveAgentSuggestion(item.agentSuggestionId, { sessionToken });
+        const saved = await saveAgentSuggestion(normalizedItem.agentSuggestionId, { sessionToken });
         const returnedAsset = saved.asset ?? saved.savedAsset ?? saved.suggestion?.asset ?? saved.suggestion?.savedAsset;
         if (returnedAsset) savedItem = fromWorldAsset(returnedAsset);
         else appendSavedItem = false;
@@ -600,7 +603,7 @@ function WorldDockRuntime() {
       }
     } else if (sessionToken && currentWorld?.id && isCloudPersistedWorldId(currentWorld.id)) {
       try {
-        const created = await createWorldAsset(currentWorld.id, toWorldAssetInput(item), { sessionToken });
+        const created = await createWorldAsset(currentWorld.id, toWorldAssetInput(normalizedItem), { sessionToken });
         savedItem = fromWorldAsset(created.asset);
         void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
       } catch {
@@ -910,6 +913,7 @@ function WorldDockRuntime() {
           })()}
           {view === "create" && (
             <CreateView initialInspiration={createInspiration}
+              sessionToken={sessionToken}
               onConfirm={handleCreateWorld} onCancel={() => setView("worlds")}/>
           )}
           {view === "workbench" && currentWorld && (
@@ -1286,6 +1290,7 @@ type CreateWorldDraft = {
   inspiration: string;
   styleKw?: string;
   avoid?: string;
+  draft?: WorldCreationDraft;
   mode: string;
 };
 
@@ -1293,16 +1298,20 @@ export function buildCreateWorldInput(draft: CreateWorldDraft): CreateWorldInput
   const inspiration = draft.inspiration.trim();
   const styleKw = draft.styleKw?.trim();
   const avoid = draft.avoid?.trim();
+  const generated = draft.draft;
+  const styleTags = parseStyleTags(styleKw);
 
   return {
-    name: draft.name?.trim() || inferWorldName(inspiration),
-    type: draft.type?.trim() || "未分类世界",
+    name: draft.name?.trim() || generated?.suggestedName?.trim() || inferWorldName(inspiration),
+    type: draft.type?.trim() || generated?.suggestedType?.trim() || "未分类世界",
     summary: [
+      generated?.coreSetting?.trim() || "",
+      generated?.coreConflict?.trim() ? `核心矛盾：${generated.coreConflict.trim()}` : "",
       `初始灵感：${inspiration}`,
       styleKw ? `风格关键词：${styleKw}` : "",
       avoid ? `避开的方向：${avoid}` : "",
     ].filter(Boolean).join("\n"),
-    tags: parseStyleTags(styleKw),
+    tags: styleTags.length > 0 ? styleTags : (generated?.styles ?? []).slice(0, 8),
     mode: draft.mode === "local" ? "local" : "cloud",
   };
 }
@@ -1329,10 +1338,6 @@ function isCloudPersistedWorldId(id: string) {
   return !id.startsWith("new_") && !id.startsWith("copy_") && !id.startsWith("fork_");
 }
 
-function getSuggestionKey(item: any) {
-  return item.agentSuggestionId ?? item.id;
-}
-
 function getAssetRelationOverlayKey(worldId: string, assetId: string) {
   return `${worldId}:${assetId}`;
 }
@@ -1341,7 +1346,7 @@ function getMessageSavedSuggestionIds(message: any, savedSuggestionKeys: any[]) 
   if (!message.suggestions) return [];
   return message.suggestions
     .filter((suggestion: any) => savedSuggestionKeys.includes(getSuggestionKey(suggestion)))
-    .map((suggestion: any) => suggestion.id);
+    .map((suggestion: any) => getSuggestionKey(suggestion));
 }
 
 const MAX_WORLD_ASSET_PAGES = 100;

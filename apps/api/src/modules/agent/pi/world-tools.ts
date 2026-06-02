@@ -1,4 +1,5 @@
 import type { ArchiveEntryRecord, ConflictRecord, StorySeedRecord, WorldRecord, WorldRepository } from "../../worlds/world.repository";
+import { normalizeWorldSuggestion } from "../suggestion-normalizer";
 import { WorldToolRegistry } from "./world-tool-registry";
 
 export type DisclosureAsset = {
@@ -57,41 +58,47 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
 
   registry.register("list_repository_releases", async () => ({ releases: [] }));
 
-  registry.register("propose_setting", async (input) => ({
-    suggestion: {
-      id: String(input.id ?? "pi_setting_proposal"),
-      kind: "setting",
-      category: String(input.category ?? "世界规则"),
-      title: String(input.title ?? "未命名设定"),
-      summary: String(input.summary ?? input.body ?? "待整理设定建议。"),
-      body: String(input.body ?? input.summary ?? "待整理设定建议。"),
-    },
-  }));
+  registry.register("propose_setting", async (input) => {
+    const body = readToolText(input.body, input.summary, "待整理设定建议。");
+    return {
+      suggestion: normalizeWorldSuggestion({
+        id: readToolText(input.id),
+        kind: "setting",
+        category: readToolText(input.category, "世界规则"),
+        title: readToolText(input.title, "未命名设定"),
+        summary: readToolText(input.summary, body),
+        body,
+      }),
+    };
+  });
 
   registry.register("propose_story_seed", async (input) => ({
-    suggestion: {
-      id: String(input.id ?? "pi_seed_proposal"),
+    suggestion: normalizeWorldSuggestion({
+      id: readToolText(input.id),
       kind: "seed",
-      category: String(input.category ?? "故事种子"),
-      title: String(input.title ?? "未命名故事种子"),
-      hook: String(input.hook ?? "一个新的故事切口。"),
-      trigger: String(input.trigger ?? "某个边界被打破。"),
-      conflict: String(input.conflict ?? "角色必须在代价之间做选择。"),
-      protagonists: String(input.protagonists ?? "待定主角"),
-      questions: Array.isArray(input.questions) ? input.questions.map(String) : [],
-    },
+      category: readToolText(input.category, "故事种子"),
+      title: readToolText(input.title, "未命名故事种子"),
+      hook: readToolText(input.hook, "一个新的故事切口。"),
+      trigger: readToolText(input.trigger, "某个边界被打破。"),
+      conflict: readToolText(input.conflict, "角色必须在代价之间做选择。"),
+      protagonists: readToolText(input.protagonists, "待定主角"),
+      questions: Array.isArray(input.questions) ? input.questions.map(String).filter((item) => item.trim()) : [],
+    }),
   }));
 
-  registry.register("propose_conflict", async (input) => ({
-    suggestion: {
-      id: String(input.id ?? "pi_conflict_proposal"),
-      kind: "conflict",
-      category: String(input.category ?? "核心冲突"),
-      title: String(input.title ?? "未命名冲突"),
-      summary: String(input.summary ?? input.body ?? "待整理冲突建议。"),
-      body: String(input.body ?? input.summary ?? "待整理冲突建议。"),
-    },
-  }));
+  registry.register("propose_conflict", async (input) => {
+    const body = readToolText(input.body, input.summary, "待整理冲突建议。");
+    return {
+      suggestion: normalizeWorldSuggestion({
+        id: readToolText(input.id),
+        kind: "conflict",
+        category: readToolText(input.category, "核心冲突"),
+        title: readToolText(input.title, "未命名冲突"),
+        summary: readToolText(input.summary, body),
+        body,
+      }),
+    };
+  });
 
   registry.register("propose_release_notes", async (input) => ({
     repositoryId: String(input.repositoryId ?? ""),
@@ -99,6 +106,15 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
   }));
 
   return registry;
+}
+
+function readToolText(...values: unknown[]) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return "";
 }
 
 export async function listDisclosureAssets(worlds: WorldRepository, worldId: string) {

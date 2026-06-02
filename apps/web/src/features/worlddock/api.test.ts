@@ -41,6 +41,7 @@ import {
   unstarRepository,
   forkRepository,
   detachFork,
+  generateWorldDraft,
   getForkUpstreamDiff,
   previewWorldRelease,
   rollbackRelease,
@@ -190,6 +191,37 @@ describe("worlddock API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-runs", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/agent-runs/run_1/events", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/agent-suggestions/ags_1/save", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("generates world drafts through the backend agent API", async () => {
+    const fetcher = vi.fn(async () => jsonResponse({
+      draft: {
+        suggestedName: "雾港",
+        suggestedType: "港口奇幻 / 悬疑",
+        styles: ["低魔", "悬疑"],
+        coreSetting: "雾港每天清晨都会吐出居民遗忘的秘密。",
+        coreConflict: "秘密既是私人记忆，也是城市权力的燃料。",
+        directions: ["秘密盐税", "失忆者身份", "外来船只筛选"],
+        firstQuestion: "秘密潮汐是自然现象，还是古老契约的副作用？",
+        tools: [{ id: "ctx", label: "分析灵感主题", detail: "提取核心概念" }],
+      },
+      tokenUsage: { inputTokens: 18, outputTokens: 90, totalTokens: 108 },
+    }));
+
+    const result = await generateWorldDraft(
+      { inspiration: "一座港口每天清晨都会吐出居民遗忘的秘密。", styleKw: "低魔 悬疑" },
+      { sessionToken: "session_valid", fetcher },
+    );
+
+    expect(result.draft.suggestedName).toBe("雾港");
+    expect(fetcher).toHaveBeenCalledWith("http://localhost:4000/v1/world-drafts", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer session_valid",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ inspiration: "一座港口每天清晨都会吐出居民遗忘的秘密。", styleKw: "低魔 悬疑" }),
+    });
   });
 
   it("publishes worlds and reads public repositories", async () => {

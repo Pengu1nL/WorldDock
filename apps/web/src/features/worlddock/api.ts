@@ -84,6 +84,36 @@ export type CreateWorldInput = {
   mode: "cloud" | "local";
 };
 
+export type WorldDraftGenerationInput = {
+  inspiration: string;
+  name?: string;
+  type?: string;
+  styleKw?: string;
+  avoid?: string;
+};
+
+export type WorldDraftTool = {
+  id: string;
+  label: string;
+  detail: string;
+};
+
+export type WorldCreationDraft = {
+  suggestedName: string;
+  suggestedType: string;
+  styles: string[];
+  coreSetting: string;
+  coreConflict: string;
+  directions: string[];
+  firstQuestion: string;
+  tools: WorldDraftTool[];
+};
+
+export type GenerateWorldDraftResponse = {
+  draft: WorldCreationDraft;
+  tokenUsage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+};
+
 export type CreateWorldAssetInput = {
   kind: WorldAssetKind;
   title: string;
@@ -434,6 +464,20 @@ export async function listWorlds(options: ApiClientOptions) {
     sessionToken: options.sessionToken,
     fetcher: options.fetcher,
     baseUrl: options.baseUrl,
+  });
+}
+
+export async function generateWorldDraft(
+  input: WorldDraftGenerationInput,
+  options: ApiClientOptions,
+): Promise<GenerateWorldDraftResponse> {
+  return requestJson("/v1/world-drafts", {
+    method: "POST",
+    sessionToken: options.sessionToken,
+    body: input,
+    fetcher: options.fetcher,
+    baseUrl: options.baseUrl,
+    signal: options.signal,
   });
 }
 

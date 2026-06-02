@@ -155,6 +155,40 @@ describe("pi agent runtime boundary", () => {
     expect(worlds.createConflict).not.toHaveBeenCalled();
   });
 
+  it("normalizes proposal ids and summarizes long markdown setting bodies", async () => {
+    const registry = createWorldToolRegistry({} as WorldRepository);
+    const result = await registry.execute("propose_setting", {
+      title: "天梯纪元·宇宙世纪的黎明",
+      category: "世界规则",
+      body: [
+        "# 天梯纪元·宇宙世纪的黎明",
+        "",
+        "## 年份：2065年，历史的分水岭",
+        "",
+        "这一年，人类站在前所未有的门槛上。",
+        "",
+        "- 北极星能源集团在2062年实现商用聚变。",
+        "- 天梯在2063年竣工。",
+        "- 轨道经济重写国家权力边界。",
+      ].join("\n"),
+    });
+    const suggestion = suggestionSchema.parse(result.suggestion);
+    if (suggestion.kind !== "setting") {
+      throw new Error("Expected propose_setting to return a setting suggestion.");
+    }
+
+    expect(suggestion).toMatchObject({
+      kind: "setting",
+      category: "世界规则",
+      title: "天梯纪元·宇宙世纪的黎明",
+      summary: "这一年，人类站在前所未有的门槛上。",
+    });
+    expect(suggestion.id).not.toBe("pi_setting_proposal");
+    expect(suggestion.id).toContain("setting");
+    expect(suggestion.summary).not.toContain("#");
+    expect(suggestion.summary.length).toBeLessThan(80);
+  });
+
   it("exposes pi as an AgentProvider without direct product writes", async () => {
     const provider = new PiAgentProvider();
     const chunks = [];

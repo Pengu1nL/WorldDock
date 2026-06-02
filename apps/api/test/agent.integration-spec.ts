@@ -26,6 +26,54 @@ describe("agent run endpoints", () => {
     app = undefined;
   });
 
+  it("generates a world draft from the real agent provider before creating the world", async () => {
+    const auth = createInMemoryAuthRepository();
+    const worlds = createInMemoryWorldRepository();
+    const agent = createInMemoryAgentRepository();
+    const billing = createInMemoryBillingRepository(agent);
+    let providerInputPrompt = "";
+    addSession(auth, "session_user_1", "user_1");
+    app = await createTestApp(auth, worlds, agent, {
+      async *stream(input) {
+        providerInputPrompt = input.prompt;
+        yield {
+          type: "delta",
+          text: JSON.stringify({
+            suggestedName: "雾港",
+            suggestedType: "港口奇幻 / 悬疑",
+            styles: ["潮湿", "行会政治", "低魔"],
+            coreSetting: "雾港每天清晨会把居民遗忘的秘密凝成潮汐盐。",
+            coreConflict: "秘密能保护个人，也能成为城市权力结构的燃料。",
+            directions: ["盐商行会如何征税", "遗忘者如何找回身份", "外来船只如何被雾港筛选"],
+            firstQuestion: "你希望秘密潮汐是自然现象，还是某个古老契约的副作用？",
+          }),
+        };
+        yield { type: "usage", tokenUsage: { inputTokens: 18, outputTokens: 90, totalTokens: 108 } };
+      },
+    }, billing);
+
+    const response = await request(app.getHttpServer())
+      .post("/v1/world-drafts")
+      .set("authorization", "Bearer session_user_1")
+      .send({ inspiration: "一座港口每天清晨都会吐出居民遗忘的秘密。", styleKw: "低魔 悬疑" })
+      .expect(201);
+
+    expect(providerInputPrompt).toContain("一座港口每天清晨都会吐出居民遗忘的秘密。");
+    expect(response.body.draft).toMatchObject({
+      suggestedName: "雾港",
+      suggestedType: "港口奇幻 / 悬疑",
+      styles: ["潮湿", "行会政治", "低魔"],
+      coreSetting: "雾港每天清晨会把居民遗忘的秘密凝成潮汐盐。",
+      coreConflict: "秘密能保护个人，也能成为城市权力结构的燃料。",
+      directions: ["盐商行会如何征税", "遗忘者如何找回身份", "外来船只如何被雾港筛选"],
+      firstQuestion: "你希望秘密潮汐是自然现象，还是某个古老契约的副作用？",
+    });
+    expect(response.body.draft.tools).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "ctx", label: "分析灵感主题" }),
+    ]));
+    expect(response.body.tokenUsage).toEqual({ inputTokens: 18, outputTokens: 90, totalTokens: 108 });
+  });
+
   it("creates a run, streams SSE events, and keeps suggestions pending until saved", async () => {
     const auth = createInMemoryAuthRepository();
     const worlds = createInMemoryWorldRepository();

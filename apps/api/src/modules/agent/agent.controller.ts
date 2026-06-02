@@ -11,10 +11,24 @@ const createRunSchema = z.object({
   mode: z.enum(["expand", "challenge", "fork", "polish"]).default("expand"),
 });
 
+const createWorldDraftSchema = z.object({
+  inspiration: z.string().trim().min(1),
+  name: z.string().trim().optional(),
+  type: z.string().trim().optional(),
+  styleKw: z.string().trim().optional(),
+  avoid: z.string().trim().optional(),
+});
+
 @Controller()
 @UseGuards(WorldDockAuthGuard)
 export class AgentController {
   constructor(@Inject(AgentService) private readonly agentService: AgentService) {}
+
+  @Post("world-drafts")
+  @RequireScopes("world:write")
+  async createWorldDraft(@CurrentSubject() subject: AuthSubject, @Body() body: unknown) {
+    return this.agentService.generateWorldDraft(subject, createWorldDraftSchema.parse(body));
+  }
 
   @Post("worlds/:worldId/agent-runs")
   @RequireScopes("world:write")
