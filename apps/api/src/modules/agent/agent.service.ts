@@ -24,8 +24,8 @@ export class AgentService {
     @Inject(AGENT_REPOSITORY) private readonly agents: AgentRepository,
     @Inject(AGENT_PROVIDER) private readonly provider: AgentProvider,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
-    private readonly billing: BillingService,
-    private readonly notifications: NotificationsService,
+    @Inject(BillingService) private readonly billing: BillingService,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
   async createRun(subject: AuthSubject, worldId: string, input: { prompt: string; mode: "expand" | "challenge" | "fork" | "polish" }) {

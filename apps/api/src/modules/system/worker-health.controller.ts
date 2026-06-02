@@ -1,4 +1,4 @@
-import { Controller, Get, Req } from "@nestjs/common";
+import { Controller, Get, Inject, Req } from "@nestjs/common";
 import type { QueueHealthWithStatus } from "@worlddock/domain";
 import { captureMessage } from "../../common/observability";
 import { getRequestId, type RequestWithRequestId } from "../../common/request-id";
@@ -6,7 +6,7 @@ import { WorkerHealthService } from "./worker-health.service";
 
 @Controller("system")
 export class WorkerHealthController {
-  constructor(private readonly workerHealth: WorkerHealthService) {}
+  constructor(@Inject(WorkerHealthService) private readonly workerHealth: WorkerHealthService) {}
 
   @Get("worker-health")
   async getWorkerHealth(@Req() request: RequestWithRequestId) {

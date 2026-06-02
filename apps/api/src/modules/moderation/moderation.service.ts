@@ -14,7 +14,7 @@ export class ModerationService {
     @Inject(MODERATION_REPOSITORY) private readonly moderation: ModerationRepository,
     @Inject(REPOSITORY_REPOSITORY) private readonly repositories: RepositoryRepository,
     @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
-    private readonly notifications: NotificationsService,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
   async reportRepository(subject: AuthSubject, repositoryId: string, input: CreateReportInput) {

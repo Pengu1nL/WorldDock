@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Headers, Param, Post, Query, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { Controller, Delete, Get, Headers, Inject, Param, Post, Query, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
 import { AuthService, type AuthSubject } from "../auth/auth.service";
@@ -7,8 +7,8 @@ import { CommunityService, normalizeCommunityAssetKind, normalizeCommunitySort }
 @Controller("community")
 export class CommunityController {
   constructor(
-    private readonly communityService: CommunityService,
-    private readonly authService: AuthService,
+    @Inject(CommunityService) private readonly communityService: CommunityService,
+    @Inject(AuthService) private readonly authService: AuthService,
   ) {}
 
   @Get("repositories")

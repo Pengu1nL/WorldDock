@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, NotFoundException, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject } from "./auth.decorators";
 import { WorldDockAuthGuard } from "./auth.guard";
@@ -21,7 +21,7 @@ const registerSchema = emailPasswordSchema.extend({
 
 @Controller()
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post("auth/register")
   async register(@Body() body: unknown) {

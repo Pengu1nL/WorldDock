@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -14,9 +14,9 @@ const placeholderIntentSchema = z.object({
 @UseGuards(WorldDockAuthGuard)
 export class BillingController {
   constructor(
-    private readonly billing: BillingService,
-    private readonly entitlements: EntitlementsService,
-    private readonly auth: AuthService,
+    @Inject(BillingService) private readonly billing: BillingService,
+    @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
+    @Inject(AuthService) private readonly auth: AuthService,
   ) {}
 
   @Get("balance")

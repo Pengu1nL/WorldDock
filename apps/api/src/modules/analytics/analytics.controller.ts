@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req } from "@nestjs/common";
+import { Body, Controller, Inject, Post, Req } from "@nestjs/common";
 import { productEventInputSchema } from "@worlddock/domain";
 import { AnalyticsService } from "./analytics.service";
 
@@ -8,7 +8,7 @@ type RequestWithHeaders = {
 
 @Controller("analytics")
 export class AnalyticsController {
-  constructor(private readonly analytics: AnalyticsService) {}
+  constructor(@Inject(AnalyticsService) private readonly analytics: AnalyticsService) {}
 
   @Post("events")
   async record(@Body() body: unknown, @Req() request: RequestWithHeaders) {

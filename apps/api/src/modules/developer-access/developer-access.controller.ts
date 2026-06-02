@@ -9,7 +9,7 @@ import { REPOSITORY_REPOSITORY, type PublicRepositoryRecord, type ReleaseRecord,
 @Controller("developer-access")
 export class DeveloperAccessController {
   constructor(
-    private readonly authService: AuthService,
+    @Inject(AuthService) private readonly authService: AuthService,
     @Inject(REPOSITORY_REPOSITORY) private readonly repositories: RepositoryRepository,
   ) {}
 

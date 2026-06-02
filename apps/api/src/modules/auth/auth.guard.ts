@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { CanActivate, ExecutionContext, Inject, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { assertSubjectRateLimit } from "../../common/security";
 import { AuthService, type AuthSubject } from "./auth.service";
@@ -7,8 +7,8 @@ import { REQUIRED_SCOPES_METADATA } from "./auth.decorators";
 @Injectable()
 export class WorldDockAuthGuard implements CanActivate {
   constructor(
-    private readonly authService: AuthService,
-    private readonly reflector: Reflector,
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(Reflector) private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

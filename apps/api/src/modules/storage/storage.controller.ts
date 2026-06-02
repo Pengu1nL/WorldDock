@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { createStorageUploadSchema } from "@worlddock/domain";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
@@ -13,7 +13,7 @@ const attachObjectSchema = z.object({
 @Controller()
 @UseGuards(WorldDockAuthGuard)
 export class StorageController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(@Inject(StorageService) private readonly storageService: StorageService) {}
 
   @Post("storage/upload-url")
   @RequireScopes("world:write")

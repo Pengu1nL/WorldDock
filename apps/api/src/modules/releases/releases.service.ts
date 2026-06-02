@@ -1,10 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { AuthSubject } from "../auth/auth.service";
 import { RepositoryService } from "../repositories/repository.service";
 
 @Injectable()
 export class ReleasesService {
-  constructor(private readonly repositories: RepositoryService) {}
+  constructor(@Inject(RepositoryService) private readonly repositories: RepositoryService) {}
 
   previewWorldRelease(subject: AuthSubject, worldId: string, input: { releaseNote?: string; license?: string }) {
     return this.repositories.previewWorldRelease(subject, worldId, input);

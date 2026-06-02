@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -13,7 +13,7 @@ const releasePreviewSchema = z.object({
 @Controller()
 @UseGuards(WorldDockAuthGuard)
 export class ReleasesController {
-  constructor(private readonly releases: ReleasesService) {}
+  constructor(@Inject(ReleasesService) private readonly releases: ReleasesService) {}
 
   @Post("worlds/:worldId/releases/preview")
   @RequireScopes("world:write")

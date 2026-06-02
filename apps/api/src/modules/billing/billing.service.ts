@@ -12,7 +12,7 @@ export const AGENT_RUN_RESERVE_CENTS = 100;
 export class BillingService {
   constructor(
     @Inject(BILLING_REPOSITORY) private readonly billing: BillingRepository,
-    private readonly notifications: NotificationsService,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
   async getBalance(userId: string) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Patch, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Patch, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -13,7 +13,7 @@ const updateProfileSchema = z.object({
 @Controller("account")
 @UseGuards(WorldDockAuthGuard)
 export class AccountController {
-  constructor(private readonly account: AccountService) {}
+  constructor(@Inject(AccountService) private readonly account: AccountService) {}
 
   @Get("profile")
   profile(@CurrentSubject() subject: AuthSubject) {

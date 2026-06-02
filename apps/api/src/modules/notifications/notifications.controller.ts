@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -13,7 +13,7 @@ const feedbackSchema = z.object({
 @Controller()
 @UseGuards(WorldDockAuthGuard)
 export class NotificationsController {
-  constructor(private readonly notifications: NotificationsService) {}
+  constructor(@Inject(NotificationsService) private readonly notifications: NotificationsService) {}
 
   @Get("notifications")
   @RequireScopes("world:read")

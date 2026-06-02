@@ -16,8 +16,8 @@ export class RepositoryService {
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     @Inject(OUTBOX_REPOSITORY) private readonly outbox: OutboxRepository,
     @Inject(REPOSITORY_SEARCH_CLIENT) private readonly searchClient: RepositorySearchClient,
-    private readonly entitlements: EntitlementsService,
-    private readonly notifications: NotificationsService,
+    @Inject(EntitlementsService) private readonly entitlements: EntitlementsService,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
   async listPublicRepositories() {

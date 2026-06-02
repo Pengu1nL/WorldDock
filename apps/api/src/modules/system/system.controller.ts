@@ -1,10 +1,10 @@
-import { Controller, Get, Req, ServiceUnavailableException } from "@nestjs/common";
+import { Controller, Get, Inject, Req, ServiceUnavailableException } from "@nestjs/common";
 import { getRequestId, type RequestWithRequestId } from "../../common/request-id";
 import { ReadinessService } from "./readiness.service";
 
 @Controller("system")
 export class SystemController {
-  constructor(private readonly readinessService: ReadinessService) {}
+  constructor(@Inject(ReadinessService) private readonly readinessService: ReadinessService) {}
 
   @Get("health")
   health(@Req() request: RequestWithRequestId) {

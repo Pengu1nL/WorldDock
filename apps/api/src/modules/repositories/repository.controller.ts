@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -32,7 +32,7 @@ const localPushSchema = z.object({
 
 @Controller()
 export class RepositoryController {
-  constructor(private readonly repositoryService: RepositoryService) {}
+  constructor(@Inject(RepositoryService) private readonly repositoryService: RepositoryService) {}
 
   @Get("repositories")
   async list() {

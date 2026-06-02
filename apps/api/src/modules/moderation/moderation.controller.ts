@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Inject, Param, Post, UseGuards } from "@nestjs/common";
 import { createReportSchema, type CreateReportInput } from "@worlddock/domain";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
 import { WorldDockAuthGuard } from "../auth/auth.guard";
@@ -7,7 +7,7 @@ import { ModerationService } from "./moderation.service";
 
 @Controller()
 export class ModerationController {
-  constructor(private readonly moderationService: ModerationService) {}
+  constructor(@Inject(ModerationService) private readonly moderationService: ModerationService) {}
 
   @Post("repositories/:repositoryId/reports")
   @UseGuards(WorldDockAuthGuard)

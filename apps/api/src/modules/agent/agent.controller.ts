@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Param, Patch, Post, Sse, UseGuards, type MessageEvent } from "@nestjs/common";
+import { Body, Controller, HttpCode, Inject, Param, Patch, Post, Sse, UseGuards, type MessageEvent } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { z } from "zod";
 import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
@@ -14,7 +14,7 @@ const createRunSchema = z.object({
 @Controller()
 @UseGuards(WorldDockAuthGuard)
 export class AgentController {
-  constructor(private readonly agentService: AgentService) {}
+  constructor(@Inject(AgentService) private readonly agentService: AgentService) {}
 
   @Post("worlds/:worldId/agent-runs")
   @RequireScopes("world:write")

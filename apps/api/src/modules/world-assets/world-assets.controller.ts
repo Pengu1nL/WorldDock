@@ -33,7 +33,7 @@ const relationSchema = z.object({
 export class WorldAssetsController {
   constructor(
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
-    private readonly assets: WorldAssetsService,
+    @Inject(WorldAssetsService) private readonly assets: WorldAssetsService,
   ) {}
 
   @Get()

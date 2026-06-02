@@ -14,7 +14,7 @@ const ASSET_PAGE_SIZE = 8;
 @Injectable()
 export class CommunityService {
   constructor(
-    private readonly repositoryService: RepositoryService,
+    @Inject(RepositoryService) private readonly repositoryService: RepositoryService,
     @Inject(REPOSITORY_REPOSITORY) private readonly repositories: RepositoryRepository,
   ) {}
 
