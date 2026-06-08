@@ -62,6 +62,30 @@ describe("WorldDock workbench message rendering", () => {
     expect(html.match(/<li/g) ?? []).toHaveLength(4);
   });
 
+  it("does not render numeric zero for empty agent suggestions or context refs", () => {
+    const html = renderToStaticMarkup(
+      <Message
+        msg={{
+          id: "m1",
+          role: "agent",
+          mode: "expand",
+          text: "工具调用失败前的部分回复。",
+          streaming: false,
+          suggestions: [],
+          contextRefs: 0,
+        }}
+        savedIds={[]}
+        onSave={() => undefined}
+        onOpenDetail={() => undefined}
+        onOpenContext={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("工具调用失败前的部分回复。");
+    expect(html).not.toContain(">0<");
+    expect(html).not.toContain("本轮引用了 0 项上下文");
+  });
+
   it("uses agent suggestion ids for duplicate-safe keys and saved state", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 

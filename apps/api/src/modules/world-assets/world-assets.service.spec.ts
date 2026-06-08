@@ -38,6 +38,46 @@ describe("WorldAssetsService", () => {
     }));
   });
 
+  it("classifies persisted organization-like settings as factions when listed", async () => {
+    const service = new WorldAssetsService();
+    const prisma = createPrismaStub();
+    prisma.__data.archiveEntries[0] = {
+      ...prisma.__data.archiveEntries[0],
+      title: "红岩联合：火星最大私人企业的双面面孔",
+      category: "世界规则",
+      summary: "红岩联合是火星上规模最大、影响力最深的私人企业。",
+      body: "红岩联合（RedRock Consortium）运营奥林帕斯基地，并在地球总部与火星现场之间维持复杂权力结构。",
+    };
+    (service as any).prisma = prisma;
+
+    const settings = await service.listAssets("world_1", { kind: "setting" });
+
+    expect(settings.assets[0]).toMatchObject({
+      title: "红岩联合：火星最大私人企业的双面面孔",
+      category: "势力",
+    });
+  });
+
+  it("keeps transportation-rule settings as world rules even when the body mentions organizations", async () => {
+    const service = new WorldAssetsService();
+    const prisma = createPrismaStub();
+    prisma.__data.archiveEntries[0] = {
+      ...prisma.__data.archiveEntries[0],
+      title: "地火运输：狭窄的生命线",
+      category: "世界规则",
+      summary: "地球与火星之间的运输是这个世界最根本的制约因素。",
+      body: "运输船队只有五艘可用于地火航线的核热推进货运飞船。红岩联合（RedRock Consortium）是火星上最大的私人企业，也拥有其中一艘货运船。",
+    };
+    (service as any).prisma = prisma;
+
+    const settings = await service.listAssets("world_1", { kind: "setting" });
+
+    expect(settings.assets[0]).toMatchObject({
+      title: "地火运输：狭窄的生命线",
+      category: "世界规则",
+    });
+  });
+
   it("removes stale legacy labels when deleting a relation", async () => {
     const service = new WorldAssetsService();
     const prisma = createPrismaStub();

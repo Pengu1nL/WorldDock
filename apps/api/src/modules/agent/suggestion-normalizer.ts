@@ -1,4 +1,5 @@
 import type { WorldSuggestion } from "@worlddock/domain";
+import { normalizeSettingCategory } from "../worlds/setting-category";
 
 const DEFAULT_PROPOSAL_IDS = new Set([
   "",
@@ -15,9 +16,11 @@ export function normalizeWorldSuggestion(suggestion: WorldSuggestion): WorldSugg
   if (suggestion.kind === "setting") {
     const body = readText(suggestion.body, suggestion.summary, DEFAULT_SETTING_BODY);
     const summary = summarizeMarkdownishText(readText(suggestion.summary, body), 96);
+    const category = normalizeSettingCategory(suggestion.category, suggestion.title, summary, body);
     return {
       ...suggestion,
       id: normalizeSuggestionId(suggestion, [suggestion.title, summary, body]),
+      category,
       summary,
       body,
     };

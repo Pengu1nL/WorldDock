@@ -1,6 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
 import type { WorldAsset, WorldAssetKind } from "@worlddock/domain";
+import { normalizeSettingCategory } from "../worlds/setting-category";
 
 export type WorldAssetRecord = WorldAsset;
 
@@ -301,7 +302,7 @@ function mapArchiveEntry(entry: {
     worldId: entry.worldId,
     kind: "setting",
     title: entry.title,
-    category: entry.category,
+    category: normalizeSettingCategory(entry.category, entry.title, entry.summary, entry.body),
     summary: entry.summary,
     body: entry.body,
     payload: { relations: entry.relations },

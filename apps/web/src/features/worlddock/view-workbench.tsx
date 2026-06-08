@@ -133,7 +133,8 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
 
   // Agent message
   const isStreaming = msg.streaming;
-  const showSuggestions = !isStreaming && msg.suggestions && msg.suggestions.length;
+  const showSuggestions = !isStreaming && Boolean(msg.suggestions?.length);
+  const showContextLink = !isStreaming && Boolean(msg.contextRefs);
 
   return (
     <div style={{ maxWidth: "var(--max-chat)", margin: "0 auto", padding: "0 24px", marginTop: 24 }}>
@@ -189,7 +190,7 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
           onSave={onSave} onOpenDetail={onOpenDetail}/>
       )}
 
-      {!isStreaming && msg.contextRefs && (
+      {showContextLink && (
         <button onClick={() => onOpenContext(msg.contextSnapshot)} className="row gap-2" style={{
           marginTop: 12, background: "transparent", border: 0, color: "var(--fg-3)",
           fontSize: "var(--t-12)", cursor: "pointer", padding: 0,

@@ -189,6 +189,32 @@ describe("pi agent runtime boundary", () => {
     expect(suggestion.summary.length).toBeLessThan(80);
   });
 
+  it("requires setting proposals to include an asset category judgment", () => {
+    const tool = describeWorldTools().find((item) => item.name === "propose_setting");
+
+    expect(tool?.inputSchema.required).toEqual(["title", "category", "categoryReason", "body"]);
+    expect(tool?.description).toContain("categoryReason");
+    expect(tool?.description).toContain("地火运输");
+    expect(tool?.description).toContain("红岩联合");
+  });
+
+  it("classifies organization-like setting proposals as factions", async () => {
+    const registry = createWorldToolRegistry({} as WorldRepository);
+    const result = await registry.execute("propose_setting", {
+      title: "红岩联合：火星最大私人企业的双面面孔",
+      category: "世界规则",
+      summary: "红岩联合是火星上规模最大、影响力最深的私人企业。",
+      body: "红岩联合（RedRock Consortium）运营奥林帕斯基地，并在地球总部与火星现场之间维持复杂权力结构。",
+    });
+    const suggestion = suggestionSchema.parse(result.suggestion);
+
+    expect(suggestion).toMatchObject({
+      kind: "setting",
+      category: "势力",
+      title: "红岩联合：火星最大私人企业的双面面孔",
+    });
+  });
+
   it("exposes pi as an AgentProvider without direct product writes", async () => {
     const provider = new PiAgentProvider();
     const chunks = [];

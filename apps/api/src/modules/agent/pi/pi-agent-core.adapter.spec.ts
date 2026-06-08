@@ -6,11 +6,41 @@ import {
   registerFauxProvider,
 } from "@earendil-works/pi-ai";
 import type { PiRuntimeEvent } from "@worlddock/domain/agent/pi";
-import { createPiAgentCoreAdapter } from "./pi-agent-core.adapter";
+import { buildContextMessage, buildSystemPrompt, createPiAgentCoreAdapter } from "./pi-agent-core.adapter";
 import { piEventToAgentChunk } from "./pi-event-adapter";
 import type { PiRuntimeToolExecutor } from "./pi-runtime.client";
 
 describe("createPiAgentCoreAdapter", () => {
+  it("exposes concrete context ids for follow-up asset tool calls", () => {
+    const message = buildContextMessage(baseInput({
+      context: [
+        {
+          level: "manifest",
+          kind: "world",
+          title: "火星孤悬",
+          excerpt: "火星开发被半搁置。",
+          targetId: "world_mars",
+          source: "initial",
+        },
+        {
+          level: "card",
+          kind: "conflict",
+          title: "红岩联合的奥德赛计划",
+          excerpt: "红岩联合试图实现火星自给自足。",
+          targetId: "conflict_odyssey",
+          source: "initial",
+        },
+      ],
+    }));
+    const systemPrompt = buildSystemPrompt(baseInput());
+
+    expect(message).toContain("worldId=world_mars");
+    expect(message).toContain("assetId=conflict_odyssey");
+    expect(message).toContain("targetId=conflict_odyssey");
+    expect(message).not.toContain("[card/conflict/initial]");
+    expect(systemPrompt).toContain("assetId 必须使用上下文或工具结果中明确标出的 assetId/targetId");
+  });
+
   it("runs a real pi Agent loop and bridges WorldDock tool results back into the loop", async () => {
     const faux = registerFauxProvider({
       provider: "worlddock-test",

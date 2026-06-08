@@ -98,11 +98,13 @@ function resolvePiModel(options: PiAgentCoreAdapterOptions): Model<Api> {
   return model as Model<Api>;
 }
 
-function buildSystemPrompt(input: PiSessionInput) {
+export function buildSystemPrompt(input: PiSessionInput) {
   return [
     "你是 WorldDock 世界观推演 Agent。",
     "你必须使用简体中文。",
     "你只能通过注册的 WorldDock tools 读取世界资料或生成 pending suggestion。",
+    "调用 get_asset_brief、get_asset_detail 或 get_asset_source_fragments 时，assetId 必须使用上下文或工具结果中明确标出的 assetId/targetId；不要把 level/kind/source 标签当作 assetId。",
+    "生成 propose_setting 前必须先判断资产分类，并在 categoryReason 中说明：按设定本体分类，不按正文偶然提到的对象分类；运输机制、成本、窗口、约束属于世界规则；企业、组织、机构、政府、派系属于势力。",
     "不要声称已经保存、删除、发布或收费；这些危险操作必须由 WorldDock API 在用户确认后执行。",
     `运行模式：${input.mode}`,
     `用户：${input.userId}`,
@@ -113,10 +115,15 @@ function buildSystemPrompt(input: PiSessionInput) {
   ].join("\n");
 }
 
-function buildContextMessage(input: PiSessionInput) {
+export function buildContextMessage(input: PiSessionInput) {
   return [
     "初始上下文：",
-    ...input.context.map((ref) => `- [${ref.level}/${ref.kind}/${ref.source ?? "initial"}] ${ref.title}: ${ref.excerpt}`),
+    ...input.context.map((ref) => {
+      const id = ref.targetId
+        ? `${ref.kind === "world" ? "worldId" : "assetId"}=${ref.targetId}; targetId=${ref.targetId}; `
+        : "";
+      return `- level=${ref.level}; kind=${ref.kind}; source=${ref.source ?? "initial"}; ${id}title=${ref.title}: ${ref.excerpt}`;
+    }),
   ].join("\n");
 }
 
