@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const worldDisclosureLevelSchema = z.enum(["manifest", "card", "brief", "detail", "source_fragment", "release_delta"]);
-export const worldContextAssetKindSchema = z.enum(["world", "setting", "seed", "conflict", "repository"]);
-export const worldDisclosableAssetKindSchema = z.enum(["setting", "seed", "conflict", "repository"]);
+export const worldContextAssetKindSchema = z.enum(["world", "setting", "seed", "conflict"]);
+export const worldDisclosableAssetKindSchema = z.enum(["setting", "seed", "conflict"]);
 
 export const worldContextBudget = {
   manifestTokens: 1200,

@@ -9,7 +9,7 @@ import { configureApiApp } from "../src/configure-api-app";
 const runLocalReadiness = process.env.WORLD_DOCK_LOCAL_READINESS === "1";
 const describeLocal = runLocalReadiness ? describe : describe.skip;
 
-describeLocal("local docker readiness", () => {
+describeLocal("local database-only readiness", () => {
   let app: INestApplication;
 
   beforeAll(async () => {
@@ -27,7 +27,7 @@ describeLocal("local docker readiness", () => {
     await app.close();
   });
 
-  it("returns ready against local PostgreSQL, Redis, and Meilisearch", async () => {
+  it("returns ready against the local PostgreSQL database", async () => {
     const response = await request(app.getHttpServer())
       .get("/v1/system/readiness")
       .expect(200);
@@ -36,8 +36,6 @@ describeLocal("local docker readiness", () => {
       status: "ready",
       dependencies: [
         { name: "database", status: "ok" },
-        { name: "redis", status: "ok" },
-        { name: "search", status: "ok" },
       ],
     });
   });

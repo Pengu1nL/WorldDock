@@ -6,7 +6,7 @@ const ALLOWED_TOOLS = new Set<PiToolName>([
   "get_asset_brief",
   "get_asset_detail",
   "get_asset_source_fragments",
-  "list_repository_releases",
+  "list_local_releases",
   "propose_setting",
   "propose_story_seed",
   "propose_conflict",

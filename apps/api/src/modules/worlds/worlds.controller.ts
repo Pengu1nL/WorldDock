@@ -1,19 +1,15 @@
-import { Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, NotFoundException, Param, Patch, Post } from "@nestjs/common";
 import { z } from "zod";
-import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
-import { WorldDockAuthGuard } from "../auth/auth.guard";
-import type { AuthSubject } from "../auth/auth.service";
 import { mapWorld } from "./world.mapper";
 import type { WorldRecord, WorldRepository } from "./world.repository";
 import { WORLD_REPOSITORY } from "./world.repository";
-import { Inject } from "@nestjs/common";
 
 const createWorldSchema = z.object({
   name: z.string().min(1),
   type: z.string().min(1),
   summary: z.string().min(1),
   tags: z.array(z.string()).default([]),
-  mode: z.enum(["cloud", "local"]).default("cloud"),
+  mode: z.enum(["cloud", "local"]).default("local"),
   maturity: z.number().int().min(0).max(100).optional(),
 });
 
@@ -54,37 +50,29 @@ const conflictSchema = z.object({
 });
 
 @Controller("worlds")
-@UseGuards(WorldDockAuthGuard)
 export class WorldsController {
   constructor(@Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository) {}
 
   @Get()
-  @RequireScopes("world:read")
-  async list(@CurrentSubject() subject: AuthSubject) {
-    const records = await this.worlds.listWorlds(subject.user.id);
+  async list() {
+    const records = await this.worlds.listWorlds();
     return {
       worlds: await Promise.all(records.map((record) => this.toWorld(record))),
     };
   }
 
   @Post()
-  @RequireScopes("world:write")
-  async create(@CurrentSubject() subject: AuthSubject, @Body() body: unknown) {
+  async create(@Body() body: unknown) {
     const input = createWorldSchema.parse(body);
-    const record = await this.worlds.createWorld({
-      ownerId: subject.user.id,
-      ...input,
-    });
+    const record = await this.worlds.createWorld(input);
 
     return { world: await this.toWorld(record) };
   }
 
   @Post(":worldId/duplicate")
-  @RequireScopes("world:write")
-  async duplicate(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
-    const original = await this.requireOwnedWorld(subject, worldId);
+  async duplicate(@Param("worldId") worldId: string) {
+    const original = await this.requireWorld(worldId);
     const record = await this.worlds.createWorld({
-      ownerId: subject.user.id,
       name: `${original.name} · 副本`,
       type: original.type,
       summary: original.summary,
@@ -106,80 +94,65 @@ export class WorldsController {
   }
 
   @Get(":worldId")
-  @RequireScopes("world:read")
-  async detail(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
-    return { world: await this.toWorld(await this.requireOwnedWorld(subject, worldId)) };
+  async detail(@Param("worldId") worldId: string) {
+    return { world: await this.toWorld(await this.requireWorld(worldId)) };
   }
 
   @Patch(":worldId")
-  @RequireScopes("world:write")
-  async update(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
-    await this.requireOwnedWorld(subject, worldId);
+  async update(@Param("worldId") worldId: string, @Body() body: unknown) {
+    await this.requireWorld(worldId);
     const record = await this.worlds.updateWorld(worldId, updateWorldSchema.parse(body));
     if (!record) throw this.notFound();
     return { world: await this.toWorld(record) };
   }
 
   @Delete(":worldId")
-  @RequireScopes("world:write")
-  async archive(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
-    await this.requireOwnedWorld(subject, worldId);
+  async archive(@Param("worldId") worldId: string) {
+    await this.requireWorld(worldId);
     const record = await this.worlds.deleteWorld(worldId);
     if (!record) throw this.notFound();
     return { world: mapWorld(record, { archive: 0, seeds: 0, conflicts: 0 }) };
   }
 
   @Get(":worldId/archive")
-  @RequireScopes("world:read")
-  async listArchive(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
-    await this.requireOwnedWorld(subject, worldId);
+  async listArchive(@Param("worldId") worldId: string) {
+    await this.requireWorld(worldId);
     return { archiveEntries: await this.worlds.listArchiveEntries(worldId) };
   }
 
   @Post(":worldId/archive")
-  @RequireScopes("world:write")
-  async createArchive(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
-    await this.requireOwnedWorld(subject, worldId);
+  async createArchive(@Param("worldId") worldId: string, @Body() body: unknown) {
+    await this.requireWorld(worldId);
     return { archiveEntry: await this.worlds.createArchiveEntry({ worldId, ...archiveEntrySchema.parse(body) }) };
   }
 
   @Get(":worldId/seeds")
-  @RequireScopes("world:read")
-  async listSeeds(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
-    await this.requireOwnedWorld(subject, worldId);
+  async listSeeds(@Param("worldId") worldId: string) {
+    await this.requireWorld(worldId);
     return { storySeeds: await this.worlds.listStorySeeds(worldId) };
   }
 
   @Post(":worldId/seeds")
-  @RequireScopes("world:write")
-  async createSeed(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
-    await this.requireOwnedWorld(subject, worldId);
+  async createSeed(@Param("worldId") worldId: string, @Body() body: unknown) {
+    await this.requireWorld(worldId);
     return { storySeed: await this.worlds.createStorySeed({ worldId, ...storySeedSchema.parse(body) }) };
   }
 
   @Get(":worldId/conflicts")
-  @RequireScopes("world:read")
-  async listConflicts(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string) {
-    await this.requireOwnedWorld(subject, worldId);
+  async listConflicts(@Param("worldId") worldId: string) {
+    await this.requireWorld(worldId);
     return { conflicts: await this.worlds.listConflicts(worldId) };
   }
 
   @Post(":worldId/conflicts")
-  @RequireScopes("world:write")
-  async createConflict(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
-    await this.requireOwnedWorld(subject, worldId);
+  async createConflict(@Param("worldId") worldId: string, @Body() body: unknown) {
+    await this.requireWorld(worldId);
     return { conflict: await this.worlds.createConflict({ worldId, ...conflictSchema.parse(body) }) };
   }
 
-  private async requireOwnedWorld(subject: AuthSubject, worldId: string) {
+  private async requireWorld(worldId: string) {
     const world = await this.worlds.findWorldById(worldId);
     if (!world) throw this.notFound();
-    if (world.ownerId !== subject.user.id) {
-      throw new ForbiddenException({
-        code: "PERMISSION_DENIED",
-        message: "You do not have access to this world.",
-      });
-    }
     return world;
   }
 

@@ -58,51 +58,6 @@
   height: 38px;
 }
 
-.auth-link {
-  justify-self: center;
-  color: var(--fg-2);
-  font-size: var(--t-13);
-}
-
-.auth-link:hover {
-  color: var(--fg);
-}
-
-.auth-error {
-  margin: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--brick-dim);
-  border-radius: var(--r-4);
-  background: var(--brick-bg);
-  color: var(--brick);
-}
-
-.onboarding-panel {
-  width: min(560px, 100%);
-}
-
-.onboarding-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.option-button {
-  min-height: 44px;
-  border: 1px solid var(--border-2);
-  border-radius: var(--r-4);
-  background: var(--surface-2);
-  color: var(--fg-1);
-  text-align: left;
-  padding: 0 12px;
-}
-
-.option-button:hover,
-.option-button.selected {
-  border-color: var(--sage-dim);
-  color: var(--fg);
-  background: var(--sage-bg);
-}
 
 .auth-actions {
   display: flex;

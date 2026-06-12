@@ -608,7 +608,7 @@ const SettingsPlaceholder = ({ onBack }) => (
     </div>
     <div style={{ padding: "20px 32px" }}>
       <div className="card" style={{ padding: 24, color: "var(--fg-2)" }}>
-        Profile / Billing / Tokens / Data / Security / Model / Community — 后续迭代。
+        Local data / Model / Import / Export — 后续迭代。
       </div>
     </div>
   </div>

@@ -79,7 +79,6 @@ export class PrismaAgentRepository implements AgentRepository, OnModuleDestroy {
 function mapRun(record: {
   id: string;
   worldId: string;
-  userId: string;
   status: string;
   mode: string;
   prompt: string;
@@ -194,7 +193,7 @@ function parseSuggestionStatus(value: string): AgentSuggestionRecord["status"] {
 }
 
 function parseContextKind(value: string): ContextRefRecord["kind"] {
-  if (value === "world" || value === "archive" || value === "seed" || value === "conflict" || value === "repository") {
+  if (value === "world" || value === "archive" || value === "seed" || value === "conflict") {
     return value;
   }
   throw new Error(`Unknown context ref kind: ${value}`);

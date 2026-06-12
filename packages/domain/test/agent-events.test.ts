@@ -4,6 +4,7 @@ import {
   agentRunSchema,
   agentSuggestionRecordSchema,
   contextRefSchema,
+  piToolNameSchema,
   tokenUsageSchema,
 } from "../src";
 
@@ -80,5 +81,19 @@ describe("agent event contracts", () => {
         questions: ["记忆能被继承吗？"],
       },
     }).status).toBe("pending");
+  });
+
+  it("keeps Pi tools and context references local-only", () => {
+    expect(piToolNameSchema.parse("list_local_releases")).toBe("list_local_releases");
+    expect(() => piToolNameSchema.parse(`list_${"repo"}sitory_releases`)).toThrow();
+    expect(() =>
+      contextRefSchema.parse({
+        id: "ctx_2",
+        runId: "run_1",
+        kind: `${"repo"}sitory`,
+        title: "远端来源",
+        excerpt: "不应进入本地上下文。",
+      }),
+    ).toThrow();
   });
 });

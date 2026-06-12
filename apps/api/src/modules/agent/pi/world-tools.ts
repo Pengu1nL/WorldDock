@@ -56,7 +56,10 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
       : { found: false, fragments: [] };
   });
 
-  registry.register("list_repository_releases", async () => ({ releases: [] }));
+  registry.register("list_local_releases", async (input) => ({
+    worldId: String(input.worldId ?? ""),
+    releases: [],
+  }));
 
   registry.register("propose_setting", async (input) => {
     const body = readToolText(input.body, input.summary, "待整理设定建议。");
@@ -101,7 +104,7 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
   });
 
   registry.register("propose_release_notes", async (input) => ({
-    repositoryId: String(input.repositoryId ?? ""),
+    worldId: String(input.worldId ?? ""),
     notes: String(input.notes ?? "待整理版本说明。"),
   }));
 

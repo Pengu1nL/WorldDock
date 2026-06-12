@@ -13,7 +13,6 @@ type WorldToolDefinition = ReturnType<typeof describeWorldTools>[number];
 
 export type AgentProviderInput = {
   runId?: string;
-  userId?: string;
   prompt: string;
   world: {
     id?: string;
@@ -25,12 +24,13 @@ export type AgentProviderInput = {
   skills?: Array<{ name: string; path: string; description: string }>;
   model?: string | null;
   mode: "expand" | "challenge" | "fork" | "polish";
+  signal?: AbortSignal;
 };
 
 export type AgentProviderOutput = {
   deltas: string[];
   contextRefs: Array<{
-    kind: "world" | "archive" | "seed" | "conflict" | "repository";
+    kind: "world" | "archive" | "seed" | "conflict";
     title: string;
     excerpt: string;
     targetId?: string | null;
@@ -105,12 +105,14 @@ export class OpenAiAgentProvider implements AgentProvider {
           },
         ],
       }),
+      signal: input.signal,
     });
 
     if (!response.ok) {
       throw new Error(`OpenAI provider request failed with ${response.status}`);
     }
 
+    if (input.signal?.aborted) return;
     yield {
       type: "context",
       contextRef: {
@@ -125,16 +127,19 @@ export class OpenAiAgentProvider implements AgentProvider {
 
     let text = "";
     let tokenUsage: TokenUsage | null = null;
-    for await (const event of readOpenAiStream(response)) {
+    for await (const event of readOpenAiStream(response, input.signal)) {
+      if (input.signal?.aborted) return;
       if (event.text) {
         text += event.text;
         yield { type: "delta", text: event.text };
       }
       if (event.tokenUsage) {
         tokenUsage = event.tokenUsage;
+        yield { type: "usage", tokenUsage };
       }
     }
 
+    if (input.signal?.aborted) return;
     yield {
       type: "suggestion",
       suggestion: {
@@ -146,15 +151,18 @@ export class OpenAiAgentProvider implements AgentProvider {
         body: text || "模型生成内容为空。",
       },
     };
-    yield {
-      type: "usage",
-      tokenUsage: tokenUsage ?? estimateTokenUsage(input.prompt, text),
-    };
+    if (!tokenUsage) {
+      yield {
+        type: "usage",
+        tokenUsage: estimateTokenUsage(input.prompt, text),
+      };
+    }
   }
 }
 
 export class MockAgentProvider implements AgentProvider {
   async *stream(input: AgentProviderInput): AsyncIterable<AgentProviderChunk> {
+    if (input.signal?.aborted) return;
     yield {
       type: "context",
       contextRef: {
@@ -163,8 +171,11 @@ export class MockAgentProvider implements AgentProvider {
         excerpt: input.world.summary,
       },
     };
+    if (input.signal?.aborted) return;
     yield { type: "delta", text: "好。" };
+    if (input.signal?.aborted) return;
     yield { type: "delta", text: `我会基于「${input.world.name}」继续推演，并先沉淀一条可确认设定。` };
+    if (input.signal?.aborted) return;
     yield {
       type: "suggestion",
       suggestion: {
@@ -176,6 +187,7 @@ export class MockAgentProvider implements AgentProvider {
         body: `围绕「${input.prompt}」，世界需要一条可被角色反复触碰的规则边界。`,
       },
     };
+    if (input.signal?.aborted) return;
     yield {
       type: "usage",
       tokenUsage: {
@@ -201,6 +213,7 @@ export class VercelAiSdkAgentProvider implements AgentProvider {
       ].filter(Boolean).join("\n"),
     });
 
+    if (input.signal?.aborted) return;
     yield {
       type: "context",
       contextRef: {
@@ -215,9 +228,11 @@ export class VercelAiSdkAgentProvider implements AgentProvider {
 
     let text = "";
     for await (const delta of result.textStream) {
+      if (input.signal?.aborted) return;
       text += delta;
       yield { type: "delta", text: delta };
     }
+    if (input.signal?.aborted) return;
 
     yield {
       type: "suggestion",
@@ -230,6 +245,7 @@ export class VercelAiSdkAgentProvider implements AgentProvider {
         body: text || "模型生成内容为空。",
       },
     };
+    if (input.signal?.aborted) return;
     yield {
       type: "usage",
       tokenUsage: { inputTokens: 0, outputTokens: text.length, totalTokens: text.length },
@@ -252,7 +268,6 @@ export class PiAgentProvider implements AgentProvider {
     for await (const event of this.runner.run({
       runId: input.runId ?? "run_pending",
       worldId: input.world.id ?? "world_pending",
-      userId: input.userId ?? "user_pending",
       mode: input.mode,
       prompt: input.prompt,
       model: input.model ?? process.env.PI_MODEL_ID ?? process.env.AI_MODEL ?? "pi-mock",
@@ -260,6 +275,7 @@ export class PiAgentProvider implements AgentProvider {
       tools: input.tools ? [...input.tools] : [...describeWorldTools()],
       skills: input.skills ?? [],
     })) {
+      if (input.signal?.aborted) return;
       const chunk = piEventToAgentChunk(event);
       if (chunk) yield chunk;
     }
@@ -301,8 +317,9 @@ export function createAgentProviderFromEnv(env: AgentProviderEnv = process.env):
   throw new Error(`Unsupported AI_PROVIDER=${provider}. Supported providers: openai, pi, vercel-ai.`);
 }
 
-async function* readOpenAiStream(response: Response): AsyncIterable<{ text?: string; tokenUsage?: TokenUsage }> {
+async function* readOpenAiStream(response: Response, signal?: AbortSignal): AsyncIterable<{ text?: string; tokenUsage?: TokenUsage }> {
   if (!response.body) {
+    if (signal?.aborted) return;
     const payload = await response.json();
     const text = payload?.choices?.[0]?.message?.content;
     if (typeof text === "string" && text.length > 0) yield { text };
@@ -316,6 +333,7 @@ async function* readOpenAiStream(response: Response): AsyncIterable<{ text?: str
   let buffer = "";
 
   while (true) {
+    if (signal?.aborted) return;
     const { done, value } = await reader.read();
     buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
 
@@ -330,6 +348,7 @@ async function* readOpenAiStream(response: Response): AsyncIterable<{ text?: str
     if (done) break;
   }
 
+  if (signal?.aborted) return;
   if (buffer.trim()) yield* parseOpenAiSseBlock(buffer);
 }
 

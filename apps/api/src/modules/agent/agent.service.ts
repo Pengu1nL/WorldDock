@@ -1,8 +1,5 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException, ServiceUnavailableException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
-import type { AuthSubject } from "../auth/auth.service";
-import { BillingService } from "../billing/billing.service";
-import { NotificationsService } from "../notifications/notifications.service";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -16,7 +13,7 @@ import { describeWorldTools } from "./pi/world-tool-registry";
 import { loadWorldDockPiSkills } from "./pi/skill-loader";
 import { buildDisclosureBriefs, buildDisclosureCards, buildDisclosureManifest } from "./pi/world-tools";
 import { normalizeWorldSuggestion } from "./suggestion-normalizer";
-import { AGENT_PROVIDER, type AgentProvider } from "./agent.provider";
+import { AGENT_PROVIDER, type AgentProvider, type AgentProviderChunk } from "./agent.provider";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord } from "./agent.repository";
 
 type CreateWorldDraftInput = {
@@ -46,31 +43,28 @@ type WorldCreationDraft = {
 
 @Injectable()
 export class AgentService {
+  private readonly runAbortControllers = new Map<string, AbortController>();
+
   constructor(
     @Inject(AGENT_REPOSITORY) private readonly agents: AgentRepository,
     @Inject(AGENT_PROVIDER) private readonly provider: AgentProvider,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
-    @Inject(BillingService) private readonly billing: BillingService,
-    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
-  async createRun(subject: AuthSubject, worldId: string, input: { prompt: string; mode: "expand" | "challenge" | "fork" | "polish" }) {
-    await this.requireOwnedWorld(subject, worldId);
-    await this.billing.assertCanReserve(subject.user.id);
+  async createRun(worldId: string, input: { prompt: string; mode: "expand" | "challenge" | "fork" | "polish" }) {
+    await this.requireWorld(worldId);
     const run = await this.agents.createRun({
       worldId,
-      userId: subject.user.id,
       mode: input.mode,
       prompt: input.prompt,
       model: resolveRunModel(process.env),
       provider: parseAgentProvider(process.env.AI_PROVIDER),
     });
     await this.append(run.id, 1, "run.started", { runId: run.id, mode: input.mode });
-    await this.billing.reserveAgentRun(subject.user.id, run.id);
     return { run, suggestions: [] };
   }
 
-  async generateWorldDraft(subject: AuthSubject, input: CreateWorldDraftInput): Promise<{ draft: WorldCreationDraft; tokenUsage: TokenUsage }> {
+  async generateWorldDraft(input: CreateWorldDraftInput): Promise<{ draft: WorldCreationDraft; tokenUsage: TokenUsage }> {
     const normalized = normalizeCreateWorldDraftInput(input);
     const prompt = buildWorldDraftPrompt(normalized);
     let text = "";
@@ -82,7 +76,6 @@ export class AgentService {
         prompt,
         mode: "expand",
         runId: `draft_${Date.now()}`,
-        userId: subject.user.id,
         model: resolveRunModel(process.env),
         world: {
           id: "world_draft",
@@ -118,15 +111,15 @@ export class AgentService {
     };
   }
 
-  async listEvents(subject: AuthSubject, runId: string) {
-    const run = await this.requireOwnedRun(subject, runId);
+  async listEvents(runId: string) {
+    const run = await this.requireRun(runId);
     return this.agents.listEvents(run.id);
   }
 
-  async *streamEvents(subject: AuthSubject, runId: string): AsyncGenerator<AgentEventRecord> {
+  async *streamEvents(runId: string): AsyncGenerator<AgentEventRecord> {
     const run = await this.agents.findRunById(runId);
     if (!run) throw this.notFound("Agent run not found.");
-    const world = await this.requireOwnedWorld(subject, run.worldId);
+    const world = await this.requireWorld(run.worldId);
 
     const existingEvents = await this.agents.listEvents(run.id);
     for (const event of existingEvents) {
@@ -136,115 +129,196 @@ export class AgentService {
     if (run.status !== "running") return;
 
     let sequence = existingEvents.reduce((max, event) => Math.max(max, event.sequence), 0) + 1;
+    let lastYieldedSequence = sequence - 1;
     let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-    const context = selectInitialWorldContext({
-      prompt: run.prompt,
-      manifest: await buildDisclosureManifest(this.worlds, world),
-      cards: await buildDisclosureCards(this.worlds, world.id),
-      briefs: await buildDisclosureBriefs(this.worlds, world.id),
-      maxCards: 8,
-      maxBriefs: 3,
-    });
+    const controller = new AbortController();
+    this.runAbortControllers.set(run.id, controller);
 
     try {
-      for await (const chunk of this.provider.stream({
+      const context = selectInitialWorldContext({
+        prompt: run.prompt,
+        manifest: await buildDisclosureManifest(this.worlds, world),
+        cards: await buildDisclosureCards(this.worlds, world.id),
+        briefs: await buildDisclosureBriefs(this.worlds, world.id),
+        maxCards: 8,
+        maxBriefs: 3,
+      });
+
+      const latestBeforeProvider = await this.agents.findRunById(run.id);
+      if (controller.signal.aborted || latestBeforeProvider?.status !== "running") {
+        for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+          yield event;
+          lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+        }
+        return;
+      }
+
+      const providerInput = {
         prompt: run.prompt,
         mode: run.mode,
         runId: run.id,
-        userId: run.userId,
         model: run.model,
         world: { id: world.id, name: world.name, summary: world.summary },
         context,
         tools: [...describeWorldTools()],
         skills: loadWorldDockPiSkills(process.env),
-      })) {
+        signal: controller.signal,
+      };
+      const iterator = this.provider.stream(providerInput)[Symbol.asyncIterator]();
+
+      try {
+        while (true) {
+          const next = await nextProviderChunk(iterator, controller.signal);
+          if (next.status === "aborted") {
+            closeProviderIterator(iterator);
+            for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+              yield event;
+              lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+            }
+            return;
+          }
+          if (next.result.done) break;
+          const chunk = next.result.value;
+
+          if (chunk.type === "usage") {
+            tokenUsage = chunk.tokenUsage;
+            await this.agents.updateRun(run.id, { tokenUsage });
+          }
+
+          const latestRun = await this.agents.findRunById(run.id);
+          if (latestRun?.status === "cancelled") {
+            for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+              yield event;
+              lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+            }
+            return;
+          }
+
+          if (chunk.type === "context") {
+            const created = await this.agents.createContextRef({ runId: run.id, ...chunk.contextRef });
+            const event = await this.append(run.id, sequence++, "context.used", {
+              contextRef: {
+                id: created.id,
+                kind: created.kind,
+                title: created.title,
+                excerpt: created.excerpt,
+                targetId: created.targetId ?? undefined,
+                level: created.level ?? "card",
+                source: created.source ?? "initial",
+              },
+            });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "pi-session-started") {
+            await this.agents.updateRun(run.id, { piSessionId: chunk.piSessionId, provider: "pi" });
+            const event = await this.append(run.id, sequence++, "pi.session.started", { piSessionId: chunk.piSessionId });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "tool-requested") {
+            const event = await this.append(run.id, sequence++, "tool.requested", { toolCall: chunk.toolCall });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "tool-completed") {
+            const event = await this.append(run.id, sequence++, "tool.completed", { toolCallId: chunk.toolCallId, result: chunk.result });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "delta") {
+            const event = await this.append(run.id, sequence++, "message.delta", { text: chunk.text });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "suggestion") {
+            const suggestion = normalizeWorldSuggestion(suggestionSchema.parse(chunk.suggestion));
+            const created = await this.agents.createSuggestion({ runId: run.id, worldId: run.worldId, suggestion });
+            const event = await this.append(run.id, sequence++, "suggestion.created", { suggestionId: created.id, suggestion });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "failed") {
+            throw new AgentProviderFailure(chunk.code, chunk.message);
+          }
+        }
+
+        if (controller.signal.aborted) {
+          for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+          return;
+        }
+
         const latestRun = await this.agents.findRunById(run.id);
-        if (latestRun?.status === "cancelled") return;
-
-        if (chunk.type === "context") {
-          const created = await this.agents.createContextRef({ runId: run.id, ...chunk.contextRef });
-          yield await this.append(run.id, sequence++, "context.used", {
-            contextRef: {
-              id: created.id,
-              kind: created.kind,
-              title: created.title,
-              excerpt: created.excerpt,
-              targetId: created.targetId ?? undefined,
-              level: created.level ?? "card",
-              source: created.source ?? "initial",
-            },
-          });
+        if (latestRun?.status === "cancelled") {
+          for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+          return;
         }
+        if (latestRun?.status !== "running") return;
 
-        if (chunk.type === "pi-session-started") {
-          await this.agents.updateRun(run.id, { piSessionId: chunk.piSessionId, provider: "pi" });
-          yield await this.append(run.id, sequence++, "pi.session.started", { piSessionId: chunk.piSessionId });
+        const completed = await this.agents.updateRunIfStatus(run.id, "running", {
+          status: "completed",
+          tokenUsage,
+          completedAt: new Date(),
+        });
+        if (!completed) return;
+        const event = await this.append(run.id, sequence++, "run.completed", { tokenUsage });
+        yield event;
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+          return;
         }
-
-        if (chunk.type === "tool-requested") {
-          yield await this.append(run.id, sequence++, "tool.requested", { toolCall: chunk.toolCall });
-        }
-
-        if (chunk.type === "tool-completed") {
-          yield await this.append(run.id, sequence++, "tool.completed", { toolCallId: chunk.toolCallId, result: chunk.result });
-        }
-
-        if (chunk.type === "delta") {
-          yield await this.append(run.id, sequence++, "message.delta", { text: chunk.text });
-        }
-
-        if (chunk.type === "suggestion") {
-          const suggestion = normalizeWorldSuggestion(suggestionSchema.parse(chunk.suggestion));
-          const created = await this.agents.createSuggestion({ runId: run.id, worldId: run.worldId, suggestion });
-          yield await this.append(run.id, sequence++, "suggestion.created", { suggestionId: created.id, suggestion });
-        }
-
-        if (chunk.type === "usage") {
-          tokenUsage = chunk.tokenUsage;
-        }
-
-        if (chunk.type === "failed") {
-          throw new AgentProviderFailure(chunk.code, chunk.message);
-        }
+        const failure = agentFailureFromError(error);
+        const failed = await this.agents.updateRunIfStatus(run.id, "running", {
+          status: "failed",
+          tokenUsage,
+          failedAt: new Date(),
+          errorCode: failure.code,
+          errorMessage: failure.message,
+        });
+        if (!failed) return;
+        yield await this.append(run.id, sequence++, "run.failed", { code: failure.code, message: failure.message });
       }
-
-      const latestRun = await this.agents.findRunById(run.id);
-      if (latestRun?.status !== "running") return;
-
-      const settlement = await this.billing.settleAgentRunAndComplete(run.userId, run.id, tokenUsage, resolveBillingModel(run.provider, run.model));
-      if (!settlement) return;
-      yield await this.append(run.id, sequence++, "run.completed", { tokenUsage });
-    } catch (error) {
-      const failure = agentFailureFromError(error);
-      const refund = await this.billing.refundAgentRunAndFail(run.userId, run.id, failure.reason, failure);
-      if (!refund) return;
-      await this.notifications.safeEmitUserEvent(run.userId, {
-        type: "agent_run_failed",
-        title: "Agent Run 失败",
-        body: failure.message,
-        targetType: "agent_run",
-        targetId: run.id,
-        metadata: { code: failure.code, reason: failure.reason, worldId: run.worldId },
-        dedupeKey: `agent-run-failed:${run.id}`,
-      });
-      yield await this.append(run.id, sequence++, "run.failed", { code: failure.code, message: failure.message });
+    } finally {
+      if (this.runAbortControllers.get(run.id) === controller) {
+        this.runAbortControllers.delete(run.id);
+      }
     }
   }
 
-  async cancelRun(subject: AuthSubject, runId: string) {
-    const run = await this.requireOwnedRun(subject, runId);
+  async cancelRun(runId: string) {
+    const run = await this.requireRun(runId);
     if (run.status !== "running") return run;
 
     const events = await this.agents.listEvents(run.id);
-    const nextSequence = events.length + 1;
-    const refund = await this.billing.refundAgentRunAndCancel(run.userId, run.id, "user_cancelled");
-    if (!refund) return await this.agents.findRunById(run.id) ?? run;
+    const nextSequence = events.reduce((max, event) => Math.max(max, event.sequence), 0) + 1;
+    const cancelled = await this.agents.updateRunIfStatus(run.id, "running", {
+      status: "cancelled",
+      cancelledAt: new Date(),
+    });
+    if (!cancelled) return await this.agents.findRunById(run.id) ?? run;
     await this.append(run.id, nextSequence, "run.cancelled", { reason: "user_cancelled" });
+    this.runAbortControllers.get(run.id)?.abort();
     return await this.agents.findRunById(run.id) ?? run;
   }
 
-  async saveSuggestion(subject: AuthSubject, suggestionId: string) {
-    const suggestion = await this.requireOwnedSuggestion(subject, suggestionId);
+  async saveSuggestion(suggestionId: string) {
+    const suggestion = await this.requireSuggestion(suggestionId);
     if (suggestion.status === "saved") {
       return {
         suggestion,
@@ -263,8 +337,8 @@ export class AgentService {
     };
   }
 
-  async editSuggestion(subject: AuthSubject, suggestionId: string, input: { suggestion: unknown }) {
-    const suggestion = await this.requireOwnedSuggestion(subject, suggestionId);
+  async editSuggestion(suggestionId: string, input: { suggestion: unknown }) {
+    const suggestion = await this.requireSuggestion(suggestionId);
     if (suggestion.status !== "pending" && suggestion.status !== "edited") return suggestion;
     return this.agents.updateSuggestion(suggestion.id, {
       status: "edited",
@@ -272,8 +346,8 @@ export class AgentService {
     });
   }
 
-  async discardSuggestion(subject: AuthSubject, suggestionId: string) {
-    const suggestion = await this.requireOwnedSuggestion(subject, suggestionId);
+  async discardSuggestion(suggestionId: string) {
+    const suggestion = await this.requireSuggestion(suggestionId);
     return this.agents.updateSuggestion(suggestion.id, { status: "discarded" });
   }
 
@@ -335,26 +409,23 @@ export class AgentService {
     return conflict ? conflictToWorldAsset(conflict) : null;
   }
 
-  private async requireOwnedRun(subject: AuthSubject, runId: string): Promise<AgentRunRecord> {
+  private async requireRun(runId: string): Promise<AgentRunRecord> {
     const run = await this.agents.findRunById(runId);
     if (!run) throw this.notFound("Agent run not found.");
-    await this.requireOwnedWorld(subject, run.worldId);
+    await this.requireWorld(run.worldId);
     return run;
   }
 
-  private async requireOwnedSuggestion(subject: AuthSubject, suggestionId: string) {
+  private async requireSuggestion(suggestionId: string) {
     const suggestion = await this.agents.findSuggestionById(suggestionId);
     if (!suggestion) throw this.notFound("Agent suggestion not found.");
-    await this.requireOwnedWorld(subject, suggestion.worldId);
+    await this.requireWorld(suggestion.worldId);
     return suggestion;
   }
 
-  private async requireOwnedWorld(subject: AuthSubject, worldId: string): Promise<WorldRecord> {
+  private async requireWorld(worldId: string): Promise<WorldRecord> {
     const world = await this.worlds.findWorldById(worldId);
     if (!world) throw this.notFound("World not found.");
-    if (world.ownerId !== subject.user.id) {
-      throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "You do not have access to this world." });
-    }
     return world;
   }
 
@@ -368,6 +439,19 @@ export class AgentService {
       payload,
     });
     return this.agents.appendEvent({ runId, type: event.type, sequence, payload: event.payload });
+  }
+
+  private async listEventsAfter(runId: string, sequence: number, waitForType?: AgentEvent["type"]) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const events = (await this.agents.listEvents(runId))
+        .filter((event) => event.sequence > sequence)
+        .sort((a, b) => a.sequence - b.sequence);
+      if (!waitForType || events.some((event) => event.type === waitForType)) return events;
+      await delay(10);
+    }
+    return (await this.agents.listEvents(runId))
+      .filter((event) => event.sequence > sequence)
+      .sort((a, b) => a.sequence - b.sequence);
   }
 
   private notFound(message: string) {
@@ -566,6 +650,43 @@ function agentFailureFromError(error: unknown) {
   };
 }
 
+function isAbortError(error: unknown) {
+  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+}
+
+async function nextProviderChunk(
+  iterator: AsyncIterator<AgentProviderChunk>,
+  signal: AbortSignal,
+): Promise<
+  | { status: "next"; result: IteratorResult<AgentProviderChunk> }
+  | { status: "aborted" }
+> {
+  if (signal.aborted) return { status: "aborted" };
+
+  let removeAbortListener = () => {};
+  const aborted = new Promise<"aborted">((resolve) => {
+    const onAbort = () => resolve("aborted");
+    signal.addEventListener("abort", onAbort, { once: true });
+    removeAbortListener = () => signal.removeEventListener("abort", onAbort);
+  });
+  const next = iterator.next().then((result) => ({ status: "next" as const, result }));
+  try {
+    const result = await Promise.race([next, aborted]);
+    if (result === "aborted") return { status: "aborted" };
+    return result;
+  } finally {
+    removeAbortListener();
+  }
+}
+
+function closeProviderIterator(iterator: AsyncIterator<AgentProviderChunk>) {
+  void iterator.return?.();
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function parseAgentProvider(value: string | undefined): AgentRunRecord["provider"] {
   if (value === "pi" || value === "vercel-ai" || value === "mock" || value === "openai") return value;
   return "openai";
@@ -575,15 +696,6 @@ function resolveRunModel(env: Record<string, string | undefined>) {
   if (env.AI_PROVIDER === "pi") return env.PI_MODEL_ID ?? env.AI_MODEL ?? null;
   if (env.AI_PROVIDER === "mock") return "mock";
   return env.AI_MODEL ?? null;
-}
-
-function resolveBillingModel(provider: AgentRunRecord["provider"], model: string | null | undefined) {
-  if (provider === "mock" || !model || model === "mock") return { provider: "openai-compatible", model: "qwen3-32b" };
-  if (model.startsWith("openai/")) return { provider: "openai", model: model.replace("openai/", "") };
-  if (model.startsWith("anthropic/")) return { provider: "anthropic", model: model.replace("anthropic/", "") };
-  if (model.startsWith("gpt-")) return { provider: "openai", model };
-  if (model.startsWith("claude")) return { provider: "anthropic", model };
-  return { provider: "openai-compatible", model };
 }
 
 function archiveEntryToWorldAsset(entry: ArchiveEntryRecord): WorldAsset {

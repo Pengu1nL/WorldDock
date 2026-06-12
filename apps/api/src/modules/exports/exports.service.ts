@@ -1,13 +1,10 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { worldPackageSchema, type WorldPackage } from "@worlddock/domain";
-import type { AuthSubject } from "../auth/auth.service";
-import { REPOSITORY_REPOSITORY, type RepositoryRepository } from "../repositories/repository.repository";
 import { WORLD_REPOSITORY, type WorldRecord, type WorldRepository } from "../worlds/world.repository";
 
 type ExportRecord = {
   id: string;
-  userId: string;
-  kind: "world" | "account";
+  kind: "world";
   status: "ready";
   payload: unknown;
   createdAt: Date;
@@ -19,56 +16,32 @@ const exportsStore = new Map<string, ExportRecord>();
 export class ExportsService {
   constructor(
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
-    @Inject(REPOSITORY_REPOSITORY) private readonly repositories: RepositoryRepository,
   ) {}
 
-  async exportWorld(subject: AuthSubject, worldId: string) {
-    const world = await this.requireOwnedWorld(subject, worldId);
+  async exportWorld(worldId: string) {
+    const world = await this.requireWorld(worldId);
     const payload = await this.buildWorldPackage(world);
-    const record = this.createExportRecord(subject.user.id, "world", payload);
+    const record = this.createExportRecord("world", payload);
     return { export: toExportResponse(record) };
   }
 
-  async getExport(subject: AuthSubject, exportId: string) {
-    const record = this.requireExport(subject, exportId);
+  async getExport(exportId: string) {
+    const record = this.requireExport(exportId);
     return { export: toExportResponse(record), package: record.payload };
   }
 
-  async importWorld(subject: AuthSubject, input: { package: unknown }) {
+  async importWorld(input: { package: unknown }) {
     const worldPackage = worldPackageSchema.parse(input.package);
     const world = await this.worlds.createWorld({
-      ownerId: subject.user.id,
       name: worldPackage.world.name,
       type: worldPackage.world.type,
       summary: worldPackage.world.summary,
       tags: worldPackage.world.tags,
-      mode: "cloud",
+      mode: "local",
       maturity: worldPackage.world.maturity,
     });
     await Promise.all(worldPackage.assets.map((asset) => this.createImportedAsset(world.id, asset)));
     return { world: await this.toWorldResponse(world) };
-  }
-
-  async requestAccountDataExport(subject: AuthSubject) {
-    const worlds = await this.worlds.listWorlds(subject.user.id);
-    const payload = {
-      format: "worlddock.account-export.v1",
-      exportedAt: new Date().toISOString(),
-      user: {
-        id: subject.user.id,
-        email: subject.user.email,
-        name: subject.user.name,
-      },
-      worlds: await Promise.all(worlds.map((world) => this.buildWorldPackage(world))),
-    };
-    const record = this.createExportRecord(subject.user.id, "account", payload);
-    return { export: toExportResponse(record) };
-  }
-
-  async getAccountDataExport(subject: AuthSubject, exportId: string) {
-    const record = this.requireExport(subject, exportId);
-    if (record.kind !== "account") throw this.notFound("Account export not found.");
-    return { export: toExportResponse(record), data: record.payload };
   }
 
   private async buildWorldPackage(world: WorldRecord): Promise<WorldPackage> {
@@ -77,14 +50,6 @@ export class ExportsService {
       this.worlds.listStorySeeds(world.id),
       this.worlds.listConflicts(world.id),
     ]);
-    const repository = await this.repositories.findByWorldId(world.id);
-    const releases = repository
-      ? (await this.repositories.listReleases(repository.id)).map((release) => ({
-          version: release.version,
-          note: release.note,
-          createdAt: release.createdAt.toISOString(),
-        }))
-      : [];
 
     return worldPackageSchema.parse({
       format: "worlddock.world-package.v1",
@@ -123,7 +88,7 @@ export class ExportsService {
           payload: { related: conflict.related ?? [], derivedSeeds: conflict.derivedSeeds ?? [] },
         })),
       ],
-      releases,
+      releases: [],
     });
   }
 
@@ -159,10 +124,9 @@ export class ExportsService {
     });
   }
 
-  private createExportRecord(userId: string, kind: ExportRecord["kind"], payload: unknown) {
+  private createExportRecord(kind: ExportRecord["kind"], payload: unknown) {
     const record: ExportRecord = {
       id: `export_${crypto.randomUUID()}`,
-      userId,
       kind,
       status: "ready",
       payload,
@@ -172,21 +136,15 @@ export class ExportsService {
     return record;
   }
 
-  private requireExport(subject: AuthSubject, exportId: string) {
+  private requireExport(exportId: string) {
     const record = exportsStore.get(exportId);
     if (!record) throw this.notFound("Export not found.");
-    if (record.userId !== subject.user.id) {
-      throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "You do not have access to this export." });
-    }
     return record;
   }
 
-  private async requireOwnedWorld(subject: AuthSubject, worldId: string) {
+  private async requireWorld(worldId: string) {
     const world = await this.worlds.findWorldById(worldId);
     if (!world) throw this.notFound("World not found.");
-    if (world.ownerId !== subject.user.id) {
-      throw new ForbiddenException({ code: "PERMISSION_DENIED", message: "You do not have access to this world." });
-    }
     return world;
   }
 

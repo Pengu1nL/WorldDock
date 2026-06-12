@@ -1,24 +1,21 @@
 import { type INestApplication } from "@nestjs/common";
-import { Test } from "@nestjs/testing";
-import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
-import { AppModule } from "../src/app.module";
-import { configureApiApp } from "../src/configure-api-app";
-import { AUTH_REPOSITORY, type AuthRepository, type StoredAccessToken, type StoredSession, type StoredUser } from "../src/modules/auth/auth.service";
-import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord, type ContextRefRecord } from "../src/modules/agent/agent.repository";
-import { AGENT_PROVIDER, type AgentProvider } from "../src/modules/agent/agent.provider";
-import { BILLING_REPOSITORY, type BillingAccountRecord, type BillingPlaceholderIntentRecord, type BillingRepository, type UsageLedgerEntryRecord } from "../src/modules/billing/billing.repository";
+import { AgentController } from "../src/modules/agent/agent.controller";
+import { AGENT_PROVIDER } from "../src/modules/agent/agent.provider";
+import { AGENT_REPOSITORY } from "../src/modules/agent/agent.repository";
+import { AgentService } from "../src/modules/agent/agent.service";
+import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
 import {
-  WORLD_REPOSITORY,
-  type ArchiveEntryRecord,
-  type ConflictRecord,
-  type StorySeedRecord,
-  type WorldRecord,
-  type WorldRepository,
-} from "../src/modules/worlds/world.repository";
+  createHttpTestApp,
+  createInMemoryAgents,
+  createInMemoryWorlds,
+  createMockStreamingAgentProvider,
+  type InMemoryAgents,
+  type InMemoryWorlds,
+} from "./local-api-test-helpers";
 
-describe("agent run endpoints", () => {
+describe("agent local endpoints", () => {
   let app: INestApplication | undefined;
 
   afterEach(async () => {
@@ -26,647 +23,98 @@ describe("agent run endpoints", () => {
     app = undefined;
   });
 
-  it("generates a world draft from the real agent provider before creating the world", async () => {
-    const auth = createInMemoryAuthRepository();
-    const worlds = createInMemoryWorldRepository();
-    const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository(agent);
-    let providerInputPrompt = "";
-    addSession(auth, "session_user_1", "user_1");
-    app = await createTestApp(auth, worlds, agent, {
-      async *stream(input) {
-        providerInputPrompt = input.prompt;
-        yield {
-          type: "delta",
-          text: JSON.stringify({
-            suggestedName: "雾港",
-            suggestedType: "港口奇幻 / 悬疑",
-            styles: ["潮湿", "行会政治", "低魔"],
-            coreSetting: "雾港每天清晨会把居民遗忘的秘密凝成潮汐盐。",
-            coreConflict: "秘密能保护个人，也能成为城市权力结构的燃料。",
-            directions: ["盐商行会如何征税", "遗忘者如何找回身份", "外来船只如何被雾港筛选"],
-            firstQuestion: "你希望秘密潮汐是自然现象，还是某个古老契约的副作用？",
-          }),
-        };
-        yield { type: "usage", tokenUsage: { inputTokens: 18, outputTokens: 90, totalTokens: 108 } };
-      },
-    }, billing);
-
-    const response = await request(app.getHttpServer())
-      .post("/v1/world-drafts")
-      .set("authorization", "Bearer session_user_1")
-      .send({ inspiration: "一座港口每天清晨都会吐出居民遗忘的秘密。", styleKw: "低魔 悬疑" })
-      .expect(201);
-
-    expect(providerInputPrompt).toContain("一座港口每天清晨都会吐出居民遗忘的秘密。");
-    expect(response.body.draft).toMatchObject({
-      suggestedName: "雾港",
-      suggestedType: "港口奇幻 / 悬疑",
-      styles: ["潮湿", "行会政治", "低魔"],
-      coreSetting: "雾港每天清晨会把居民遗忘的秘密凝成潮汐盐。",
-      coreConflict: "秘密能保护个人，也能成为城市权力结构的燃料。",
-      directions: ["盐商行会如何征税", "遗忘者如何找回身份", "外来船只如何被雾港筛选"],
-      firstQuestion: "你希望秘密潮汐是自然现象，还是某个古老契约的副作用？",
-    });
-    expect(response.body.draft.tools).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: "ctx", label: "分析灵感主题" }),
-    ]));
-    expect(response.body.tokenUsage).toEqual({ inputTokens: 18, outputTokens: 90, totalTokens: 108 });
-  });
-
-  it("creates a run, streams SSE events, and keeps suggestions pending until saved", async () => {
-    const auth = createInMemoryAuthRepository();
-    const worlds = createInMemoryWorldRepository();
-    const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository(agent);
-    addSession(auth, "session_user_1", "user_1");
+  it("creates a local run and streams provider events to completion", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const provider = createMockStreamingAgentProvider();
     const world = await worlds.createWorld({
-      ownerId: "user_1",
       name: "回忆所",
       type: "近未来",
       summary: "记忆可以被买卖。",
       tags: ["记忆"],
-      mode: "cloud",
+      mode: "local",
+      maturity: 20,
     });
-    app = await createTestApp(auth, worlds, agent, createMockAgentProvider(), billing);
-
-    const createRun = await request(app.getHttpServer())
-      .post(`/v1/worlds/${world.id}/agent-runs`)
-      .set("authorization", "Bearer session_user_1")
-      .send({ prompt: "推演记忆交易制度", mode: "expand" })
-      .expect(201);
-
-    expect(createRun.body.run).toMatchObject({ worldId: world.id, status: "running" });
-    expect(createRun.body.suggestions).toEqual([]);
-    expect(await agent.listSuggestions(createRun.body.run.id)).toEqual([]);
-    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved"]);
-    expect((await worlds.countAssets(world.id)).archive).toBe(0);
-
-    const sse = await request(app.getHttpServer())
-      .get(`/v1/agent-runs/${createRun.body.run.id}/events`)
-      .set("authorization", "Bearer session_user_1")
-      .expect(200);
-
-    expect(sse.headers["content-type"]).toContain("text/event-stream");
-    expect(sse.text).toContain("event: message.delta");
-    expect(sse.text).toContain("event: suggestion.created");
-    expect(sse.text).toContain("event: run.completed");
-    expect(await agent.findRunById(createRun.body.run.id)).toEqual(expect.objectContaining({
-      status: "completed",
-      tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
-    }));
-    const ledgerEntries = await billing.listLedgerEntriesForRun(createRun.body.run.id);
-    expect(ledgerEntries).toHaveLength(2);
-    expect(ledgerEntries.find((entry) => entry.type === "model_run_reserved")).toEqual(expect.objectContaining({
-      amountCents: -100,
-    }));
-    expect(ledgerEntries.find((entry) => entry.type === "model_run_settled")).toEqual(expect.objectContaining({
-      amountCents: 99,
-      tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 },
-    }));
-
-    const suggestionId = (await agent.listSuggestions(createRun.body.run.id))[0].id;
-    await request(app.getHttpServer())
-      .patch(`/v1/agent-suggestions/${suggestionId}`)
-      .set("authorization", "Bearer session_user_1")
-      .send({
-        suggestion: {
-          id: "s1",
-          kind: "setting",
-          category: "世界规则",
-          title: "《记忆交易法》修订版",
-          summary: "修订后的法律地位。",
-          body: "仅认证机构可以主持交易，并需要保留撤销机制。",
-        },
-      })
-      .expect(200);
-    expect((await agent.findSuggestionById(suggestionId))?.status).toBe("edited");
-
-    const saved = await request(app.getHttpServer())
-      .post(`/v1/agent-suggestions/${suggestionId}/save`)
-      .set("authorization", "Bearer session_user_1")
-      .expect(201);
-
-    expect(saved.body.suggestion).toMatchObject({ status: "saved", savedAssetId: "archive_1" });
-    expect(saved.body.asset).toMatchObject({
-      id: "archive_1",
+    await worlds.createArchiveEntry({
       worldId: world.id,
-      kind: "setting",
-      title: "《记忆交易法》修订版",
+      title: "记忆交易法",
       category: "世界规则",
-      summary: "修订后的法律地位。",
-      body: "仅认证机构可以主持交易，并需要保留撤销机制。",
-      payload: { relations: [] },
+      summary: "记忆交易需要登记。",
+      body: "许可制度决定谁能合法买卖记忆。",
+      relations: [],
       position: 0,
     });
-    expect(saved.body.asset.createdAt).toEqual(expect.any(String));
-    expect(saved.body.asset.updatedAt).toEqual(expect.any(String));
-    expect((await worlds.countAssets(world.id)).archive).toBe(1);
+    app = await createAgentApp(worlds, agents, provider);
 
-    const savedAgain = await request(app.getHttpServer())
-      .post(`/v1/agent-suggestions/${suggestionId}/save`)
-      .set("authorization", "Bearer session_user_1")
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-runs`)
+      .send({ prompt: "继续推演记忆交易", mode: "expand" })
       .expect(201);
+    const runId = created.body.run.id;
+    expect(created.body).toMatchObject({
+      run: { worldId: world.id, status: "running", mode: "expand", prompt: "继续推演记忆交易" },
+      suggestions: [],
+    });
 
-    expect(savedAgain.body.suggestion).toMatchObject({ status: "saved", savedAssetId: "archive_1" });
-    expect(savedAgain.body.asset).toMatchObject({ id: "archive_1", kind: "setting" });
-    expect((await worlds.countAssets(world.id)).archive).toBe(1);
+    const streamed = await request(app.getHttpServer())
+      .get(`/v1/agent-runs/${runId}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+    expect(streamed.text).toContain("run.started");
+    expect(streamed.text).toContain("context.used");
+    expect(streamed.text).toContain("message.delta");
+    expect(streamed.text).toContain("suggestion.created");
+    expect(streamed.text).toContain("run.completed");
+
+    const completedRun = await agents.findRunById(runId);
+    expect(completedRun).toMatchObject({
+      status: "completed",
+      tokenUsage: { inputTokens: 12, outputTokens: 24, totalTokens: 36 },
+    });
+    expect(await agents.listSuggestions(runId)).toHaveLength(1);
+    expect(provider.calls[0]).toMatchObject({
+      runId,
+      prompt: "继续推演记忆交易",
+      world: { id: world.id, name: "回忆所" },
+    });
   });
 
-  it("cancels runs and emits a cancelled event", async () => {
-    const auth = createInMemoryAuthRepository();
-    const worlds = createInMemoryWorldRepository();
-    const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository(agent);
-    addSession(auth, "session_user_1", "user_1");
+  it("cancels a local running run", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
     const world = await worlds.createWorld({
-      ownerId: "user_1",
-      name: "市声",
-      type: "都市奇幻",
-      summary: "城市拥有意识。",
-      tags: [],
-      mode: "cloud",
+      name: "白塔城",
+      type: "奇幻城市",
+      summary: "钟声管理所有人的时间。",
+      tags: ["钟声"],
+      mode: "local",
+      maturity: 9,
     });
-    app = await createTestApp(auth, worlds, agent, createMockAgentProvider(), billing);
+    app = await createAgentApp(worlds, agents, createMockStreamingAgentProvider());
 
-    const createRun = await request(app.getHttpServer())
+    const created = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-runs`)
-      .set("authorization", "Bearer session_user_1")
-      .send({ prompt: "继续推演", mode: "expand" })
+      .send({ prompt: "推演迟到者", mode: "challenge" })
       .expect(201);
 
-    await request(app.getHttpServer())
-      .post(`/v1/agent-runs/${createRun.body.run.id}/cancel`)
-      .set("authorization", "Bearer session_user_1")
+    const cancelled = await request(app.getHttpServer())
+      .post(`/v1/agent-runs/${created.body.run.id}/cancel`)
       .expect(200);
+    expect(cancelled.body.run).toMatchObject({ id: created.body.run.id, status: "cancelled" });
 
-    const sse = await request(app.getHttpServer())
-      .get(`/v1/agent-runs/${createRun.body.run.id}/events`)
-      .set("authorization", "Bearer session_user_1")
-      .expect(200);
-
-    expect(sse.text).toContain("event: run.cancelled");
-    expect(sse.text).not.toContain("event: message.delta");
-    expect(sse.text).not.toContain("event: suggestion.created");
-    expect(await agent.findRunById(createRun.body.run.id)).toEqual(expect.objectContaining({ status: "cancelled" }));
-    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
-  });
-
-  it("records provider failures as MODEL_UNAVAILABLE in the SSE stream", async () => {
-    const auth = createInMemoryAuthRepository();
-    const worlds = createInMemoryWorldRepository();
-    const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository(agent);
-    addSession(auth, "session_user_1", "user_1");
-    const world = await worlds.createWorld({
-      ownerId: "user_1",
-      name: "故障世界",
-      type: "科幻",
-      summary: "模型失败路径。",
-      tags: [],
-      mode: "cloud",
-    });
-    app = await createTestApp(auth, worlds, agent, createFailingAgentProvider(), billing);
-
-    const createRun = await request(app.getHttpServer())
-      .post(`/v1/worlds/${world.id}/agent-runs`)
-      .set("authorization", "Bearer session_user_1")
-      .send({ prompt: "fail", mode: "expand" })
-      .expect(201);
-
-    const sse = await request(app.getHttpServer())
-      .get(`/v1/agent-runs/${createRun.body.run.id}/events`)
-      .set("authorization", "Bearer session_user_1")
-      .expect(200);
-
-    expect(sse.text).toContain("event: run.failed");
-    expect(sse.text).toContain("MODEL_UNAVAILABLE");
-    expect(await agent.findRunById(createRun.body.run.id)).toEqual(expect.objectContaining({
-      status: "failed",
-      errorCode: "MODEL_UNAVAILABLE",
-    }));
-    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual(["model_run_reserved", "model_run_refunded"]);
-  });
-
-  it("does not complete a run that is cancelled and refunded before the provider stream ends", async () => {
-    const auth = createInMemoryAuthRepository();
-    const worlds = createInMemoryWorldRepository();
-    const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository(agent);
-    addSession(auth, "session_user_1", "user_1");
-    const world = await worlds.createWorld({
-      ownerId: "user_1",
-      name: "中断世界",
-      type: "科幻",
-      summary: "流式结束前被取消。",
-      tags: [],
-      mode: "cloud",
-    });
-    app = await createTestApp(auth, worlds, agent, createCancellingAgentProvider(agent, billing), billing);
-
-    const createRun = await request(app.getHttpServer())
-      .post(`/v1/worlds/${world.id}/agent-runs`)
-      .set("authorization", "Bearer session_user_1")
-      .send({ prompt: "取消竞态", mode: "expand" })
-      .expect(201);
-
-    const sse = await request(app.getHttpServer())
-      .get(`/v1/agent-runs/${createRun.body.run.id}/events`)
-      .set("authorization", "Bearer session_user_1")
-      .expect(200);
-
-    expect(sse.text).toContain("event: message.delta");
-    expect(sse.text).not.toContain("event: run.completed");
-    expect((await agent.findRunById(createRun.body.run.id))?.status).toBe("cancelled");
-    expect((await billing.listLedgerEntriesForRun(createRun.body.run.id)).map((entry) => entry.type)).toEqual([
-      "model_run_reserved",
-      "model_run_refunded",
-    ]);
-  });
-
-  it("blocks agent runs when balance cannot cover the reserve", async () => {
-    const auth = createInMemoryAuthRepository();
-    const worlds = createInMemoryWorldRepository();
-    const agent = createInMemoryAgentRepository();
-    const billing = createInMemoryBillingRepository(agent);
-    addSession(auth, "session_user_1", "user_1");
-    seedBillingAccount(billing, "user_1", 50);
-    const world = await worlds.createWorld({
-      ownerId: "user_1",
-      name: "低余额世界",
-      type: "科幻",
-      summary: "余额不足路径。",
-      tags: [],
-      mode: "cloud",
-    });
-    app = await createTestApp(auth, worlds, agent, createMockAgentProvider(), billing);
-
-    const response = await request(app.getHttpServer())
-      .post(`/v1/worlds/${world.id}/agent-runs`)
-      .set("authorization", "Bearer session_user_1")
-      .send({ prompt: "余额不足", mode: "expand" })
-      .expect(402);
-
-    expect(response.body).toMatchObject({
-      code: "INSUFFICIENT_BALANCE",
-      message: "Insufficient balance for Agent Run.",
-    });
+    const events = await agents.listEvents(created.body.run.id);
+    expect(events.map((event) => event.type)).toEqual(["run.started", "run.cancelled"]);
   });
 });
 
-async function createTestApp(
-  authRepository: AuthRepository,
-  worldRepository: WorldRepository,
-  agentRepository: AgentRepository,
-  agentProvider: AgentProvider,
-  billingRepository: BillingRepository = createInMemoryBillingRepository(),
-) {
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  })
-    .overrideProvider(AUTH_REPOSITORY)
-    .useValue(authRepository)
-    .overrideProvider(WORLD_REPOSITORY)
-    .useValue(worldRepository)
-    .overrideProvider(AGENT_REPOSITORY)
-    .useValue(agentRepository)
-    .overrideProvider(AGENT_PROVIDER)
-    .useValue(agentProvider)
-    .overrideProvider(BILLING_REPOSITORY)
-    .useValue(billingRepository)
-    .compile();
-
-  const testApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
-  configureApiApp(testApp);
-  await testApp.init();
-  await testApp.getHttpAdapter().getInstance().ready();
-  return testApp;
-}
-
-function createMockAgentProvider(): AgentProvider {
-  return {
-    async *stream() {
-      yield { type: "context", contextRef: { kind: "world", title: "世界摘要", excerpt: "记忆可以被买卖。" } };
-      yield { type: "delta", text: "好。" };
-      yield { type: "delta", text: "让我先把这个灵感拆成可保存的设定。" };
-      yield {
-        type: "suggestion",
-        suggestion: {
-          id: "s1",
-          kind: "setting",
-          category: "世界规则",
-          title: "《记忆交易法》",
-          summary: "确立记忆作为可交易资产的法律地位。",
-          body: "仅认证机构可以主持交易。",
-        },
-      };
-      yield { type: "usage", tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 } };
-    },
-  };
-}
-
-function createFailingAgentProvider(): AgentProvider {
-  return {
-    async *stream() {
-      throw new Error("model unavailable");
-    }
-  };
-}
-
-function createCancellingAgentProvider(agent: AgentRepository, billing: BillingRepository): AgentProvider {
-  return {
-    async *stream(input) {
-      yield { type: "delta", text: "处理中。" };
-      yield { type: "usage", tokenUsage: { inputTokens: 12, outputTokens: 30, totalTokens: 42 } };
-      if (!input.runId || !input.userId) throw new Error("Expected run and user ids in agent provider input.");
-      await agent.updateRun(input.runId, { status: "cancelled", cancelledAt: new Date() });
-      const reserved = (await billing.listLedgerEntriesForRun(input.runId)).find((entry) => entry.type === "model_run_reserved");
-      if (reserved) {
-        await billing.createTerminalLedgerEntryOnce({
-          accountId: reserved.accountId,
-          userId: input.userId,
-          agentRunId: input.runId,
-          type: "model_run_refunded",
-          amountCents: -reserved.amountCents,
-          tokenUsage: null,
-          reason: "user_cancelled",
-        });
-      }
-    },
-  };
-}
-
-function addSession(repository: ReturnType<typeof createInMemoryAuthRepository>, token: string, userId: string) {
-  repository.users.set(userId, { id: userId, email: `${userId}@example.com`, name: userId, role: "user" });
-  repository.sessions.set(token, { token, userId, expiresAt: new Date(Date.now() + 60_000) });
-}
-
-function createInMemoryAuthRepository() {
-  const users = new Map<string, StoredUser>();
-  const sessions = new Map<string, StoredSession>();
-  const accessTokens = new Map<string, StoredAccessToken>();
-  return {
-    users,
-    sessions,
-    accessTokens,
-    async findUserById(id: string) { return users.get(id) ?? null; },
-    async findSessionByToken(token: string) { return sessions.get(token) ?? null; },
-    async deleteSession(token: string) { sessions.delete(token); },
-    async listAccessTokens(userId: string) { return [...accessTokens.values()].filter((item) => item.userId === userId); },
-    async createAccessToken(input: StoredAccessToken) { accessTokens.set(input.id, input); return input; },
-    async findAccessTokenByHash(tokenHash: string) { return [...accessTokens.values()].find((item) => item.tokenHash === tokenHash) ?? null; },
-    async markAccessTokenUsed(id: string, usedAt: Date) { const token = accessTokens.get(id); if (token) token.lastUsedAt = usedAt; },
-    async revokeAccessToken(userId: string, tokenId: string, revokedAt: Date) {
-      const token = accessTokens.get(tokenId);
-      if (!token || token.userId !== userId) return null;
-      token.revokedAt = revokedAt;
-      return token;
-    },
-  } satisfies AuthRepository & { users: typeof users; sessions: typeof sessions; accessTokens: typeof accessTokens };
-}
-
-function createInMemoryWorldRepository() {
-  const worlds = new Map<string, WorldRecord>();
-  const archiveEntries = new Map<string, ArchiveEntryRecord>();
-  const storySeeds = new Map<string, StorySeedRecord>();
-  const conflicts = new Map<string, ConflictRecord>();
-
-  const repository: WorldRepository = {
-    async createWorld(input) {
-      const now = new Date();
-      const world: WorldRecord = {
-        id: `world_${worlds.size + 1}`,
-        ownerId: input.ownerId,
-        name: input.name,
-        type: input.type,
-        summary: input.summary,
-        tags: input.tags,
-        status: "draft",
-        visibility: "private",
-        mode: input.mode,
-        maturity: input.maturity ?? 0,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      worlds.set(world.id, world);
-      return world;
-    },
-    async listWorlds(ownerId) { return [...worlds.values()].filter((world) => world.ownerId === ownerId && !world.deletedAt); },
-    async findWorldById(id) { const world = worlds.get(id); return world && !world.deletedAt ? world : null; },
-    async updateWorld(id, input) { const world = worlds.get(id); if (!world || world.deletedAt) return null; const next = { ...world, ...input, updatedAt: new Date() }; worlds.set(id, next); return next; },
-    async deleteWorld(id) { const world = worlds.get(id); if (!world || world.deletedAt) return null; const next = { ...world, status: "unpublished" as const, deletedAt: new Date(), updatedAt: new Date() }; worlds.set(id, next); return next; },
-    async duplicateWorldAssets() { return; },
-    async listArchiveEntries(worldId) { return [...archiveEntries.values()].filter((entry) => entry.worldId === worldId); },
-    async createArchiveEntry(input) { const entry = { id: `archive_${archiveEntries.size + 1}`, ...input, relations: input.relations ?? [], createdAt: new Date(), updatedAt: new Date() }; archiveEntries.set(entry.id, entry); return entry; },
-    async listStorySeeds(worldId) { return [...storySeeds.values()].filter((seed) => seed.worldId === worldId); },
-    async createStorySeed(input) { const seed = { id: `seed_${storySeeds.size + 1}`, ...input, questions: input.questions ?? [], createdAt: new Date(), updatedAt: new Date() }; storySeeds.set(seed.id, seed); return seed; },
-    async listConflicts(worldId) { return [...conflicts.values()].filter((conflict) => conflict.worldId === worldId); },
-    async createConflict(input) { const conflict = { id: `conflict_${conflicts.size + 1}`, ...input, related: input.related ?? [], derivedSeeds: input.derivedSeeds ?? [], createdAt: new Date(), updatedAt: new Date() }; conflicts.set(conflict.id, conflict); return conflict; },
-    async listAssetRelations() { return []; },
-    async countAssets(worldId) {
-      return {
-        archive: [...archiveEntries.values()].filter((entry) => entry.worldId === worldId).length,
-        seeds: [...storySeeds.values()].filter((seed) => seed.worldId === worldId).length,
-        conflicts: [...conflicts.values()].filter((conflict) => conflict.worldId === worldId).length,
-      };
-    },
-    async replaceWorldFromSnapshot() { return null; },
-    async createAssetFromSnapshot() { return null; },
-    async remapForkAssetReferences() { return; },
-    async replaceForkAssetRelationsFromSnapshot() { return true; },
-    async forkAssetRelationsMatchSnapshot() { return true; },
-    async applyForkSnapshotChange(input) { return { status: "skipped", change: input.change, reason: "missing_source" }; },
-  };
-
-  return repository;
-}
-
-function createInMemoryAgentRepository() {
-  const runs = new Map<string, AgentRunRecord>();
-  const events = new Map<string, AgentEventRecord[]>();
-  const suggestions = new Map<string, AgentSuggestionRecord>();
-  const contextRefs = new Map<string, ContextRefRecord>();
-  let runCounter = 0;
-  let eventCounter = 0;
-
-  const repository: AgentRepository = {
-    async createRun(input) {
-      const now = new Date();
-      const run: AgentRunRecord = {
-        id: `run_${++runCounter}`,
-        worldId: input.worldId,
-        userId: input.userId,
-        mode: input.mode,
-        prompt: input.prompt,
-        status: "running",
-        model: input.model,
-        provider: input.provider ?? "openai",
-        piSessionId: input.piSessionId ?? null,
-        tokenUsage: null,
-        createdAt: now,
-        updatedAt: now,
-        completedAt: null,
-        failedAt: null,
-        cancelledAt: null,
-        errorCode: null,
-        errorMessage: null,
-      };
-      runs.set(run.id, run);
-      return run;
-    },
-    async findRunById(id) { return runs.get(id) ?? null; },
-    async updateRun(id, input) { const run = runs.get(id); if (!run) return null; const next = { ...run, ...input, updatedAt: new Date() }; runs.set(id, next); return next; },
-    async updateRunIfStatus(id, status, input) {
-      const run = runs.get(id);
-      if (!run || run.status !== status) return null;
-      const next = { ...run, ...input, updatedAt: new Date() };
-      runs.set(id, next);
-      return next;
-    },
-    async appendEvent(input) {
-      const event = { id: `evt_${++eventCounter}`, createdAt: new Date(), ...input };
-      events.set(input.runId, [...(events.get(input.runId) ?? []), event]);
-      return event;
-    },
-    async listEvents(runId) { return events.get(runId) ?? []; },
-    async createContextRef(input) {
-      const contextRef = { id: `ctx_${contextRefs.size + 1}`, ...input };
-      contextRefs.set(contextRef.id, contextRef);
-      return contextRef;
-    },
-    async createSuggestion(input) { const suggestion = { id: `ags_${suggestions.size + 1}`, status: "pending" as const, savedAssetId: null, ...input }; suggestions.set(suggestion.id, suggestion); return suggestion; },
-    async listSuggestions(runId) { return [...suggestions.values()].filter((item) => item.runId === runId); },
-    async findSuggestionById(id) { return suggestions.get(id) ?? null; },
-    async updateSuggestion(id, input) { const suggestion = suggestions.get(id); if (!suggestion) return null; const next = { ...suggestion, ...input }; suggestions.set(id, next); return next; },
-  };
-
-  return repository;
-}
-
-function createInMemoryBillingRepository(agentRepository?: AgentRepository) {
-  const accounts = new Map<string, BillingAccountRecord>();
-  const entries = new Map<string, UsageLedgerEntryRecord>();
-  const placeholderIntents = new Map<string, BillingPlaceholderIntentRecord>();
-
-  const repository = {
-    accounts,
-    entries,
-    async findAccountByUserId(userId: string) {
-      return [...accounts.values()].find((account) => account.userId === userId) ?? null;
-    },
-    async createAccount(input: { userId: string; freeCreditGrantedAt?: Date | null }) {
-      const now = new Date();
-      const account: BillingAccountRecord = {
-        id: `ba_${accounts.size + 1}`,
-        userId: input.userId,
-        currency: "CNY",
-        freeCreditGrantedAt: input.freeCreditGrantedAt ?? null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      accounts.set(account.id, account);
-      return account;
-    },
-    async markFreeCreditGranted(accountId: string, grantedAt: Date) {
-      const account = accounts.get(accountId);
-      if (!account) return null;
-      const next = { ...account, freeCreditGrantedAt: grantedAt, updatedAt: new Date() };
-      accounts.set(accountId, next);
-      return next;
-    },
-    async createLedgerEntry(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
-      const entry: UsageLedgerEntryRecord = {
-        id: `ule_${entries.size + 1}`,
-        createdAt: new Date(),
-        ...input,
-      };
-      entries.set(entry.id, entry);
-      return entry;
-    },
-    async createTerminalLedgerEntryOnce(input: Omit<UsageLedgerEntryRecord, "id" | "createdAt">) {
-      const existing = input.agentRunId
-        ? [...entries.values()].find((entry) => entry.agentRunId === input.agentRunId && isTerminalBillingEntry(entry))
-        : null;
-      if (existing) return existing;
-      const entry: UsageLedgerEntryRecord = {
-        id: `ule_${entries.size + 1}`,
-        createdAt: new Date(),
-        ...input,
-      };
-      entries.set(entry.id, entry);
-      return entry;
-    },
-    async createTerminalLedgerEntryAndUpdateRun(input) {
-      const existing = [...entries.values()].find((entry) => entry.agentRunId === input.entry.agentRunId && isTerminalBillingEntry(entry));
-      if (existing) {
-        if (existing.type !== input.entry.type) return null;
-        const updated = agentRepository
-          ? await agentRepository.updateRunIfStatus(input.entry.agentRunId, input.expectedRunStatus, input.runUpdate)
-          : null;
-        const run = agentRepository ? await agentRepository.findRunById(input.entry.agentRunId) : null;
-        return updated || run?.status === input.runUpdate.status ? existing : null;
-      }
-      const updated = agentRepository
-        ? await agentRepository.updateRunIfStatus(input.entry.agentRunId, input.expectedRunStatus, input.runUpdate)
-        : { id: input.entry.agentRunId };
-      if (!updated) return null;
-      const entry: UsageLedgerEntryRecord = {
-        id: `ule_${entries.size + 1}`,
-        createdAt: new Date(),
-        ...input.entry,
-      };
-      entries.set(entry.id, entry);
-      return entry;
-    },
-    async listLedgerEntries(userId: string) {
-      return [...entries.values()].filter((entry) => entry.userId === userId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    },
-    async listLedgerEntriesForRun(agentRunId: string) {
-      return [...entries.values()].filter((entry) => entry.agentRunId === agentRunId);
-    },
-    async createPlaceholderIntent(input) {
-      const intent: BillingPlaceholderIntentRecord = {
-        id: `bpi_${placeholderIntents.size + 1}`,
-        createdAt: new Date(),
-        status: input.status ?? "captured",
-        ...input,
-      };
-      placeholderIntents.set(intent.id, intent);
-      return intent;
-    },
-    async listPlaceholderIntents(userId: string) {
-      return [...placeholderIntents.values()].filter((intent) => intent.userId === userId);
-    },
-  } satisfies BillingRepository & { accounts: typeof accounts; entries: typeof entries };
-
-  return repository;
-}
-
-function isTerminalBillingEntry(entry: UsageLedgerEntryRecord) {
-  return entry.type === "model_run_settled" || entry.type === "model_run_refunded";
-}
-
-function seedBillingAccount(repository: ReturnType<typeof createInMemoryBillingRepository>, userId: string, balanceCents: number) {
-  const now = new Date();
-  const account: BillingAccountRecord = {
-    id: `ba_seed_${userId}`,
-    userId,
-    currency: "CNY",
-    freeCreditGrantedAt: now,
-    createdAt: now,
-    updatedAt: now,
-  };
-  repository.accounts.set(account.id, account);
-  repository.entries.set(`ule_seed_${userId}`, {
-    id: `ule_seed_${userId}`,
-    accountId: account.id,
-    userId,
-    agentRunId: null,
-    type: "credit_granted",
-    amountCents: balanceCents,
-    tokenUsage: null,
-    reason: "seed test balance",
-    createdAt: now,
+async function createAgentApp(worlds: InMemoryWorlds, agents: InMemoryAgents, provider: ReturnType<typeof createMockStreamingAgentProvider>) {
+  return createHttpTestApp({
+    controllers: [AgentController],
+    providers: [
+      AgentService,
+      { provide: WORLD_REPOSITORY, useValue: worlds },
+      { provide: AGENT_REPOSITORY, useValue: agents },
+      { provide: AGENT_PROVIDER, useValue: provider },
+    ],
   });
 }

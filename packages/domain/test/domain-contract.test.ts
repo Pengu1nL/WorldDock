@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   agentSeedSchema,
+  appErrorKindSchema,
   apiErrorSchema,
-  publicRepositorySchema,
+  releaseSnapshotSchema,
   suggestionSchema,
+  type ReleaseSnapshot,
   worldSchema,
 } from "../src";
 
@@ -23,7 +25,7 @@ describe("@worlddock/domain contracts", () => {
         seeds: 2,
         conflicts: 1,
         updated: "刚刚",
-        mode: "cloud",
+        mode: "local",
       }),
     ).not.toThrow();
   });
@@ -44,35 +46,27 @@ describe("@worlddock/domain contracts", () => {
     expect(parsed.kind).toBe("seed");
   });
 
-  it("requires public repositories to carry license and release metadata", () => {
-    expect(() =>
-      publicRepositorySchema.parse({
-        id: "repo_memory",
-        owner: "ren",
-        slug: "memory-market",
-        name: "回忆所",
-        summary: "记忆交易社会。",
-        tags: ["记忆"],
-        stars: 12,
-        forks: 2,
-        updated: "刚刚",
-        version: "v0.1.0",
-        visibility: "public",
-        license: "free-fork-attribution",
-        releases: [
-          {
-            version: "v0.1.0",
-            updated: "刚刚",
-            note: "初始发布",
-            addedSettings: 3,
-            changedSettings: 0,
-            removedSettings: 0,
-            addedSeeds: 2,
-            source: "cloud-publish",
-          },
-        ],
-      }),
-    ).not.toThrow();
+  it("keeps local release snapshots on the root domain surface", () => {
+    const parsed: ReleaseSnapshot = releaseSnapshotSchema.parse({
+      contractVersion: "0.1.0",
+      package: {
+        format: "worlddock.world-package.v1",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "回忆所",
+          type: "近未来 / 软科幻",
+          summary: "记忆可以被买卖的近未来社会。",
+          tags: ["记忆", "制度"],
+          maturity: 64,
+        },
+        assets: [],
+        releases: [],
+      },
+      createdAt: "2026-06-12T00:00:00.000Z",
+      assets: [],
+    });
+
+    expect(parsed.package.format).toBe("worlddock.world-package.v1");
   });
 
   it("defines the API error envelope shared by backend and frontend", () => {
@@ -83,6 +77,7 @@ describe("@worlddock/domain contracts", () => {
         requestId: "req_123",
       }),
     ).not.toThrow();
+    expect(appErrorKindSchema.parse("local-runtime-disconnected")).toBe("local-runtime-disconnected");
   });
 
   it("validates agent seed fixtures with nested suggestions and issues", () => {

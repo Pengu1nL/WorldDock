@@ -22,7 +22,6 @@ describe("system endpoints", () => {
   it("returns process health with a request id", async () => {
     app = await createTestApp([
       { name: "database", check: async () => undefined },
-      { name: "redis", check: async () => undefined },
     ]);
 
     const response = await request(app.getHttpServer())
@@ -42,8 +41,6 @@ describe("system endpoints", () => {
   it("returns baseline process metrics", async () => {
     app = await createTestApp([
       { name: "database", check: async () => undefined },
-      { name: "redis", check: async () => undefined },
-      { name: "search", check: async () => undefined },
     ]);
 
     const response = await request(app.getHttpServer())
@@ -57,7 +54,6 @@ describe("system endpoints", () => {
   it("returns readiness details when dependencies are healthy", async () => {
     app = await createTestApp([
       { name: "database", check: async () => undefined },
-      { name: "redis", check: async () => undefined },
     ]);
 
     const response = await request(app.getHttpServer())
@@ -67,16 +63,14 @@ describe("system endpoints", () => {
     expect(response.body.status).toBe("ready");
     expect(response.body.dependencies).toEqual([
       { name: "database", status: "ok" },
-      { name: "redis", status: "ok" },
     ]);
     expect(response.body.requestId).toMatch(/^req_[a-z0-9]+$/);
   });
 
   it("normalizes dependency failures into ApiError", async () => {
     app = await createTestApp([
-      { name: "database", check: async () => undefined },
       {
-        name: "redis",
+        name: "database",
         check: async () => {
           throw new Error("connection refused");
         },
@@ -94,8 +88,7 @@ describe("system endpoints", () => {
       requestId: "req_unready",
       details: {
         dependencies: [
-          { name: "database", status: "ok" },
-          { name: "redis", status: "error" },
+          { name: "database", status: "error" },
         ],
       },
     });
@@ -109,16 +102,10 @@ describe("system endpoints", () => {
         API_PORT: "4000",
         WEB_APP_URL: "https://worlddock.example",
         DATABASE_URL: "postgresql://worlddock:worlddock@db.example:5432/worlddock",
-        REDIS_URL: "redis://redis.example:6379",
-        MEILISEARCH_HOST: "https://search.worlddock.example",
-        S3_ENDPOINT: "https://s3.worlddock.example",
-        S3_BUCKET: "worlddock-prod",
-        BETTER_AUTH_SECRET: "prod_secret_at_least_32_chars_value",
-        BETTER_AUTH_URL: "https://api.worlddock.example",
         AI_PROVIDER: "mock",
         SENTRY_DSN: "https://public@example.com/1",
       }),
-    ).toThrow("AI_PROVIDER=mock is not allowed in production.");
+    ).toThrow("AI_PROVIDER=mock is not allowed.");
   });
 });
 

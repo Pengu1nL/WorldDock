@@ -5,15 +5,14 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./assets": "./src/assets/index.ts",
     "./agent": "./src/agent/index.ts",
     "./agent/context": "./src/agent/context.ts",
     "./agent/pi": "./src/agent/pi.ts",
     "./api": "./src/api/index.ts",
-    "./billing": "./src/billing/index.ts",
-    "./developer-access": "./src/developer-access/index.ts",
-    "./repository": "./src/repository/index.ts",
     "./releases": "./src/releases/index.ts",
-    "./world": "./src/world/index.ts"
+    "./world": "./src/world/index.ts",
+    "./worlds/world-package": "./src/worlds/world-package.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

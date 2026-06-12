@@ -3,7 +3,7 @@ import type { PiRuntimeEvent } from "@worlddock/domain/agent/pi";
 import { describe, expect, it, vi } from "vitest";
 import { PiAgentProvider } from "../src/modules/agent/agent.provider";
 import { PiSessionRunner } from "../src/modules/agent/pi/pi-session-runner";
-import type { PiRuntimeClient } from "../src/modules/agent/pi/pi-runtime.client";
+import type { PiRuntimeClient, PiSessionInput } from "../src/modules/agent/pi/pi-runtime.client";
 import { SafetyGate } from "../src/modules/agent/pi/safety-gate";
 import { createWorldToolRegistry } from "../src/modules/agent/pi/world-tools";
 import { WorldToolRegistry, describeWorldTools } from "../src/modules/agent/pi/world-tool-registry";
@@ -34,12 +34,11 @@ describe("pi agent runtime boundary", () => {
     const events = [];
     for await (const event of runner.run({
       runId: "run_1",
-      userId: "user_1",
       worldId: "world_1",
       mode: "expand",
       prompt: "继续推演",
       context: [],
-      tools: [...describeWorldTools()],
+      tools: localPiTools(),
       skills: [],
     })) {
       events.push(event);
@@ -79,12 +78,6 @@ describe("pi agent runtime boundary", () => {
       }),
       listAssetRelations: vi.fn(async () => []),
       countAssets: vi.fn(async () => ({ archive: 0, seeds: 0, conflicts: 0 })),
-      replaceWorldFromSnapshot: vi.fn(async () => null),
-      createAssetFromSnapshot: vi.fn(async () => null),
-      remapForkAssetReferences: vi.fn(async () => undefined),
-      replaceForkAssetRelationsFromSnapshot: vi.fn(async () => true),
-      forkAssetRelationsMatchSnapshot: vi.fn(async () => true),
-      applyForkSnapshotChange: vi.fn(async (input) => ({ status: "skipped" as const, change: input.change, reason: "missing_source" as const })),
     };
     const expectedSuggestion: WorldSuggestion = {
       id: "setting_license",
@@ -121,12 +114,11 @@ describe("pi agent runtime boundary", () => {
     const events: PiRuntimeEvent[] = [];
     for await (const event of runner.run({
       runId: "run_1",
-      userId: "user_1",
       worldId: "world_1",
       mode: "expand",
       prompt: "生成制度建议",
       context: [],
-      tools: [...describeWorldTools()],
+      tools: localPiTools(),
       skills: [],
     })) {
       events.push(event);
@@ -220,7 +212,6 @@ describe("pi agent runtime boundary", () => {
     const chunks = [];
     for await (const chunk of provider.stream({
       runId: "run_1",
-      userId: "user_1",
       prompt: "继续推演记忆交易",
       mode: "expand",
       world: { id: "world_1", name: "回忆所", summary: "记忆可以被买卖。" },
@@ -233,3 +224,18 @@ describe("pi agent runtime boundary", () => {
     expect(chunks.map((chunk) => chunk.type)).toContain("usage");
   });
 });
+
+function localPiTools(): PiSessionInput["tools"] {
+  return [
+    { name: "get_world_manifest", description: "Read the World Manifest entry point.", inputSchema: { type: "object", required: ["worldId"] } },
+    { name: "search_world_assets", description: "Search local world assets.", inputSchema: { type: "object", required: ["worldId", "query"] } },
+    { name: "get_asset_brief", description: "Read one compact asset brief.", inputSchema: { type: "object", required: ["worldId", "assetId"] } },
+    { name: "get_asset_detail", description: "Read one full local asset detail.", inputSchema: { type: "object", required: ["worldId", "assetId"] } },
+    { name: "get_asset_source_fragments", description: "Read bounded local source fragments.", inputSchema: { type: "object", required: ["worldId", "assetId"] } },
+    { name: "list_local_releases", description: "List local release metadata.", inputSchema: { type: "object", required: ["worldId"] } },
+    { name: "propose_setting", description: "Return a typed pending setting suggestion.", inputSchema: { type: "object", required: ["title", "category", "categoryReason", "body"] } },
+    { name: "propose_story_seed", description: "Return a typed pending story seed suggestion.", inputSchema: { type: "object", required: ["title", "hook", "conflict"] } },
+    { name: "propose_conflict", description: "Return a typed pending conflict suggestion.", inputSchema: { type: "object", required: ["title", "body"] } },
+    { name: "propose_release_notes", description: "Return proposed local release notes.", inputSchema: { type: "object", required: ["worldId"] } },
+  ];
+}

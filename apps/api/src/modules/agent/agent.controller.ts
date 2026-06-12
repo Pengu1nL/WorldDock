@@ -1,9 +1,6 @@
-import { Body, Controller, HttpCode, Inject, Param, Patch, Post, Sse, UseGuards, type MessageEvent } from "@nestjs/common";
+import { Body, Controller, HttpCode, Inject, Param, Patch, Post, Sse, type MessageEvent } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { z } from "zod";
-import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
-import { WorldDockAuthGuard } from "../auth/auth.guard";
-import type { AuthSubject } from "../auth/auth.service";
 import { AgentService } from "./agent.service";
 
 const createRunSchema = z.object({
@@ -20,21 +17,18 @@ const createWorldDraftSchema = z.object({
 });
 
 @Controller()
-@UseGuards(WorldDockAuthGuard)
 export class AgentController {
   constructor(@Inject(AgentService) private readonly agentService: AgentService) {}
 
   @Post("world-drafts")
-  @RequireScopes("world:write")
-  async createWorldDraft(@CurrentSubject() subject: AuthSubject, @Body() body: unknown) {
-    return this.agentService.generateWorldDraft(subject, createWorldDraftSchema.parse(body));
+  async createWorldDraft(@Body() body: unknown) {
+    return this.agentService.generateWorldDraft(createWorldDraftSchema.parse(body));
   }
 
   @Post("worlds/:worldId/agent-runs")
-  @RequireScopes("world:write")
-  async createRun(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
+  async createRun(@Param("worldId") worldId: string, @Body() body: unknown) {
     const input = createRunSchema.parse(body);
-    const result = await this.agentService.createRun(subject, worldId, input);
+    const result = await this.agentService.createRun(worldId, input);
     return {
       run: result.run,
       suggestions: result.suggestions,
@@ -42,12 +36,11 @@ export class AgentController {
   }
 
   @Sse("agent-runs/:runId/events")
-  @RequireScopes("world:read")
-  events(@CurrentSubject() subject: AuthSubject, @Param("runId") runId: string): Observable<MessageEvent> {
+  events(@Param("runId") runId: string): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
       void (async () => {
         try {
-          for await (const event of this.agentService.streamEvents(subject, runId)) {
+          for await (const event of this.agentService.streamEvents(runId)) {
             subscriber.next({
               id: event.id,
               type: event.type,
@@ -66,28 +59,24 @@ export class AgentController {
   }
 
   @Post("agent-runs/:runId/cancel")
-  @RequireScopes("world:write")
   @HttpCode(200)
-  async cancel(@CurrentSubject() subject: AuthSubject, @Param("runId") runId: string) {
-    return { run: await this.agentService.cancelRun(subject, runId) };
+  async cancel(@Param("runId") runId: string) {
+    return { run: await this.agentService.cancelRun(runId) };
   }
 
   @Post("agent-suggestions/:suggestionId/save")
-  @RequireScopes("world:write")
-  async save(@CurrentSubject() subject: AuthSubject, @Param("suggestionId") suggestionId: string) {
-    return this.agentService.saveSuggestion(subject, suggestionId);
+  async save(@Param("suggestionId") suggestionId: string) {
+    return this.agentService.saveSuggestion(suggestionId);
   }
 
   @Patch("agent-suggestions/:suggestionId")
-  @RequireScopes("world:write")
-  async edit(@CurrentSubject() subject: AuthSubject, @Param("suggestionId") suggestionId: string, @Body() body: unknown) {
+  async edit(@Param("suggestionId") suggestionId: string, @Body() body: unknown) {
     const input = z.object({ suggestion: z.unknown() }).parse(body);
-    return { suggestion: await this.agentService.editSuggestion(subject, suggestionId, input) };
+    return { suggestion: await this.agentService.editSuggestion(suggestionId, input) };
   }
 
   @Post("agent-suggestions/:suggestionId/discard")
-  @RequireScopes("world:write")
-  async discard(@CurrentSubject() subject: AuthSubject, @Param("suggestionId") suggestionId: string) {
-    return { suggestion: await this.agentService.discardSuggestion(subject, suggestionId) };
+  async discard(@Param("suggestionId") suggestionId: string) {
+    return { suggestion: await this.agentService.discardSuggestion(suggestionId) };
   }
 }

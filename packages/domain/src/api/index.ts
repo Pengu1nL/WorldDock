@@ -13,7 +13,7 @@ export const appErrorKindSchema = z.enum([
   "model-unavailable",
   "insufficient-balance",
   "permission-denied",
-  "community-disconnected",
+  "local-runtime-disconnected",
 ]);
 
 export type ApiError = z.infer<typeof apiErrorSchema>;

@@ -18,8 +18,6 @@
     "test:readiness:local": "WORLD_DOCK_LOCAL_READINESS=1 vitest run --config vitest.integration.config.ts test/readiness-local.integration-spec.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1053.0",
-    "@aws-sdk/s3-request-presigner": "^3.1053.0",
     "@earendil-works/pi-agent-core": "0.75.5",
     "@earendil-works/pi-ai": "0.75.5",
     "@fastify/cors": "latest",
@@ -34,9 +32,6 @@
     "@worlddock/db": "workspace:*",
     "@worlddock/domain": "workspace:*",
     "ai": "^6.0.0",
-    "better-auth": "latest",
-    "bullmq": "^5.77.3",
-    "ioredis": "latest",
     "reflect-metadata": "latest",
     "rxjs": "latest",
     "zod": "latest"

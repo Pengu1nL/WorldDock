@@ -7,166 +7,28 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id            String        @id @default(cuid())
-  name          String
-  email         String        @unique
-  emailVerified Boolean       @default(false)
-  image         String?
-  role          String        @default("user")
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  accessTokens  AccessToken[]
-  worlds        World[]
-  billingAccount BillingAccount?
-  usageLedger   UsageLedgerEntry[]
-  repositories  PublicRepository[]
-  stars         RepositoryStar[]
-  forks         RepositoryFork[]
-  collections   RepositoryCollection[]
-  reports       Report[]
-  moderationActions ModerationAction[]
-  storageObjects StorageObject[]
-  profile       UserProfile?
-  notifications Notification[]
-  activityEvents ActivityEvent[]
-  supportFeedback SupportFeedback[]
-  analyticsEvents ProductAnalyticsEvent[]
-
-  @@map("users")
-}
-
-model ProductAnalyticsEvent {
-  id          String   @id @default(cuid())
-  userId      String?
-  name        String
-  context     Json     @default("{}")
-  anonymousId String?
-  route       String?
-  userAgent   String?
-  occurredAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([name, occurredAt])
-  @@index([anonymousId, occurredAt])
-  @@index([userId, occurredAt])
-  @@map("product_analytics_events")
-}
-
-model UserProfile {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  displayName           String
-  handle                String   @unique
-  avatarObjectId        String?
-  onboardingCompletedAt DateTime?
-  deletedAt             DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_profiles")
-}
-
-model Account {
-  id                    String    @id @default(cuid())
-  accountId             String
-  providerId            String
-  userId                String
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
-  scope                 String?
-  password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@unique([providerId, accountId])
-  @@map("accounts")
-}
-
-model Session {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("sessions")
-}
-
-model Verification {
-  id         String   @id @default(cuid())
-  identifier String
-  value      String
-  expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@index([identifier])
-  @@map("verifications")
-}
-
-model AccessToken {
-  id         String    @id @default(cuid())
-  userId     String
-  name       String
-  tokenHash  String    @unique
-  prefix     String
-  scopes     String[]  @default([])
-  lastUsedAt DateTime?
-  expiresAt  DateTime?
-  revokedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([prefix])
-  @@map("access_tokens")
-}
-
 model World {
   id                String             @id @default(cuid())
-  ownerId           String
   name              String
   type              String
   summary           String
   tags              String[]           @default([])
   status            String             @default("draft")
   visibility        String             @default("private")
-  mode              String             @default("cloud")
+  mode              String             @default("local")
   maturity          Int                @default(0)
   coverObjectId     String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   deletedAt         DateTime?
-  owner             User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   archiveEntries    ArchiveEntry[]
   storySeeds        StorySeed[]
   conflicts         Conflict[]
   consistencyIssues ConsistencyIssue[]
+  assetRelations    WorldAssetRelation[]
   agentRuns         AgentRun[]
   agentSuggestions  AgentSuggestion[]
-  repository        PublicRepository?
-  forkRecords       RepositoryFork[]
-  coverObject       StorageObject?     @relation("WorldCoverObject", fields: [coverObjectId], references: [id], onDelete: SetNull)
-  storageObjects    StorageObject[]
-  assetRelations    WorldAssetRelation[]
 
-  @@index([ownerId])
-  @@index([ownerId, deletedAt])
   @@index([coverObjectId])
   @@map("worlds")
 }
@@ -253,31 +115,28 @@ model WorldAssetRelation {
 }
 
 model AgentRun {
-  id             String            @id @default(cuid())
-  worldId        String
-  userId         String
-  status         String            @default("running")
-  mode           String
-  prompt         String
-  model          String?
-  provider       String            @default("openai")
-  piSessionId    String?
-  tokenUsage     Json?
-  errorCode      String?
-  errorMessage   String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  completedAt    DateTime?
-  failedAt       DateTime?
-  cancelledAt    DateTime?
-  world          World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  events         AgentEvent[]
-  suggestions    AgentSuggestion[]
-  contextRefs    ContextRef[]
-  usageLedger     UsageLedgerEntry[]
+  id           String            @id @default(cuid())
+  worldId      String
+  status       String            @default("running")
+  mode         String
+  prompt       String
+  model        String?
+  provider     String            @default("openai")
+  piSessionId  String?
+  tokenUsage   Json?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  completedAt  DateTime?
+  failedAt     DateTime?
+  cancelledAt  DateTime?
+  world        World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  events       AgentEvent[]
+  suggestions  AgentSuggestion[]
+  contextRefs  ContextRef[]
 
   @@index([worldId])
-  @@index([userId])
   @@index([piSessionId])
   @@map("agent_runs")
 }
@@ -330,322 +189,25 @@ model ContextRef {
   @@map("context_refs")
 }
 
-model BillingAccount {
-  id                  String             @id @default(cuid())
-  userId              String             @unique
-  currency            String             @default("CNY")
-  freeCreditGrantedAt DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  entries             UsageLedgerEntry[]
-  placeholderIntents  BillingPlaceholderIntent[]
+model LocalStorageObject {
+  id          String   @id @default(cuid())
+  bucket      String   @default("local")
+  key         String   @unique
+  filePath    String
+  contentType String?
+  sizeBytes   Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@map("billing_accounts")
+  @@map("local_storage_objects")
 }
 
-model UsageLedgerEntry {
-  id          String         @id @default(cuid())
-  accountId   String
-  userId      String
-  agentRunId  String?
-  type        String
-  amountCents Int
-  tokenUsage  Json?
-  reason      String?
-  createdAt   DateTime       @default(now())
-  account     BillingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agentRun    AgentRun?      @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
-
-  @@index([accountId, createdAt])
-  @@index([userId])
-  @@index([agentRunId])
-  @@map("usage_ledger")
-}
-
-model BillingPlaceholderIntent {
-  id        String   @id @default(cuid())
-  userId    String
-  accountId String
-  plan      String
-  source    String   @default("alpha_ui")
-  status    String   @default("captured")
+model HubConnection {
+  id        String   @id @default("default")
+  hubUrl    String
+  token     String
   createdAt DateTime @default(now())
-  account   BillingAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  updatedAt DateTime @updatedAt
 
-  @@index([userId, createdAt])
-  @@index([accountId])
-  @@map("billing_placeholder_intents")
-}
-
-model PublicRepository {
-  id        String              @id @default(cuid())
-  worldId   String?             @unique
-  ownerId   String
-  ownerName String
-  slug      String
-  name      String
-  summary   String
-  tags      String[]            @default([])
-  license   String
-  moderationStatus String              @default("visible")
-  moderationReason String?
-  moderatedAt DateTime?
-  stars     Int                 @default(0)
-  forks     Int                 @default(0)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-  owner     User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  world     World?              @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  releases  RepositoryRelease[]
-  snapshots ReleaseSnapshot[]
-  starRecords RepositoryStar[]
-  forkRecords RepositoryFork[]
-  collections RepositoryCollection[]
-  reports   Report[]
-  moderationActions ModerationAction[]
-  storageObjects StorageObject[]
-
-  @@unique([ownerName, slug])
-  @@index([ownerId])
-  @@index([moderationStatus])
-  @@map("repositories")
-}
-
-model RepositoryRelease {
-  id           String          @id @default(cuid())
-  repositoryId String
-  version      String
-  status       String          @default("published")
-  note         String
-  license      String
-  diff         Json
-  changes      Json            @default("[]")
-  source       String
-  createdAt    DateTime        @default(now())
-  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  snapshot     ReleaseSnapshot?
-  forks        RepositoryFork[]
-  storageObjects StorageObject[]
-
-  @@unique([repositoryId, version])
-  @@index([repositoryId])
-  @@index([status])
-  @@map("releases")
-}
-
-model ReleaseSnapshot {
-  id           String            @id @default(cuid())
-  repositoryId String
-  releaseId    String            @unique
-  snapshot     Json
-  createdAt    DateTime          @default(now())
-  repository   PublicRepository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  release      RepositoryRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
-
-  @@index([repositoryId])
-  @@map("release_snapshots")
-}
-
-model RepositoryStar {
-  id           String           @id @default(cuid())
-  repositoryId String
-  userId       String
-  createdAt    DateTime         @default(now())
-  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([repositoryId, userId])
-  @@index([userId])
-  @@map("stars")
-}
-
-model RepositoryCollection {
-  id           String           @id @default(cuid())
-  repositoryId String
-  userId       String
-  name         String           @default("saved")
-  createdAt    DateTime         @default(now())
-  repository   PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([repositoryId, userId, name])
-  @@index([userId, createdAt])
-  @@index([repositoryId])
-  @@map("repository_collections")
-}
-
-model RepositoryFork {
-  id                 String           @id @default(cuid())
-  repositoryId       String
-  sourceReleaseId    String
-  targetWorldId      String
-  userId             String
-  licenseSnapshot    String
-  createdAt          DateTime         @default(now())
-  repository         PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  sourceRelease      RepositoryRelease @relation(fields: [sourceReleaseId], references: [id], onDelete: Cascade)
-  targetWorld        World            @relation(fields: [targetWorldId], references: [id], onDelete: Cascade)
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  assetMaps          RepositoryForkAssetMap[]
-
-  @@index([repositoryId])
-  @@index([userId])
-  @@index([targetWorldId])
-  @@map("forks")
-}
-
-model RepositoryForkAssetMap {
-  id              String         @id @default(cuid())
-  forkId          String
-  upstreamAssetId String
-  targetAssetId   String
-  kind            String
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  fork            RepositoryFork @relation(fields: [forkId], references: [id], onDelete: Cascade)
-
-  @@unique([forkId, upstreamAssetId])
-  @@index([targetAssetId])
-  @@map("fork_asset_maps")
-}
-
-model OutboxEvent {
-  id          String    @id @default(cuid())
-  type        String
-  aggregateId String
-  payload     Json
-  createdAt   DateTime  @default(now())
-  processedAt DateTime?
-
-  @@index([type])
-  @@index([processedAt, createdAt])
-  @@map("outbox_events")
-}
-
-model Report {
-  id           String           @id @default(cuid())
-  repositoryId String?
-  reporterId   String
-  targetType   String           @default("repository")
-  targetId     String
-  reason       String
-  detail       String?
-  status       String           @default("open")
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  repository   PublicRepository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  reporter     User             @relation(fields: [reporterId], references: [id], onDelete: Cascade)
-  actions      ModerationAction[]
-
-  @@index([repositoryId, status])
-  @@index([reporterId])
-  @@index([targetType, targetId, status])
-  @@index([reporterId, targetType, targetId, createdAt])
-  @@index([status, createdAt])
-  @@map("reports")
-}
-
-model ModerationAction {
-  id             String           @id @default(cuid())
-  repositoryId   String
-  reportId       String?
-  moderatorId    String?
-  action         String
-  reason         String
-  previousStatus String
-  nextStatus     String
-  createdAt      DateTime         @default(now())
-  repository     PublicRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  report         Report?          @relation(fields: [reportId], references: [id], onDelete: SetNull)
-  moderator      User?            @relation(fields: [moderatorId], references: [id], onDelete: SetNull)
-
-  @@index([repositoryId, createdAt])
-  @@index([reportId])
-  @@index([moderatorId])
-  @@map("moderation_actions")
-}
-
-model StorageObject {
-  id           String             @id @default(cuid())
-  ownerId      String
-  bucket       String
-  key          String             @unique
-  filename     String
-  mimeType     String
-  sizeBytes    Int
-  checksum     String?
-  purpose      String
-  visibility   String             @default("private")
-  status       String             @default("pending")
-  worldId      String?
-  repositoryId String?
-  releaseId    String?
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  deletedAt    DateTime?
-  owner        User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  world        World?             @relation(fields: [worldId], references: [id], onDelete: SetNull)
-  repository   PublicRepository?  @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
-  release      RepositoryRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
-  coverForWorlds World[]          @relation("WorldCoverObject")
-
-  @@index([ownerId])
-  @@index([status, createdAt])
-  @@index([worldId])
-  @@index([repositoryId])
-  @@index([releaseId])
-  @@map("storage_objects")
-}
-
-model Notification {
-  id        String    @id @default(cuid())
-  userId    String
-  type      String
-  title     String
-  body      String
-  dedupeKey String?
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, dedupeKey])
-  @@index([userId, readAt, createdAt])
-  @@index([type])
-  @@map("notifications")
-}
-
-model ActivityEvent {
-  id         String   @id @default(cuid())
-  userId     String
-  type       String
-  title      String
-  body       String
-  targetType String
-  targetId   String?
-  metadata   Json
-  dedupeKey  String?
-  createdAt  DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, dedupeKey])
-  @@index([userId, createdAt])
-  @@index([type, createdAt])
-  @@index([targetType, targetId])
-  @@map("activity_events")
-}
-
-model SupportFeedback {
-  id        String   @id @default(cuid())
-  userId    String
-  message   String
-  context   Json
-  status    String   @default("open")
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([status, createdAt])
-  @@map("support_feedback")
+  @@map("hub_connections")
 }

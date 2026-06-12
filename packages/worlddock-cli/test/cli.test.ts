@@ -6,7 +6,6 @@ import { runWorldDockCli } from "../src/main";
 
 const env = {
   WORLD_DOCK_API_URL: "https://api.worlddock.test",
-  WORLD_DOCK_TOKEN: "wdl_test_token",
 };
 
 describe("worlddock cli", () => {
@@ -17,21 +16,7 @@ describe("worlddock cli", () => {
     tempDirs.length = 0;
   });
 
-  it("prints explicit auth guidance when token is missing", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({}));
-    const stderr: string[] = [];
-
-    await expect(runWorldDockCli(["worlds", "list"], {
-      env: { WORLD_DOCK_API_URL: "https://api.worlddock.test" },
-      fetch: fetchMock as typeof fetch,
-      stderr: (line) => stderr.push(line),
-    })).resolves.toBe(1);
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(stderr[0]).toBe("WORLD_DOCK_TOKEN is required.");
-  });
-
-  it("accepts login tokens without writing local files", async () => {
+  it("prints the P4 login placeholder without writing local files", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({}));
     const stdout: string[] = [];
     const homeDir = await mkdtemp(join(tmpdir(), "worlddock-cli-home-"));
@@ -45,21 +30,18 @@ describe("worlddock cli", () => {
     })).resolves.toBe(0);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(stdout[0]).toBe("WorldDock token detected. Export WORLD_DOCK_TOKEN for subsequent commands.");
+    expect(stdout[0]).toBe("WorldDock Hub login is not configured yet. Run P4 to enable PAT connections.");
     expect(await readdir(homeDir)).toEqual([]);
     expect(await readdir(configDir)).toEqual([]);
   });
 
-  it("lists worlds with a bearer token", async () => {
+  it("lists worlds without auth headers", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ worlds: [{ id: "world_1", name: "回忆所" }] }));
     const stdout: string[] = [];
 
     await expect(runWorldDockCli(["worlds", "list"], { env, fetch: fetchMock as typeof fetch, stdout: (line) => stdout.push(line) })).resolves.toBe(0);
 
-    expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/worlds", expect.objectContaining({
-      method: "GET",
-      headers: expect.objectContaining({ authorization: "Bearer wdl_test_token" }),
-    }));
+    expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/worlds", { method: "GET" });
     expect(JSON.parse(stdout[0])).toEqual({ worlds: [{ id: "world_1", name: "回忆所" }] });
   });
 
@@ -86,48 +68,28 @@ describe("worlddock cli", () => {
     await expect(runWorldDockCli(["worlds", "export", "world_1"], { env, fetch: fetchMock as typeof fetch, stdout: (line) => stdout.push(line) })).resolves.toBe(0);
     await expect(runWorldDockCli(["worlds", "import", packagePath], { env, fetch: fetchMock as typeof fetch, stdout: (line) => stdout.push(line) })).resolves.toBe(0);
 
-    expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/worlds/world_1/export", expect.objectContaining({ method: "POST" }));
+    expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/worlds/world_1/export", { method: "POST" });
     expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/worlds/import", expect.objectContaining({
       method: "POST",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ package: worldPackage }),
     }));
     expect(JSON.parse(stdout[0])).toMatchObject({ format: "worlddock.world-package.v1" });
     expect(JSON.parse(stdout[1])).toEqual({ world: { id: "world_2", name: "Memory Market" } });
   });
 
-  it("pulls repository packages without local deployment dependencies", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({
-      package: {
-        format: "worlddock.world-package.v1",
-        exportedAt: "2026-05-27T12:00:00.000Z",
-        world: { name: "Memory Market", type: "近未来", summary: "记忆交易。", tags: ["记忆"], maturity: 42 },
-        assets: [{ kind: "setting", title: "记忆交易法", summary: "制度。", body: "正文。", payload: {} }],
-        releases: [{ version: "v1.0.0", note: "初始发布", createdAt: "2026-05-27T12:00:00.000Z" }],
-      },
-    }));
-    const stdout: string[] = [];
-
-    await expect(runWorldDockCli(["repositories", "pull", "ren/memory-market"], { env, fetch: fetchMock as typeof fetch, stdout: (line) => stdout.push(line) })).resolves.toBe(0);
-
-    expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/developer-access/repositories/ren/memory-market/pull", expect.objectContaining({
-      method: "GET",
-      headers: expect.objectContaining({ authorization: "Bearer wdl_test_token" }),
-    }));
-    expect(JSON.parse(stdout[0]).assets[0]).toMatchObject({ kind: "setting", title: "记忆交易法" });
-  });
-
-  it.each(["memory-market", "ren/memory-market/typo"])("validates repository pull spec %s before calling the API", async (spec) => {
+  it("treats cloud pull as unknown usage", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({}));
     const stderr: string[] = [];
 
-    await expect(runWorldDockCli(["repositories", "pull", spec], {
+    await expect(runWorldDockCli(["repositories", "pull", "ren/memory-market"], {
       env,
       fetch: fetchMock as typeof fetch,
       stderr: (line) => stderr.push(line),
     })).resolves.toBe(1);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(stderr[0]).toBe("Repository must be formatted as <owner>/<slug>.");
+    expect(stderr[0]).toBe("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file>");
   });
 });
 

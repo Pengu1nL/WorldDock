@@ -101,7 +101,7 @@ export const agentRunSchema = z.object({
 export const contextRefSchema = z.object({
   id: z.string().min(1),
   runId: z.string().min(1),
-  kind: z.enum(["world", "archive", "seed", "conflict", "repository"]),
+  kind: z.enum(["world", "archive", "seed", "conflict"]),
   title: z.string().min(1),
   excerpt: z.string().min(1),
   targetId: z.string().min(1).optional(),
@@ -133,7 +133,7 @@ const agentPiToolCallSchema = z.object({
     "get_asset_brief",
     "get_asset_detail",
     "get_asset_source_fragments",
-    "list_repository_releases",
+    "list_local_releases",
     "propose_setting",
     "propose_story_seed",
     "propose_conflict",

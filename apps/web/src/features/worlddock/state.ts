@@ -1,4 +1,4 @@
-import type { PublicRepository, World, WorldSuggestion } from "@worlddock/domain";
+import type { World, WorldSuggestion } from "@worlddock/domain";
 
 export type WorldDockState = {
   worlds: World[];
@@ -11,10 +11,7 @@ export type WorldDockState = {
 
 export type WorldDockAction =
   | { type: "world.opened"; worldId: string }
-  | { type: "suggestion.saved"; item: WorldSuggestion }
-  | { type: "repository.forked"; repository: PublicRepository }
-  | { type: "world.published"; worldId: string }
-  | { type: "world.push.completed"; worldId: string };
+  | { type: "suggestion.saved"; item: WorldSuggestion };
 
 export function createInitialWorldDockState(worlds: World[]): WorldDockState {
   return {
@@ -77,55 +74,6 @@ export function worldDockReducer(
           : state.worlds,
       };
     }
-    case "repository.forked": {
-      const forkedWorld: World = {
-        id: `fork_${action.repository.id}`,
-        name: `${action.repository.name} · Fork`,
-        type: "Forked World",
-        tags: action.repository.tags,
-        summary: action.repository.summary,
-        maturity: action.repository.maturity ?? 20,
-        status: "draft",
-        visibility: "private",
-        archive: 0,
-        seeds: action.repository.seeds ?? 0,
-        conflicts: 0,
-        updated: "刚刚",
-        mode: "cloud",
-        hasUnsaved: false,
-        hasUnpushed: false,
-        isNew: true,
-      };
-      return {
-        ...state,
-        worlds: [forkedWorld, ...state.worlds],
-        currentWorld: forkedWorld,
-      };
-    }
-    case "world.published":
-      return {
-        ...state,
-        worlds: state.worlds.map((world) =>
-          world.id === action.worldId
-            ? { ...world, status: "published", visibility: "public", hasUnsaved: false }
-            : world,
-        ),
-        currentWorld: state.currentWorld?.id === action.worldId
-          ? { ...state.currentWorld, status: "published", visibility: "public", hasUnsaved: false }
-          : state.currentWorld,
-      };
-    case "world.push.completed":
-      return {
-        ...state,
-        worlds: state.worlds.map((world) =>
-          world.id === action.worldId
-            ? { ...world, hasUnpushed: false, status: "published", visibility: "public" }
-            : world,
-        ),
-        currentWorld: state.currentWorld?.id === action.worldId
-          ? { ...state.currentWorld, hasUnpushed: false, status: "published", visibility: "public" }
-          : state.currentWorld,
-      };
     default:
       return state;
   }

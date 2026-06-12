@@ -1,8 +1,5 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Inject, NotFoundException, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, NotFoundException, Param, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
-import { CurrentSubject, RequireScopes } from "../auth/auth.decorators";
-import { WorldDockAuthGuard } from "../auth/auth.guard";
-import type { AuthSubject } from "../auth/auth.service";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldAssetsService } from "./world-assets.service";
 
@@ -29,7 +26,6 @@ const relationSchema = z.object({
 });
 
 @Controller("worlds/:worldId/assets")
-@UseGuards(WorldDockAuthGuard)
 export class WorldAssetsController {
   constructor(
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
@@ -37,15 +33,13 @@ export class WorldAssetsController {
   ) {}
 
   @Get()
-  @RequireScopes("world:read")
   async list(
-    @CurrentSubject() subject: AuthSubject,
     @Param("worldId") worldId: string,
     @Query("kind") kind?: string,
     @Query("q") q?: string,
     @Query("cursor") cursor?: string,
   ) {
-    await this.requireOwnedWorld(subject, worldId);
+    await this.requireWorld(worldId);
     return this.assets.listAssets(worldId, {
       kind: kind ? assetKindSchema.parse(kind) : undefined,
       q,
@@ -54,39 +48,34 @@ export class WorldAssetsController {
   }
 
   @Post()
-  @RequireScopes("world:write")
-  async create(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
-    await this.requireOwnedWorld(subject, worldId);
+  async create(@Param("worldId") worldId: string, @Body() body: unknown) {
+    await this.requireWorld(worldId);
     return { asset: await this.assets.createAsset(worldId, createAssetSchema.parse(body)) };
   }
 
   @Get(":assetId")
-  @RequireScopes("world:read")
-  async detail(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Param("assetId") assetId: string) {
-    await this.requireOwnedWorld(subject, worldId);
+  async detail(@Param("worldId") worldId: string, @Param("assetId") assetId: string) {
+    await this.requireWorld(worldId);
     const asset = await this.assets.getAsset(worldId, assetId);
     if (!asset) throw this.notFound();
     return { asset };
   }
 
   @Patch(":assetId")
-  @RequireScopes("world:write")
   async update(
-    @CurrentSubject() subject: AuthSubject,
     @Param("worldId") worldId: string,
     @Param("assetId") assetId: string,
     @Body() body: unknown,
   ) {
-    await this.requireOwnedWorld(subject, worldId);
+    await this.requireWorld(worldId);
     const asset = await this.assets.updateAsset(worldId, assetId, updateAssetSchema.parse(body));
     if (!asset) throw this.notFound();
     return { asset };
   }
 
   @Delete(":assetId")
-  @RequireScopes("world:write")
-  async delete(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Param("assetId") assetId: string) {
-    await this.requireOwnedWorld(subject, worldId);
+  async delete(@Param("worldId") worldId: string, @Param("assetId") assetId: string) {
+    await this.requireWorld(worldId);
     const asset = await this.assets.deleteAsset(worldId, assetId);
     if (!asset) throw this.notFound();
     return { asset };
@@ -94,47 +83,36 @@ export class WorldAssetsController {
 
   @Post("reorder")
   @HttpCode(200)
-  @RequireScopes("world:write")
-  async reorder(@CurrentSubject() subject: AuthSubject, @Param("worldId") worldId: string, @Body() body: unknown) {
-    await this.requireOwnedWorld(subject, worldId);
+  async reorder(@Param("worldId") worldId: string, @Body() body: unknown) {
+    await this.requireWorld(worldId);
     return this.assets.reorderAssets(worldId, reorderAssetsSchema.parse(body).assetIds);
   }
 
   @Post(":assetId/relations")
-  @RequireScopes("world:write")
   async relate(
-    @CurrentSubject() subject: AuthSubject,
     @Param("worldId") worldId: string,
     @Param("assetId") assetId: string,
     @Body() body: unknown,
   ) {
-    await this.requireOwnedWorld(subject, worldId);
+    await this.requireWorld(worldId);
     const relation = await this.assets.addRelation(worldId, assetId, relationSchema.parse(body).targetAssetId);
     if (!relation) throw this.notFound();
     return { relation };
   }
 
   @Delete(":assetId/relations/:targetAssetId")
-  @RequireScopes("world:write")
   async unrelate(
-    @CurrentSubject() subject: AuthSubject,
     @Param("worldId") worldId: string,
     @Param("assetId") assetId: string,
     @Param("targetAssetId") targetAssetId: string,
   ) {
-    await this.requireOwnedWorld(subject, worldId);
+    await this.requireWorld(worldId);
     return { relation: await this.assets.deleteRelation(worldId, assetId, targetAssetId) };
   }
 
-  private async requireOwnedWorld(subject: AuthSubject, worldId: string) {
+  private async requireWorld(worldId: string) {
     const world = await this.worlds.findWorldById(worldId);
     if (!world) throw this.notFound();
-    if (world.ownerId !== subject.user.id) {
-      throw new ForbiddenException({
-        code: "PERMISSION_DENIED",
-        message: "You do not have access to this world.",
-      });
-    }
     return world;
   }
 

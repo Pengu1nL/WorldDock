@@ -78,7 +78,6 @@ describe("createPiAgentCoreAdapter", () => {
       await adapter(
         {
           runId: "run_1",
-          userId: "user_1",
           worldId: "world_1",
           mode: "expand",
           prompt: "继续推演记忆交易制度",
@@ -442,7 +441,7 @@ describe("createPiAgentCoreAdapter", () => {
     }
   });
 
-  it("uses tool.inputSchema so propose_release_notes accepts repositoryId", async () => {
+  it("uses tool.inputSchema so propose_release_notes accepts worldId", async () => {
     const faux = registerFauxProvider({
       provider: "worlddock-release-notes-test",
       models: [{ id: "phase5-release-model", name: "Phase 5 Release Model" }],
@@ -456,7 +455,7 @@ describe("createPiAgentCoreAdapter", () => {
             fauxText("我检查版本说明。"),
             fauxToolCall(
               "propose_release_notes",
-              { repositoryId: "repo_1" },
+              { worldId: "world_1" },
               { id: "call_release_1" },
             ),
           ],
@@ -482,7 +481,7 @@ describe("createPiAgentCoreAdapter", () => {
             {
               name: "propose_release_notes",
               description: "Return proposed release notes without publishing.",
-              inputSchema: { type: "object", required: ["repositoryId"] },
+              inputSchema: { type: "object", required: ["worldId"] },
             },
           ],
         }),
@@ -490,7 +489,7 @@ describe("createPiAgentCoreAdapter", () => {
         async (toolCall) => {
           toolCalls.push(toolCall);
           return {
-            result: { repositoryId: toolCall.arguments.repositoryId, notes: "待整理版本说明。" },
+            result: { worldId: toolCall.arguments.worldId, notes: "待整理版本说明。" },
             contextEvents: [],
           };
         },
@@ -500,13 +499,13 @@ describe("createPiAgentCoreAdapter", () => {
         {
           id: "call_release_1",
           name: "propose_release_notes",
-          arguments: { repositoryId: "repo_1" },
+          arguments: { worldId: "world_1" },
         },
       ]);
       expect(events).toContainEqual({
         type: "tool.completed",
         toolCallId: "call_release_1",
-        result: { repositoryId: "repo_1", notes: "待整理版本说明。" },
+        result: { worldId: "world_1", notes: "待整理版本说明。" },
       });
       expect(events.some((event) => event.type === "session.failed")).toBe(false);
       expect(events).toContainEqual({ type: "session.completed" });
@@ -533,7 +532,6 @@ describe("piEventToAgentChunk", () => {
 function baseInput(overrides: Partial<Parameters<ReturnType<typeof createPiAgentCoreAdapter>>[0]> = {}) {
   return {
     runId: "run_1",
-    userId: "user_1",
     worldId: "world_1",
     mode: "expand" as const,
     prompt: "继续推演记忆交易制度",

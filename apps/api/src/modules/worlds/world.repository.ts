@@ -1,10 +1,7 @@
-import type { ReleaseChange, ReleaseSnapshot } from "@worlddock/domain";
-
 export const WORLD_REPOSITORY = Symbol("WORLD_REPOSITORY");
 
 export type WorldRecord = {
   id: string;
-  ownerId: string;
   name: string;
   type: string;
   summary: string;
@@ -70,19 +67,8 @@ export type WorldAssetRelationRecord = {
   targetAssetId: string;
 };
 
-export type ForkSnapshotAssetMap = {
-  upstreamAssetId: string;
-  targetAssetId: string;
-  kind: "archive" | "seed" | "conflict";
-};
-
-export type ForkSyncApplyResult =
-  | { status: "applied"; change: ReleaseChange }
-  | { status: "skipped"; change: ReleaseChange; reason: "missing_source" | "missing_upstream" | "local_conflict" };
-
 export type WorldRepository = {
   createWorld(input: {
-    ownerId: string;
     name: string;
     type: string;
     summary: string;
@@ -90,7 +76,7 @@ export type WorldRepository = {
     mode: "cloud" | "local";
     maturity?: number;
   }): Promise<WorldRecord>;
-  listWorlds(ownerId: string): Promise<WorldRecord[]>;
+  listWorlds(): Promise<WorldRecord[]>;
   findWorldById(id: string): Promise<WorldRecord | null>;
   updateWorld(
     id: string,
@@ -111,38 +97,4 @@ export type WorldRepository = {
   createConflict(input: Omit<ConflictRecord, "id" | "createdAt" | "updatedAt">): Promise<ConflictRecord>;
   listAssetRelations(worldId: string): Promise<WorldAssetRelationRecord[]>;
   countAssets(worldId: string): Promise<AssetCounts>;
-  replaceWorldFromSnapshot(input: {
-    worldId: string;
-    snapshot: ReleaseSnapshot;
-    status: WorldRecord["status"];
-    visibility: WorldRecord["visibility"];
-  }): Promise<WorldRecord | null>;
-  createAssetFromSnapshot(input: {
-    worldId: string;
-    upstreamAssetId: string;
-    targetAssetId?: string;
-    snapshot: ReleaseSnapshot;
-  }): Promise<ForkSnapshotAssetMap | null>;
-  remapForkAssetReferences(input: {
-    worldId: string;
-    assetMaps: ForkSnapshotAssetMap[];
-  }): Promise<void>;
-  replaceForkAssetRelationsFromSnapshot(input: {
-    worldId: string;
-    snapshot: ReleaseSnapshot;
-    assetMaps: ForkSnapshotAssetMap[];
-  }): Promise<boolean>;
-  forkAssetRelationsMatchSnapshot(input: {
-    worldId: string;
-    snapshot: ReleaseSnapshot;
-    assetMaps: ForkSnapshotAssetMap[];
-  }): Promise<boolean>;
-  applyForkSnapshotChange(input: {
-    worldId: string;
-    targetAsset?: ForkSnapshotAssetMap | null;
-    assetMaps?: ForkSnapshotAssetMap[];
-    sourceSnapshot: ReleaseSnapshot;
-    upstreamSnapshot: ReleaseSnapshot;
-    change: ReleaseChange;
-  }): Promise<ForkSyncApplyResult>;
 };

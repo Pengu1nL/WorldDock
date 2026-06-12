@@ -10,21 +10,17 @@ import {
   createWorld as createWorldRequest,
   createWorldAsset,
   deleteWorldAsset,
-  deleteWorld as deleteCloudWorld,
+  deleteWorld as deleteWorldRequest,
   discardAgentSuggestion,
-  duplicateWorld as duplicateCloudWorld,
-  getBillingBalance,
+  duplicateWorld as duplicateWorldRequest,
   listWorldAssets,
   listWorlds,
-  publishWorld,
-  readStoredSessionToken,
   relateWorldAssets,
   reorderWorldAssets,
   saveAgentSuggestion,
   streamAgentEvents,
   unrelateWorldAssets,
   updateWorldAsset,
-  WorldDockApiError,
   type AgentContextRef,
   type CreateWorldInput,
   type WorldCreationDraft,
@@ -34,7 +30,6 @@ import { ContextInspector } from "../agent/context-inspector";
 import { AssetEditor } from "../world-assets/asset-editor";
 import { AssetSearch } from "../world-assets/asset-search";
 import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
-import { CommunityView } from "./view-community";
 import {
   TweakRadio,
   TweakSection,
@@ -49,13 +44,12 @@ import {
   PendingDrawer,
   SuggestionDetail,
 } from "./view-workbench";
-import { PublishView } from "./view-publish";
 import { SettingsView } from "./view-settings";
 import { getSuggestionKey, normalizeSuggestionForSave } from "./suggestion-utils";
 import { CreateView, WorldsView } from "./view-worlds";
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "mode": "cloud",
+  "mode": "local",
   "density": "regular",
   "titleFont": "serif",
   "appTheme": "light"
@@ -95,7 +89,7 @@ function WorldDockRuntime() {
   useEffect(() => { document.documentElement.dataset.appTheme = t.appTheme; }, [t.appTheme]);
 
   // ────────── App state ──────────
-  const [view, setView] = useState<any>("worlds");  // worlds | create | workbench | archive | seeds | conflicts | publish | explore | settings
+  const [view, setView] = useState<any>("worlds");  // worlds | create | workbench | archive | seeds | conflicts | settings
   const [currentWorld, setCurrentWorld] = useState<any>(null);
   const [worlds, setWorlds] = useState<any[]>([]);
   const [createInspiration, setCreateInspiration] = useState("");
@@ -112,11 +106,8 @@ function WorldDockRuntime() {
   const [savedIssues, setSavedIssues] = useState<any[]>([]);   // 一致性问题（待修矛盾）
   const [savedIds, setSavedIds] = useState<any[]>([]);
   const [toasts, setToasts] = useState<any[]>([]);
-  const [balance, setBalance] = useState(0);
   const [runTokens, setRunTokens] = useState(0);
   const [modeFlash, setModeFlash] = useState<any>(null);  // flash banner when agent mode changes mid-thread
-  const [communityConnected, setCommunityConnected] = useState(false);
-  const [sessionToken, setSessionToken] = useState("");
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
   const [agentContextRefs, setAgentContextRefs] = useState<AgentContextRef[]>([]);
   const [agentToolEvents, setAgentToolEvents] = useState<AgentToolEvent[]>([]);
@@ -134,14 +125,9 @@ function WorldDockRuntime() {
   // worldId → { messages, savedSettings, savedSeeds, savedConflicts, savedIds, agentMode }
   const worldStatesRef = useRef<any>({});
 
-  useEffect(() => {
-    setSessionToken(readStoredSessionToken());
-  }, []);
-
   const worldsQuery = useQuery({
-    queryKey: ["worlds", sessionToken],
-    queryFn: async () => listWorlds({ sessionToken }) as Promise<{ worlds: any[] }>,
-    enabled: Boolean(sessionToken),
+    queryKey: ["worlds"],
+    queryFn: async () => listWorlds() as Promise<{ worlds: any[] }>,
     retry: false,
   });
 
@@ -150,22 +136,19 @@ function WorldDockRuntime() {
   }, [worldsQuery.data]);
 
   useEffect(() => {
-    if (!sessionToken) return;
     if (worldsQuery.isPending || worldsQuery.isError) setWorlds([]);
-  }, [sessionToken, worldsQuery.isError, worldsQuery.isPending]);
+  }, [worldsQuery.isError, worldsQuery.isPending]);
 
-  const cloudWorldsState = sessionToken
-    ? worldsQuery.isPending
-      ? "loading"
-      : worldsQuery.isError
-        ? "error"
-        : "ready"
-    : "ready";
+  const worldsState = worldsQuery.isPending
+    ? "loading"
+    : worldsQuery.isError
+      ? "error"
+      : "ready";
 
   const assetsQuery = useQuery({
-    queryKey: ["world-assets", sessionToken, currentWorld?.id],
-    queryFn: async ({ signal }) => listAllWorldAssets(currentWorld.id, { sessionToken, signal }),
-    enabled: Boolean(sessionToken && currentWorld?.id),
+    queryKey: ["world-assets", currentWorld?.id],
+    queryFn: async ({ signal }) => listAllWorldAssets(currentWorld.id, { signal }),
+    enabled: Boolean(currentWorld?.id),
     retry: false,
   });
 
@@ -203,7 +186,7 @@ function WorldDockRuntime() {
   }, [assetsQuery.data, assetsQuery.dataUpdatedAt, currentWorld?.id, localAssetRelationLabels]);
 
   useEffect(() => {
-    if (!currentWorld || !sessionToken || !assetsQuery.data?.assets) return;
+    if (!currentWorld || !assetsQuery.data?.assets) return;
     const nextCounts = {
       archive: assetsQuery.data.assets.filter((asset: any) => asset.kind === "setting").length,
       seeds: assetsQuery.data.assets.filter((asset: any) => asset.kind === "seed").length,
@@ -219,7 +202,7 @@ function WorldDockRuntime() {
     const nextWorld = { ...currentWorld, ...nextCounts };
     setCurrentWorld(nextWorld);
     setWorlds((prev: any[]) => prev.map((world: any) => world.id === nextWorld.id ? nextWorld : world));
-  }, [assetsQuery.data, currentWorld, sessionToken]);
+  }, [assetsQuery.data, currentWorld]);
 
   // Persist current world's workbench state whenever it changes
   useEffect(() => {
@@ -265,8 +248,8 @@ function WorldDockRuntime() {
 
   const startAgentRun = useCallback(async (userText: string, targetWorld = currentWorld) => {
     if (agentBusy) return;
-    if (!sessionToken || !targetWorld?.id) {
-      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+    if (!targetWorld?.id) {
+      pushToast({ kind: "warn", text: "请先打开一个世界" });
       return;
     }
     setAgentBusy(true);
@@ -293,10 +276,9 @@ function WorldDockRuntime() {
       const created: any = await createAgentRun(
         targetWorld.id,
         { prompt: userText, mode: getBackendAgentMode(agentMode) },
-        { sessionToken },
       );
       if (agentAbortRef.current !== abortController) {
-        void cancelAgentRun(created.run.id, { sessionToken });
+        void cancelAgentRun(created.run.id);
         return;
       }
       setActiveAgentRunId(created.run.id);
@@ -308,7 +290,7 @@ function WorldDockRuntime() {
       let streamedToolEvents: AgentToolEvent[] = [];
       const suggestions: any[] = [];
 
-      await streamAgentEvents(created.run.id, { sessionToken, signal: abortController.signal }, (event) => {
+      await streamAgentEvents(created.run.id, { signal: abortController.signal }, (event) => {
         if (agentAbortRef.current !== abortController) return;
         if (event.type === "pi.session.started") {
           streamedToolEvents = [
@@ -383,14 +365,6 @@ function WorldDockRuntime() {
       setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id
         ? { ...m, streaming: false, suggestions, contextRefs, contextSnapshot }
         : m));
-      if (latestRunStatus === "completed") {
-        try {
-          const billing = await getBillingBalance({ sessionToken });
-          setBalance(billing.balance.balanceCents / 100);
-        } catch {
-          pushToast({ kind: "info", text: "Agent 已完成，用量稍后同步" });
-        }
-      }
       if (agentAbortRef.current === abortController) agentAbortRef.current = null;
       setAgentBusy(false);
       setActiveAgentRunId(null);
@@ -407,17 +381,13 @@ function WorldDockRuntime() {
       setMessages((prev: any[]) => prev.filter((m: any) => m.id !== agentMsg.id));
       setAgentBusy(false);
       setActiveAgentRunId(null);
-      if (error instanceof WorldDockApiError && error.code === "INSUFFICIENT_BALANCE") {
-        pushToast({ kind: "warn", text: "余额不足 · 请充值后继续推演" });
-        return;
-      }
       pushToast({ kind: "warn", text: "Agent 调用失败 · 请检查后端、Provider 和 API Key" });
     }
-  }, [agentBusy, agentMode, currentWorld, pushToast, sessionToken]);
+  }, [agentBusy, agentMode, currentWorld, pushToast]);
 
   const stopAgent = useCallback(() => {
-    if (activeAgentRunId && sessionToken) {
-      void cancelAgentRun(activeAgentRunId, { sessionToken });
+    if (activeAgentRunId) {
+      void cancelAgentRun(activeAgentRunId);
       setActiveAgentRunId(null);
     }
     const contextSnapshot: AgentContextSnapshot = {
@@ -433,14 +403,14 @@ function WorldDockRuntime() {
     setMessages((prev: any[]) => prev.map((m: any) => m.streaming
       ? { ...m, streaming: false, text: m.text + " [已停止]", contextRefs: agentContextRefs.length, contextSnapshot }
       : m));
-  }, [activeAgentRunId, agentContextRefs, agentToolEvents, runTokens, sessionToken]);
+  }, [activeAgentRunId, agentContextRefs, agentToolEvents, runTokens]);
 
   // ────────── Navigation handlers ──────────
   const openWorld = (id: string) => {
     const w = worlds.find((world: any) => world.id === id);
     if (!w) return;
-    if (activeAgentRunId && sessionToken) {
-      void cancelAgentRun(activeAgentRunId, { sessionToken });
+    if (activeAgentRunId) {
+      void cancelAgentRun(activeAgentRunId);
     }
     if (agentAbortRef.current) {
       const contextSnapshot: AgentContextSnapshot = {
@@ -511,13 +481,11 @@ function WorldDockRuntime() {
   };
 
   const deleteWorld = async (id: string) => {
-    if (sessionToken && isCloudPersistedWorldId(id)) {
-      try {
-        await deleteCloudWorld(id, { sessionToken });
-      } catch {
-        pushToast({ kind: "warn", text: "云端删除失败 · 请稍后重试" });
-        return;
-      }
+    try {
+      await deleteWorldRequest(id);
+    } catch {
+      pushToast({ kind: "warn", text: "删除失败 · 请检查本地 API 服务" });
+      return;
     }
     setWorlds((prev: any[]) => prev.filter((w: any) => w.id !== id));
     delete worldStatesRef.current[id];
@@ -529,36 +497,19 @@ function WorldDockRuntime() {
   const duplicateWorld = async (id: string) => {
     const w = worlds.find((world: any) => world.id === id);
     if (!w) return;
-    if (sessionToken && isCloudPersistedWorldId(id)) {
-      try {
-        const created: any = await duplicateCloudWorld(id, { sessionToken });
-        setWorlds((prev: any[]) => [created.world, ...prev.filter((world: any) => world.id !== created.world.id)]);
-        pushToast({ kind: "save", text: `已复制 · ${created.world.name}` });
-        return;
-      } catch {
-        pushToast({ kind: "warn", text: "云端复制失败 · 请稍后重试" });
-        return;
-      }
+    try {
+      const created: any = await duplicateWorldRequest(id);
+      setWorlds((prev: any[]) => [created.world, ...prev.filter((world: any) => world.id !== created.world.id)]);
+      pushToast({ kind: "save", text: `已复制 · ${created.world.name}` });
+    } catch {
+      pushToast({ kind: "warn", text: "复制失败 · 请检查本地 API 服务" });
     }
-    const copy = { ...w, id: "copy_" + Date.now(), name: w.name + " · 副本", status: "draft", updated: "刚刚", isNew: true };
-    setWorlds((prev: any[]) => [copy, ...prev]);
-    // Copy workbench state too
-    if (worldStatesRef.current[id]) {
-      worldStatesRef.current[copy.id] = JSON.parse(JSON.stringify(worldStatesRef.current[id]));
-    }
-    pushToast({ kind: "save", text: `已复制 · ${copy.name}` });
   };
 
   const handleCreateWorld = async ({ name, type, inspiration, styleKw, avoid, draft }: any) => {
-    if (!sessionToken) {
-      pushToast({ kind: "warn", text: "请先登录，再创建真实世界" });
-      return;
-    }
-
     try {
       const created: any = await createWorldRequest(
         buildCreateWorldInput({ name, type, inspiration, styleKw, avoid, draft, mode: t.mode }),
-        { sessionToken },
       );
       const newWorld = created.world;
       setWorlds((prev: any[]) => [newWorld, ...prev.filter((world: any) => world.id !== newWorld.id)]);
@@ -577,7 +528,7 @@ function WorldDockRuntime() {
       setView("workbench");
       setTimeout(() => startAgentRun(inspiration, newWorld), 200);
     } catch {
-      pushToast({ kind: "warn", text: "创建世界失败 · 请检查登录状态和 API 服务" });
+      pushToast({ kind: "warn", text: "创建世界失败 · 请检查本地 API 服务" });
     }
   };
 
@@ -588,26 +539,26 @@ function WorldDockRuntime() {
     if (savedIds.includes(suggestionKey)) return;
     let savedItem = normalizedItem;
     let appendSavedItem = true;
-    if (sessionToken && normalizedItem.agentSuggestionId) {
+    if (normalizedItem.agentSuggestionId) {
       try {
-        const saved = await saveAgentSuggestion(normalizedItem.agentSuggestionId, { sessionToken });
+        const saved = await saveAgentSuggestion(normalizedItem.agentSuggestionId);
         const returnedAsset = saved.asset ?? saved.savedAsset ?? saved.suggestion?.asset ?? saved.suggestion?.savedAsset;
         if (returnedAsset) savedItem = fromWorldAsset(returnedAsset);
         else appendSavedItem = false;
         if (currentWorld?.id) {
-          void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+          void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
         }
       } catch {
-        pushToast({ kind: "warn", text: "云端保存失败 · 请检查网络后重试" });
+        pushToast({ kind: "warn", text: "保存失败 · 请检查本地 API 服务" });
         return;
       }
-    } else if (sessionToken && currentWorld?.id && isCloudPersistedWorldId(currentWorld.id)) {
+    } else if (currentWorld?.id) {
       try {
-        const created = await createWorldAsset(currentWorld.id, toWorldAssetInput(normalizedItem), { sessionToken });
+        const created = await createWorldAsset(currentWorld.id, toWorldAssetInput(normalizedItem));
         savedItem = fromWorldAsset(created.asset);
-        void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+        void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
       } catch {
-        pushToast({ kind: "warn", text: "云端资产保存失败 · 请检查网络后重试" });
+        pushToast({ kind: "warn", text: "资产保存失败 · 请检查本地 API 服务" });
         return;
       }
     }
@@ -636,11 +587,11 @@ function WorldDockRuntime() {
 
   const handleDiscard = async (item: any) => {
     const suggestionKey = getSuggestionKey(item);
-    if (sessionToken && item.agentSuggestionId) {
+    if (item.agentSuggestionId) {
       try {
-        await discardAgentSuggestion(item.agentSuggestionId, { sessionToken });
+        await discardAgentSuggestion(item.agentSuggestionId);
       } catch {
-        pushToast({ kind: "warn", text: "云端丢弃失败 · 请检查网络后重试" });
+        pushToast({ kind: "warn", text: "丢弃失败 · 请检查本地 API 服务" });
         return;
       }
     }
@@ -670,28 +621,28 @@ function WorldDockRuntime() {
   };
 
   const saveEditedAsset = async (draft: any) => {
-    if (!sessionToken || !currentWorld?.id) {
-      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+    if (!currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先打开一个世界" });
       return;
     }
     setAssetSaving(true);
     try {
       const saved = draft.id
-        ? await updateWorldAsset(currentWorld.id, draft.id, toWorldAssetUpdateInput(draft), { sessionToken })
-        : await createWorldAsset(currentWorld.id, toWorldAssetInput(draft), { sessionToken });
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+        ? await updateWorldAsset(currentWorld.id, draft.id, toWorldAssetUpdateInput(draft))
+        : await createWorldAsset(currentWorld.id, toWorldAssetInput(draft));
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
       setDrawerOpen(null);
       pushToast({ kind: "save", text: `已保存资产 · ${saved.asset.title}` });
     } catch {
-      pushToast({ kind: "warn", text: "资产保存失败 · 请稍后重试" });
+      pushToast({ kind: "warn", text: "资产保存失败 · 请检查本地 API 服务" });
     } finally {
       setAssetSaving(false);
     }
   };
 
   const removeEditedAsset = async (asset: any) => {
-    if (!sessionToken || !currentWorld?.id) {
-      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+    if (!currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先打开一个世界" });
       return;
     }
     if (!asset.id) {
@@ -700,20 +651,20 @@ function WorldDockRuntime() {
     }
     setAssetSaving(true);
     try {
-      await deleteWorldAsset(currentWorld.id, asset.id, { sessionToken });
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      await deleteWorldAsset(currentWorld.id, asset.id);
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
       setDrawerOpen(null);
       pushToast({ kind: "warn", text: `已删除资产 · ${asset.title}` });
     } catch {
-      pushToast({ kind: "warn", text: "资产删除失败 · 请稍后重试" });
+      pushToast({ kind: "warn", text: "资产删除失败 · 请检查本地 API 服务" });
     } finally {
       setAssetSaving(false);
     }
   };
 
   const reorderAssets = async (assetIds: string[]) => {
-    if (!sessionToken || !currentWorld?.id) {
-      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+    if (!currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先打开一个世界" });
       return;
     }
     if (assetIds.length === 0) {
@@ -721,16 +672,16 @@ function WorldDockRuntime() {
       return;
     }
     try {
-      await reorderWorldAssets(currentWorld.id, assetIds, { sessionToken });
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      await reorderWorldAssets(currentWorld.id, assetIds);
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
     } catch {
-      pushToast({ kind: "warn", text: "资产排序失败 · 请稍后重试" });
+      pushToast({ kind: "warn", text: "资产排序失败 · 请检查本地 API 服务" });
     }
   };
 
   const relateAssets = async (sourceAsset: any, targetAsset: any) => {
-    if (!sessionToken || !currentWorld?.id) {
-      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+    if (!currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先打开一个世界" });
       return false;
     }
     if (!sourceAsset?.id || !targetAsset?.id) {
@@ -738,7 +689,7 @@ function WorldDockRuntime() {
       return false;
     }
     try {
-      await relateWorldAssets(currentWorld.id, sourceAsset.id, targetAsset.id, { sessionToken });
+      await relateWorldAssets(currentWorld.id, sourceAsset.id, targetAsset.id);
       const relationLabel = targetAsset.title || targetAsset.id;
       const relationTarget = { targetAssetId: targetAsset.id, label: relationLabel };
       const overlayKey = getAssetRelationOverlayKey(currentWorld.id, sourceAsset.id);
@@ -759,18 +710,18 @@ function WorldDockRuntime() {
       setSavedConflicts((prev: any[]) => prev.map((asset: any) =>
         asset.id === sourceAsset.id ? applyLocalRelationLabels(asset, [relationLabel], [relationTarget]) : asset,
       ));
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
       pushToast({ kind: "save", text: `已关联资产 · ${relationLabel}` });
       return true;
     } catch {
-      pushToast({ kind: "warn", text: "资产关联失败 · 请稍后重试" });
+      pushToast({ kind: "warn", text: "资产关联失败 · 请检查本地 API 服务" });
       return false;
     }
   };
 
   const unrelateAssets = async (sourceAsset: any, targetAssetId: string, relationLabel: string) => {
-    if (!sessionToken || !currentWorld?.id) {
-      pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
+    if (!currentWorld?.id) {
+      pushToast({ kind: "warn", text: "请先打开一个世界" });
       return false;
     }
     if (!sourceAsset?.id || !targetAssetId) {
@@ -778,7 +729,7 @@ function WorldDockRuntime() {
       return false;
     }
     try {
-      await unrelateWorldAssets(currentWorld.id, sourceAsset.id, targetAssetId, { sessionToken });
+      await unrelateWorldAssets(currentWorld.id, sourceAsset.id, targetAssetId);
       const overlayKey = getAssetRelationOverlayKey(currentWorld.id, sourceAsset.id);
       setLocalAssetRelationLabels((prev) => {
         const overlay = prev[overlayKey];
@@ -805,11 +756,11 @@ function WorldDockRuntime() {
           ? { ...prev, item: removeLocalRelationLabels(prev.item, [relationLabel], [targetAssetId]) }
           : prev
       ));
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", sessionToken, currentWorld.id] });
+      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
       pushToast({ kind: "save", text: `已解除关联 · ${relationLabel}` });
       return true;
     } catch {
-      pushToast({ kind: "warn", text: "解除关联失败 · 请稍后重试" });
+      pushToast({ kind: "warn", text: "解除关联失败 · 请检查本地 API 服务" });
       return false;
     }
   };
@@ -868,28 +819,20 @@ function WorldDockRuntime() {
   return (
     <div className="app">
       <StatusBar
-        world={currentWorld && view !== "worlds" && view !== "create" && view !== "explore" ? currentWorld : null}
+        world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
         mode={t.mode}
-        balance={balance}
         tokens={runTokens}
-        onMode={(m: any) => setTweak("mode", m)}
-        onOpenPublish={() => {
-          if (currentWorld) setView("publish");
-          else pushToast({ text: "请先打开一个世界", kind: "warn" });
-        }}
-        onOpenCommunity={() => setView("explore")}
       />
       <div className="app-body">
         <Rail
           view={view}
           onNav={(v: any) => {
-            if (v === "explore") setView("explore");
-            else if (v === "worlds") setView("worlds");
+            if (v === "worlds") setView("worlds");
             else if (v === "settings") setView("settings");
             else if (currentWorld) setView(v);
             else setView("worlds");
           }}
-          world={currentWorld && view !== "worlds" && view !== "create" && view !== "explore" ? currentWorld : null}
+          world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
           pendingCount={pendingItems.length}
         />
         <main className="app-main" ref={mainRef} style={{ position: "relative", overflow: "hidden" }}>
@@ -906,14 +849,12 @@ function WorldDockRuntime() {
                 onDelete={deleteWorld}
                 onDuplicate={duplicateWorld}
                 hideDraftFromList={isStillFresh ? draftWorld.id : null}
-                cloudState={cloudWorldsState}
-                cloudOnly={Boolean(sessionToken)}
+                worldsState={worldsState}
               />
             );
           })()}
           {view === "create" && (
             <CreateView initialInspiration={createInspiration}
-              sessionToken={sessionToken}
               onConfirm={handleCreateWorld} onCancel={() => setView("worlds")}/>
           )}
           {view === "workbench" && currentWorld && (
@@ -983,60 +924,10 @@ function WorldDockRuntime() {
               onRelateAssets={openAssetRelation}
               onBackToWorkbench={() => setView("workbench")}/>
           )}
-          {view === "publish" && currentWorld && (
-            <PublishView
-              mode={t.mode}
-              world={currentWorld}
-              sessionToken={sessionToken}
-              communityConnected={communityConnected}
-              onBack={() => setView("workbench")}
-              onConfirm={async ({ releaseNote, license }: any) => {
-                if (!sessionToken || !currentWorld?.id) {
-                  pushToast({ kind: "warn", text: "请先登录并打开一个真实世界" });
-                  return;
-                }
-                try {
-                  await publishWorld(currentWorld.id, { releaseNote, license }, { sessionToken });
-                } catch {
-                  pushToast({ kind: "warn", text: "发布失败 · 请检查 API 服务和权限" });
-                  return;
-                }
-                setCurrentWorld((prev: any) => prev
-                  ? { ...prev, status: "published", visibility: "public", hasUnpushed: false, hasUnsaved: false }
-                  : prev);
-                setWorlds((prev: any[]) => prev.map((world: any) =>
-                  world.id === currentWorld.id
-                    ? { ...world, status: "published", visibility: "public", hasUnpushed: false, hasUnsaved: false }
-                    : world,
-                ));
-                pushToast({
-                  kind: "save",
-                  text: `${t.mode === "local" ? "Push" : "发布"}成功 · ${releaseNote.slice(0, 18)}`,
-                  action: { label: "查看界仓", onClick: () => setView("explore") },
-                });
-                setView("workbench");
-              }}
-            />
-          )}
-          {view === "explore" && (
-            <CommunityView
-              onBack={() => setView("worlds")}
-              onToast={pushToast}
-              onFork={(world: any) => {
-                setWorlds((prev: any[]) => [world, ...prev.filter((item: any) => item.id !== world.id)]);
-                setCurrentWorld(world);
-                setView("worlds");
-              }}
-            />
-          )}
           {view === "settings" && (
             <SettingsView
-              mode={t.mode}
-              balance={balance}
-              communityConnected={communityConnected}
               onBack={() => setView("worlds")}
               onToast={pushToast}
-              onCommunityConnected={setCommunityConnected}
               currentWorld={currentWorld}
             />
           )}
@@ -1173,8 +1064,6 @@ function WorldDockRuntime() {
 
       {/* Tweaks panel */}
       <TweaksPanel title="Tweaks">
-        <TweakSection label="模式 · MODE"/>
-        <TweakRadio label="Mode" value={t.mode} options={["cloud", "local"]} onChange={(v: any) => setTweak("mode", v)}/>
         <TweakSection label="排版 · TYPOGRAPHY"/>
         <TweakRadio label="对话密度" value={t.density} options={["compact", "regular", "comfy"]} onChange={(v: any) => setTweak("density", v)}/>
         <TweakRadio label="标题字体" value={t.titleFont} options={["sans", "serif"]} onChange={(v: any) => setTweak("titleFont", v)}/>
@@ -1334,10 +1223,6 @@ function isAbortError(error: unknown) {
   return error instanceof Error && error.name === "AbortError";
 }
 
-function isCloudPersistedWorldId(id: string) {
-  return !id.startsWith("new_") && !id.startsWith("copy_") && !id.startsWith("fork_");
-}
-
 function getAssetRelationOverlayKey(worldId: string, assetId: string) {
   return `${worldId}:${assetId}`;
 }
@@ -1352,9 +1237,10 @@ function getMessageSavedSuggestionIds(message: any, savedSuggestionKeys: any[]) 
 const MAX_WORLD_ASSET_PAGES = 100;
 
 async function listAllWorldAssets(worldId: string, options: Parameters<typeof listWorldAssets>[1]) {
+  const queryOptions = options ?? {};
   const assets: any[] = [];
   const seenCursors = new Set<string>();
-  let cursor = options.cursor;
+  let cursor = queryOptions.cursor;
 
   for (let pageCount = 0; pageCount < MAX_WORLD_ASSET_PAGES; pageCount++) {
     if (cursor) {
@@ -1364,7 +1250,7 @@ async function listAllWorldAssets(worldId: string, options: Parameters<typeof li
       seenCursors.add(cursor);
     }
 
-    const page = await listWorldAssets(worldId, { ...options, cursor });
+    const page = await listWorldAssets(worldId, { ...queryOptions, cursor });
     assets.push(...page.assets);
     cursor = page.nextCursor ?? undefined;
     if (!cursor) return { assets, nextCursor: null };

@@ -445,7 +445,4 @@ p  { margin: 0; }
     padding-right: 16px !important;
   }
 
-  .community-detail-grid {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
 }

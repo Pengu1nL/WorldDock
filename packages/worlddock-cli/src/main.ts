@@ -24,12 +24,11 @@ export async function runWorldDockCli(argv = process.argv.slice(2), options: Cli
 
   try {
     if (command === "login") {
-      return login(argv.slice(1), env, output, error);
+      return login(output);
     }
 
     const client = createApiClient({
       apiUrl: env.WORLD_DOCK_API_URL ?? "http://localhost:4000",
-      token: env.WORLD_DOCK_TOKEN,
       fetch: options.fetch ?? fetch,
     });
 
@@ -52,14 +51,7 @@ export async function runWorldDockCli(argv = process.argv.slice(2), options: Cli
       return 0;
     }
 
-    if (command === "repositories" && argv[1] === "pull" && argv[2]) {
-      const [owner, slug] = parseRepositorySpec(argv[2]);
-      const pulled = await client.request<{ package: unknown }>(`/v1/developer-access/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/pull`);
-      output(JSON.stringify(worldPackageSchema.parse(pulled.package), null, 2));
-      return 0;
-    }
-
-    error("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file> | repositories pull <owner>/<slug>");
+    error("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file>");
     return 1;
   } catch (caught) {
     error(caught instanceof Error ? caught.message : "Unknown WorldDock CLI error.");
@@ -67,50 +59,28 @@ export async function runWorldDockCli(argv = process.argv.slice(2), options: Cli
   }
 }
 
-function login(argv: string[], env: Record<string, string | undefined>, output: (line: string) => void, error: (line: string) => void) {
-  const token = readOption(argv, "--token") ?? env.WORLD_DOCK_TOKEN;
-  if (!token) {
-    error("Set WORLD_DOCK_TOKEN or pass --token to use Alpha API access.");
-    return 1;
-  }
-  output("WorldDock token detected. Export WORLD_DOCK_TOKEN for subsequent commands.");
+function login(output: (line: string) => void) {
+  output("WorldDock Hub login is not configured yet. Run P4 to enable PAT connections.");
   return 0;
 }
 
-function createApiClient(input: { apiUrl: string; token?: string; fetch: typeof fetch }) {
-  if (!input.token) {
-    throw new Error("WORLD_DOCK_TOKEN is required.");
-  }
-
+function createApiClient(input: { apiUrl: string; fetch: typeof fetch }) {
   return {
     async request<T = unknown>(path: string, options: RequestOptions = {}) {
-      const response = await input.fetch(`${input.apiUrl.replace(/\/$/, "")}${path}`, {
+      const requestInit: RequestInit = {
         method: options.method ?? "GET",
-        headers: {
-          authorization: `Bearer ${input.token}`,
-          ...(options.body === undefined ? {} : { "content-type": "application/json" }),
-        },
-        ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
-      });
+      };
+      if (options.body !== undefined) {
+        requestInit.headers = { "content-type": "application/json" };
+        requestInit.body = JSON.stringify(options.body);
+      }
+      const response = await input.fetch(`${input.apiUrl.replace(/\/$/, "")}${path}`, requestInit);
       if (!response.ok) {
         throw new Error(`WorldDock API request failed with ${response.status}.`);
       }
       return await response.json() as T;
     },
   };
-}
-
-function parseRepositorySpec(spec: string) {
-  const parts = spec.split("/");
-  if (parts.length !== 2 || parts.some((part) => !part)) {
-    throw new Error("Repository must be formatted as <owner>/<slug>.");
-  }
-  return parts as [string, string];
-}
-
-function readOption(argv: string[], name: string) {
-  const index = argv.indexOf(name);
-  return index >= 0 ? argv[index + 1] : undefined;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

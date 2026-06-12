@@ -10,8 +10,6 @@ export function createFastifyLoggerOptions() {
         "req.body.apiKey",
         "req.body.password",
         "OPENAI_API_KEY",
-        "S3_SECRET_ACCESS_KEY",
-        "BETTER_AUTH_SECRET",
       ],
       censor: "[REDACTED]",
     },

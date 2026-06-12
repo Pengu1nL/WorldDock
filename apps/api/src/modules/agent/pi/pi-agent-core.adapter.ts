@@ -107,7 +107,6 @@ export function buildSystemPrompt(input: PiSessionInput) {
     "生成 propose_setting 前必须先判断资产分类，并在 categoryReason 中说明：按设定本体分类，不按正文偶然提到的对象分类；运输机制、成本、窗口、约束属于世界规则；企业、组织、机构、政府、派系属于势力。",
     "不要声称已经保存、删除、发布或收费；这些危险操作必须由 WorldDock API 在用户确认后执行。",
     `运行模式：${input.mode}`,
-    `用户：${input.userId}`,
     `世界：${input.worldId}`,
     input.skills.length > 0
       ? `可用技能：${input.skills.map((skill) => `${skill.name}(${skill.description})`).join("; ")}`
@@ -161,8 +160,9 @@ function parametersForTool(name: PiToolName, inputSchema?: Record<string, unknow
   if (name === "get_asset_brief" || name === "get_asset_detail" || name === "get_asset_source_fragments") {
     return Type.Object({ worldId: Type.String(), assetId: Type.String() }, { additionalProperties: true });
   }
-  if (name === "list_repository_releases") return Type.Object({ repositoryId: Type.String() }, { additionalProperties: true });
-  if (name === "propose_release_notes") return Type.Object({ repositoryId: Type.String() }, { additionalProperties: true });
+  if (name === "list_local_releases" || name === "propose_release_notes") {
+    return Type.Object({ worldId: Type.String() }, { additionalProperties: true });
+  }
   if (name === "propose_story_seed") {
     return Type.Object(
       {

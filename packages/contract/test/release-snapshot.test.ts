@@ -1,15 +1,11 @@
 import { describe, expect, it } from "vitest";
+import * as contract from "../src";
 import { releaseSnapshotSchema } from "../src/releases";
 
 describe("release snapshot contract", () => {
   it("accepts a minimal published snapshot with contractVersion", () => {
     const parsed = releaseSnapshotSchema.parse({
       contractVersion: "0.1.0",
-      repository: {
-        owner: "ren",
-        slug: "memory-market",
-        name: "Memory Market",
-      },
       package: {
         format: "worlddock.world-package.v1",
         exportedAt: "2026-06-12T00:00:00.000Z",
@@ -29,5 +25,9 @@ describe("release snapshot contract", () => {
 
     expect(parsed.contractVersion).toBe("0.1.0");
     expect(parsed.package.format).toBe("worlddock.world-package.v1");
+  });
+
+  it("does not expose hub contracts from the root entry", () => {
+    expect("hubPersonalAccessTokenScopeSchema" in contract).toBe(false);
   });
 });

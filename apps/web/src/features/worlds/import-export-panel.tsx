@@ -5,11 +5,10 @@ import { Icon } from "../worlddock/components";
 
 type ImportExportPanelProps = {
   world?: { id: string; name: string } | null;
-  sessionToken: string;
   onToast: (toast: { kind: "save" | "warn" | "info"; text: string }) => void;
 };
 
-export function ImportExportPanel({ world, sessionToken, onToast }: ImportExportPanelProps) {
+export function ImportExportPanel({ world, onToast }: ImportExportPanelProps) {
   const [exportId, setExportId] = useState("");
   const [packageText, setPackageText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -18,8 +17,8 @@ export function ImportExportPanel({ world, sessionToken, onToast }: ImportExport
     if (!world) return;
     setBusy(true);
     try {
-      const created = await exportWorldPackage(world.id, { sessionToken });
-      const loaded = await getWorldExport(created.export.id, { sessionToken });
+      const created = await exportWorldPackage(world.id);
+      const loaded = await getWorldExport(created.export.id);
       setExportId(created.export.id);
       setPackageText(JSON.stringify(loaded.package, null, 2));
       onToast({ kind: "save", text: "世界包已生成" });
@@ -34,8 +33,8 @@ export function ImportExportPanel({ world, sessionToken, onToast }: ImportExport
     setBusy(true);
     try {
       const parsed = JSON.parse(packageText) as WorldPackage;
-      await importWorldPackage(parsed, { sessionToken });
-      onToast({ kind: "save", text: "世界包已导入为私有世界" });
+      await importWorldPackage(parsed);
+      onToast({ kind: "save", text: "世界包已导入" });
     } catch {
       onToast({ kind: "warn", text: "世界包导入失败" });
     } finally {
@@ -46,10 +45,10 @@ export function ImportExportPanel({ world, sessionToken, onToast }: ImportExport
   return (
     <section className="col" style={{ gap: 14 }}>
       <div className="row gap-2" style={{ flexWrap: "wrap" }}>
-        <button className="btn primary" disabled={!world || !sessionToken || busy} onClick={exportCurrentWorld}>
+        <button className="btn primary" disabled={!world || busy} onClick={exportCurrentWorld}>
           <Icon name="download" size={12} /><span>导出世界包</span>
         </button>
-        <button className="btn" disabled={!packageText.trim() || !sessionToken || busy} onClick={importPackage}>
+        <button className="btn" disabled={!packageText.trim() || busy} onClick={importPackage}>
           <Icon name="upload" size={12} /><span>导入世界包</span>
         </button>
         {exportId ? <span className="badge slate">{exportId}</span> : null}

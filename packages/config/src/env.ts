@@ -9,7 +9,6 @@ export const runtimeEnvironmentSchema = z.enum([
 
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
-export const worldDockEditionSchema = z.enum(["cloud", "local"]).default("cloud");
 export const agentProviderSchema = z.enum(["openai", "pi", "vercel-ai", "mock"]).default("openai");
 
 const optionalNonEmptyString = z.preprocess(
@@ -37,7 +36,6 @@ const optionalUrlString = z.preprocess(
 );
 
 export const worldDockEnvSchema = z.object({
-  WORLD_DOCK_EDITION: worldDockEditionSchema,
   NODE_ENV: nodeEnvironmentSchema.default("development"),
   APP_ENV: runtimeEnvironmentSchema.default("development"),
   API_HOST: z.string().min(1).default("0.0.0.0"),
@@ -45,20 +43,9 @@ export const worldDockEnvSchema = z.object({
   API_BODY_LIMIT_BYTES: z.coerce.number().int().positive().default(1048576),
   API_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
   TRUSTED_ORIGINS: z.string().optional(),
+  WORLD_DOCK_DATA_DIR: z.string().min(1).default(".worlddock/data"),
   WEB_APP_URL: z.string().url(),
   DATABASE_URL: z.string().url(),
-  REDIS_URL: z.string().url(),
-  MEILISEARCH_HOST: z.string().url(),
-  MEILISEARCH_API_KEY: z.string().min(1).optional(),
-  S3_ENDPOINT: z.string().url(),
-  S3_REGION: z.string().min(1).default("us-east-1"),
-  S3_BUCKET: z.string().min(1),
-  S3_ACCESS_KEY_ID: z.string().min(1).optional(),
-  S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-  S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
-  S3_PUBLIC_BASE_URL: z.string().url().optional(),
-  BETTER_AUTH_SECRET: z.string().min(32),
-  BETTER_AUTH_URL: z.string().url(),
   SENTRY_DSN: optionalUrlString,
   OTEL_EXPORTER_OTLP_ENDPOINT: optionalUrlString,
   OTEL_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
@@ -85,15 +72,11 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
     : parsed.NODE_ENV === "production";
 
   if (parsed.AI_PROVIDER === "mock") {
-    throw new Error("AI_PROVIDER=mock is not allowed in production.");
+    throw new Error("AI_PROVIDER=mock is not allowed.");
   }
 
   if (!isProduction) {
     return parsed;
-  }
-
-  if (parsed.WORLD_DOCK_EDITION !== "cloud") {
-    throw new Error("Production deployment must use WORLD_DOCK_EDITION=cloud.");
   }
 
   if (!parsed.SENTRY_DSN) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseWorldDockEnv, runtimeEnvironmentSchema, worldDockEditionSchema } from "../src";
+import { parseWorldDockEnv, runtimeEnvironmentSchema } from "../src";
 
 function baseEnv(overrides: Record<string, string | undefined> = {}) {
   return {
@@ -8,12 +8,6 @@ function baseEnv(overrides: Record<string, string | undefined> = {}) {
     API_PORT: "4000",
     WEB_APP_URL: "http://localhost:3000",
     DATABASE_URL: "postgresql://worlddock:worlddock@localhost:5432/worlddock",
-    REDIS_URL: "redis://localhost:6379",
-    MEILISEARCH_HOST: "http://localhost:7700",
-    S3_ENDPOINT: "http://localhost:9000",
-    S3_BUCKET: "worlddock-local",
-    BETTER_AUTH_SECRET: "test_secret_at_least_32_characters",
-    BETTER_AUTH_URL: "http://localhost:4000",
     ...overrides,
   };
 }
@@ -25,29 +19,18 @@ describe("@worlddock/config env", () => {
     expect(runtimeEnvironmentSchema.parse("production")).toBe("production");
   });
 
-  it("accepts supported WorldDock editions", () => {
-    expect(worldDockEditionSchema.parse("cloud")).toBe("cloud");
-    expect(worldDockEditionSchema.parse("local")).toBe("local");
-  });
-
-  it("parses the minimal backend environment shared by API and worker", () => {
+  it("parses the minimal backend environment used by the API", () => {
     const parsed = parseWorldDockEnv(baseEnv());
 
     expect(parsed.API_PORT).toBe(4000);
-    expect(parsed.WORLD_DOCK_EDITION).toBe("cloud");
+    expect(parsed.WORLD_DOCK_DATA_DIR).toBe(".worlddock/data");
     expect(parsed.AI_PROVIDER).toBe("openai");
   });
 
-  it("requires a 32 character Better Auth secret", () => {
-    expect(() =>
-      parseWorldDockEnv(baseEnv({ BETTER_AUTH_SECRET: "short_secret_16" })),
-    ).toThrow();
-  });
+  it("accepts a custom local data directory", () => {
+    const parsed = parseWorldDockEnv(baseEnv({ WORLD_DOCK_DATA_DIR: "/var/lib/worlddock" }));
 
-  it("requires a Better Auth base URL", () => {
-    expect(() =>
-      parseWorldDockEnv(baseEnv({ BETTER_AUTH_URL: undefined })),
-    ).toThrow();
+    expect(parsed.WORLD_DOCK_DATA_DIR).toBe("/var/lib/worlddock");
   });
 
   it("rejects the disabled mock agent provider", () => {
@@ -125,7 +108,6 @@ describe("@worlddock/config env", () => {
       baseEnv({
         NODE_ENV: "production",
         APP_ENV: "staging",
-        WORLD_DOCK_EDITION: "local",
         SENTRY_DSN: "",
         AI_MODEL: "",
         OPENAI_API_KEY: "",
@@ -133,25 +115,9 @@ describe("@worlddock/config env", () => {
     );
 
     expect(parsed.APP_ENV).toBe("staging");
-    expect(parsed.WORLD_DOCK_EDITION).toBe("local");
     expect(parsed.SENTRY_DSN).toBeUndefined();
     expect(parsed.AI_MODEL).toBeUndefined();
     expect(parsed.OPENAI_API_KEY).toBeUndefined();
-  });
-
-  it("rejects local edition in production", () => {
-    expect(() =>
-      parseWorldDockEnv(
-        baseEnv({
-          NODE_ENV: "production",
-          APP_ENV: "production",
-          WORLD_DOCK_EDITION: "local",
-          SENTRY_DSN: "https://examplePublicKey@o0.ingest.sentry.io/0",
-          AI_MODEL: "gpt-5-mini",
-          OPENAI_API_KEY: "sk-test",
-        }),
-      ),
-    ).toThrow("Production deployment must use WORLD_DOCK_EDITION=cloud.");
   });
 
   it("rejects production without OpenAI model configuration", () => {
@@ -220,7 +186,6 @@ describe("@worlddock/config env", () => {
     );
 
     expect(parsed.APP_ENV).toBe("production");
-    expect(parsed.BETTER_AUTH_URL).toBe("http://localhost:4000");
     expect(parsed.AI_PROVIDER).toBe("openai");
   });
 

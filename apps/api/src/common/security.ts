@@ -1,10 +1,21 @@
 import { HttpException, HttpStatus, type INestApplication } from "@nestjs/common";
-import Redis from "ioredis";
-import type { AuthSubject } from "../modules/auth/auth.service";
 
 const defaultTrustedOrigins = ["http://localhost:3000"];
 const rateLimitWindowMs = 60_000;
 const rateLimitMax = Number(process.env.API_RATE_LIMIT_MAX ?? 120);
+
+type AuthSubject =
+  | {
+      kind: "session";
+      user: { id: string };
+      sessionToken: string;
+    }
+  | {
+      kind: "access-token";
+      user: { id: string };
+      accessTokenId: string;
+      scopes: string[];
+    };
 
 export type RateLimitDecision = {
   allowed: boolean;
@@ -87,20 +98,6 @@ export async function decideRateLimit(
   };
 }
 
-export function createRedisRateLimitStore(redisUrl = process.env.API_RATE_LIMIT_REDIS_URL ?? process.env.REDIS_URL): RateLimitCounterStore {
-  if (!redisUrl) return createMemoryRateLimitStore();
-  const redis = new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 1 });
-  return {
-    async increment(key, windowMs, now) {
-      const namespacedKey = `worlddock:rate-limit:${key}`;
-      const count = await redis.incr(namespacedKey);
-      if (count === 1) await redis.pexpire(namespacedKey, windowMs);
-      const ttl = await redis.pttl(namespacedKey);
-      return { count, resetAt: now + (ttl > 0 ? ttl : windowMs) };
-    },
-  };
-}
-
 export function createMemoryRateLimitStore(): RateLimitCounterStore {
   const buckets = new Map<string, { count: number; resetAt: number }>();
   return {
@@ -127,7 +124,7 @@ function ipRateLimitKeys(request: SecurityRequest) {
 }
 
 function defaultStore() {
-  defaultRateLimitStore ??= createRedisRateLimitStore();
+  defaultRateLimitStore ??= createMemoryRateLimitStore();
   return defaultRateLimitStore;
 }
 

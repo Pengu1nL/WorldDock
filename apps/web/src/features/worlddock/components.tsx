@@ -12,7 +12,6 @@ const ICONS: Record<string, Lucide.LucideIcon> = {
   seed: Lucide.Sprout,
   conflict: Lucide.TriangleAlert,
   settings: Lucide.Settings,
-  community: Lucide.Users,
   chevron: Lucide.ChevronRight,
   chevdown: Lucide.ChevronDown,
   chevup: Lucide.ChevronUp,
@@ -62,8 +61,7 @@ export const Icon = ({ name, size = 16, className = "", style = {} }: any) => {
 };
 
 // ────────── Status Bar ──────────
-export const StatusBar = ({ world, mode, balance, tokens, onMode, onOpenPublish, onOpenCommunity }: any) => {
-  const isCloud = mode === "cloud";
+export const StatusBar = ({ world, mode, tokens }: any) => {
   return (
     <div className="statusbar">
       <div className="statusbar-section" style={{ paddingLeft: 4 }}>
@@ -105,48 +103,17 @@ export const StatusBar = ({ world, mode, balance, tokens, onMode, onOpenPublish,
       <div className="statusbar-section flex"/>
 
       <div className="statusbar-section">
-        <button className="sb-btn" onClick={() => onMode && onMode(isCloud ? "local" : "cloud")} title="切换模式 ⌘L">
-          <span className={"dot " + (isCloud ? "slate" : "sage")}/>
-          <span className="sb-mono" style={{ color: isCloud ? "var(--slate)" : "var(--sage)" }}>
-            {isCloud ? "CLOUD" : "LOCAL"}
-          </span>
-        </button>
+        <span className="dot sage"/>
+        <span className="sb-mono" style={{ color: "var(--sage)" }}>{String(mode).toUpperCase()}</span>
       </div>
 
-      {isCloud ? (
-        <>
-          <div className="statusbar-section">
-            <span className="sb-mono sb-dim">balance</span>
-            <span className="sb-mono">¥<span className="num">{balance.toFixed(2)}</span></span>
-          </div>
-          <div className="statusbar-section">
-            <span className="sb-mono sb-dim">run</span>
-            <span className="sb-mono" style={{ color: "var(--amber)" }}>{tokens} tk</span>
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="statusbar-section" title="本地模型连接">
-            <span className="dot sage"/>
-            <span className="sb-mono sb-dim">model</span>
-            <span className="sb-mono">qwen3-32b</span>
-          </div>
-          <div className="statusbar-section">
-            <span className="sb-mono sb-dim">ctx</span>
-            <span className="sb-mono">{tokens} / 32k</span>
-          </div>
-        </>
-      )}
-
+      <div className="statusbar-section" title="本地模型连接">
+        <span className="sb-mono sb-dim">model</span>
+        <span className="sb-mono">local API</span>
+      </div>
       <div className="statusbar-section">
-        <button className="sb-btn" onClick={onOpenCommunity} title="界仓社区">
-          <Icon name="community" size={12}/>
-          <span>界仓</span>
-        </button>
-        <button className="sb-btn primary" onClick={onOpenPublish}>
-          <Icon name={mode === "local" ? "push" : "upload"} size={12}/>
-          <span>{mode === "local" ? "Push" : "发布"}</span>
-        </button>
+        <span className="sb-mono sb-dim">run</span>
+        <span className="sb-mono" style={{ color: "var(--amber)" }}>{tokens} tk</span>
       </div>
     </div>
   );
@@ -156,7 +123,6 @@ export const StatusBar = ({ world, mode, balance, tokens, onMode, onOpenPublish,
 export const Rail = ({ view, onNav, world, pendingCount }: any) => {
   const items = [
     { id: "worlds",   label: "世界",  ico: "worlds" },
-    { id: "explore",  label: "界仓",  ico: "community" },
   ];
   const worldItems = world ? [
     { id: "workbench", label: "推演", ico: "spark", badge: pendingCount },

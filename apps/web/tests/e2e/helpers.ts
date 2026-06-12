@@ -1,11 +1,5 @@
 import type { Page, Route } from "playwright/test";
 
-const sessionToken = "session_valid";
-
-type ApiMockOptions = {
-  onAnalyticsEvent?: (event: Record<string, any>) => void;
-};
-
 const tideWorld = {
   id: "tide",
   name: "潮汐之书",
@@ -13,15 +7,13 @@ const tideWorld = {
   tags: ["海洋", "宗教", "制度"],
   summary: "潮汐每 13 年一次反向，整个文明的法律、婚姻与税收都建立在这个循环之上。",
   maturity: 72,
-  status: "published",
-  visibility: "public",
+  status: "draft",
+  visibility: "private",
   archive: 47,
   seeds: 12,
   conflicts: 6,
   updated: "3 小时前",
-  starred: 184,
-  forked: 23,
-  mode: "cloud",
+  mode: "local",
   hasUnpushed: false,
 };
 
@@ -32,46 +24,14 @@ const ledgerWorld = {
   tags: ["货币", "蒸汽", "审计"],
   summary: "所有人际关系都必须以双式记账法记录，未入账的承诺在法律上不存在。",
   maturity: 54,
-  status: "unpublished",
+  status: "draft",
   visibility: "private",
   archive: 31,
   seeds: 8,
   conflicts: 4,
   updated: "昨天",
-  mode: "cloud",
+  mode: "local",
   hasUnsaved: true,
-};
-
-const tideRepository = {
-  id: "repo_tide",
-  owner: "ren",
-  slug: "tide-book",
-  name: "潮汐之书",
-  summary: "潮汐每 13 年一次反向，文明的法律、婚姻与税收都建立在这个循环之上。",
-  readme: "一个把自然周期写进制度深处的海洋奇幻世界。",
-  tags: ["海洋", "宗教", "制度"],
-  stars: 184,
-  forks: 23,
-  seeds: 12,
-  maturity: 72,
-  updated: "3 小时前",
-  version: "v1.2.0",
-  visibility: "public",
-  license: "free-fork-attribution",
-  moderationStatus: "visible",
-  moderationReason: null,
-  releases: [
-    {
-      version: "v1.2.0",
-      updated: "3 小时前",
-      note: "新增潮税制度与两条高潜力故事种子。",
-      addedSettings: 6,
-      changedSettings: 2,
-      removedSettings: 0,
-      addedSeeds: 2,
-      source: "cloud-publish",
-    },
-  ],
 };
 
 const memoryTradeLawAsset = {
@@ -88,18 +48,15 @@ const memoryTradeLawAsset = {
   updatedAt: "2026-05-28T10:00:00.000Z",
 };
 
-export async function gotoApp(page: Page, options: { installMocks?: boolean; onAnalyticsEvent?: (event: Record<string, any>) => void } = {}) {
+export async function gotoApp(page: Page, options: { installMocks?: boolean } = {}) {
   if (options.installMocks ?? true) {
-    await installApiMocks(page, { onAnalyticsEvent: options.onAnalyticsEvent });
-    await page.addInitScript((token) => {
-      window.localStorage.setItem("worlddock.sessionToken", token);
-    }, sessionToken);
+    await installApiMocks(page);
   }
   await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
 }
 
-async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
+async function installApiMocks(page: Page) {
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -126,10 +83,10 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
           seeds: 0,
           conflicts: 0,
           updated: "刚刚",
-          mode: "cloud",
+          mode: "local",
           hasUnsaved: true,
         },
-      });
+      }, 201);
     }
 
     if (method === "POST" && path === "/v1/world-drafts") {
@@ -168,7 +125,7 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/archive$/.test(path)) {
       const worldId = path.split("/")[3];
       const archiveEntries = worldId === "tide" || worldId === "ledger"
-        ? [{ id: "archive_1", title: "潮汐律", category: "世界规则", summary: "公开发布所需的已确认设定。", body: "潮汐律定义文明周期。", relations: [] }]
+        ? [{ id: "archive_1", title: "潮汐律", category: "世界规则", summary: "已确认设定。", body: "潮汐律定义文明周期。", relations: [] }]
         : [];
       return json(route, { archiveEntries });
     }
@@ -179,24 +136,6 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
 
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/conflicts$/.test(path)) {
       return json(route, { conflicts: [] });
-    }
-
-    if (method === "POST" && /\/v1\/worlds\/[^/]+\/releases\/preview$/.test(path)) {
-      return json(route, {
-        preflight: {
-          ok: true,
-          checks: [
-            { code: "assets", ok: true, message: "至少保存一个世界资产" },
-            { code: "license", ok: true, message: "已选择授权方式" },
-            { code: "release_note", ok: true, message: "已填写发布说明" },
-            { code: "moderation", ok: true, message: "发布前预扫描通过" },
-            { code: "entitlement", ok: true, message: "账户包含公开发布权益" },
-          ],
-          changes: [
-            { assetId: "archive:archive_1", kind: "added", title: "潮汐律", afterHash: "hash_1" },
-          ],
-        },
-      }, 201);
     }
 
     if (method === "POST" && /\/v1\/worlds\/[^/]+\/agent-runs$/.test(path)) {
@@ -265,205 +204,6 @@ async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
       return json(route, { suggestion: { id: "ags_1", status: "discarded" } });
     }
 
-    if (method === "POST" && /\/v1\/worlds\/[^/]+\/publish$/.test(path)) {
-      return json(route, {
-        repository: tideRepository,
-        release: {
-          id: "release_tide_1",
-          repositoryId: tideRepository.id,
-          version: "v1.2.1",
-          note: "补齐公开仓库的首个快照。",
-          license: "free-fork-attribution",
-          diff: { addedSettings: 1, changedSettings: 0, removedSettings: 0, addedSeeds: 0 },
-          createdAt: "2026-05-28T10:00:00.000Z",
-        },
-      });
-    }
-
-    if (method === "GET" && path === "/v1/repositories") {
-      return json(route, { repositories: [tideRepository] });
-    }
-
-    if (method === "GET" && path === "/v1/community/repositories") {
-      return json(route, { repositories: [toCommunityRepository(tideRepository)], nextCursor: null });
-    }
-
-    if (method === "GET" && path === "/v1/community/repositories/ren/tide-book") {
-      return json(route, { repository: toCommunityRepository(tideRepository) });
-    }
-
-    if (method === "GET" && path === "/v1/community/repositories/repo_tide/assets") {
-      return json(route, {
-        repositoryId: "repo_tide",
-        releaseId: "release_tide_1",
-        assets: [],
-        nextCursor: null,
-      });
-    }
-
-    if (method === "GET" && path === "/v1/community/creators/ren") {
-      return json(route, {
-        creator: {
-          handle: "ren",
-          displayName: "ren",
-          bio: "Alpha 创作者主页",
-          stats: { repositories: 1, stars: tideRepository.stars, forks: tideRepository.forks },
-          tags: tideRepository.tags,
-          latestUpdated: tideRepository.updated,
-        },
-      });
-    }
-
-    if (method === "GET" && path === "/v1/community/creators/ren/repositories") {
-      return json(route, { repositories: [toCommunityRepository(tideRepository)], nextCursor: null });
-    }
-
-    if (method === "POST" && path === "/v1/community/repositories/repo_tide/collections") {
-      return json(route, {
-        collection: {
-          id: "collection_1",
-          repositoryId: "repo_tide",
-          userId: "user_1",
-          name: "saved",
-          createdAt: "2026-05-28T10:00:00.000Z",
-        },
-      });
-    }
-
-    if (method === "GET" && path === "/v1/repositories/search") {
-      return json(route, { repositories: [tideRepository] });
-    }
-
-    if (method === "POST" && path === "/v1/repositories/repo_tide/star") {
-      return json(route, { repository: { ...tideRepository, stars: tideRepository.stars + 1 } });
-    }
-
-    if (method === "DELETE" && path === "/v1/repositories/repo_tide/star") {
-      return json(route, { repository: tideRepository });
-    }
-
-    if (method === "POST" && path === "/v1/repositories/repo_tide/fork") {
-      return json(route, {
-        world: {
-          ...tideWorld,
-          id: "fork_tide",
-          name: "潮汐之书 · Fork",
-          status: "draft",
-          visibility: "private",
-          updated: "刚刚",
-          hasUnsaved: false,
-        },
-        fork: { id: "fork_1" },
-      });
-    }
-
-    if (method === "POST" && path === "/v1/repositories/repo_tide/reports") {
-      return json(route, { report: { id: "report_1" } });
-    }
-
-    if (method === "GET" && path === "/v1/billing/balance") {
-      return json(route, {
-        balance: { userId: "user_1", currency: "CNY", balanceCents: 9950, lowBalanceThresholdCents: 500, updatedAt: "刚刚" },
-      });
-    }
-
-    if (method === "GET" && path === "/v1/billing/usage") {
-      return json(route, {
-        usage: {
-          balance: { userId: "user_1", currency: "CNY", balanceCents: 9950, lowBalanceThresholdCents: 500, updatedAt: "刚刚" },
-          lastAgentRun: {
-            agentRunId: "run_e2e",
-            tokenUsage: { inputTokens: 120, outputTokens: 260, totalTokens: 380 },
-            costCents: 42,
-            createdAt: "2026-05-28T10:00:00.000Z",
-          },
-          entries: [
-            {
-              id: "ledger_1",
-              accountId: "account_1",
-              userId: "user_1",
-              agentRunId: "run_e2e",
-              type: "agent_run",
-              amountCents: -42,
-              tokenUsage: { inputTokens: 120, outputTokens: 260, totalTokens: 380 },
-              reason: "e2e agent run",
-              createdAt: "2026-05-28T10:00:00.000Z",
-            },
-          ],
-        },
-      });
-    }
-
-    if (method === "GET" && path === "/v1/access-tokens") {
-      return json(route, { accessTokens: [] });
-    }
-
-    if (method === "POST" && path === "/v1/access-tokens") {
-      return json(route, {
-        token: "wd_mock_token",
-        accessToken: {
-          id: "at_1",
-          name: "Local Push",
-          prefix: "wd_mock",
-          scopes: ["world:read", "world:write", "repository:push"],
-          lastUsedAt: null,
-          expiresAt: null,
-          revokedAt: null,
-          createdAt: "2026-05-28T10:00:00.000Z",
-        },
-      });
-    }
-
-    if (method === "POST" && path === "/v1/support/feedback") {
-      const input = postData(request);
-      return json(route, {
-        feedback: {
-          id: "feedback_e2e",
-          userId: "user_1",
-          message: input.message,
-          context: input.context ?? {},
-          status: "open",
-          createdAt: "2026-06-01T10:00:00.000Z",
-        },
-        notification: {
-          id: "notification_feedback_e2e",
-          userId: "user_1",
-          type: "support_feedback_submitted",
-          title: "反馈已收到",
-          body: input.message,
-          readAt: null,
-          createdAt: "2026-06-01T10:00:00.000Z",
-        },
-      }, 201);
-    }
-
-    if (method === "POST" && path === "/v1/analytics/events") {
-      const input = postData(request);
-      options.onAnalyticsEvent?.(input);
-      return json(route, {
-        event: {
-          id: "event_e2e",
-          ...input,
-          createdAt: "2026-06-01T10:00:00.000Z",
-        },
-      }, 201);
-    }
-
-    if (method === "DELETE" && /\/v1\/access-tokens\/[^/]+$/.test(path)) {
-      return json(route, {
-        accessToken: {
-          id: "at_1",
-          name: "Local Push",
-          prefix: "wd_mock",
-          scopes: ["world:read", "world:write", "repository:push"],
-          lastUsedAt: null,
-          expiresAt: null,
-          revokedAt: "2026-05-28T10:00:00.000Z",
-          createdAt: "2026-05-28T10:00:00.000Z",
-        },
-      });
-    }
-
     return json(route, { message: `Unhandled mock route: ${method} ${path}` }, 404);
   });
 }
@@ -489,16 +229,6 @@ function agentSse(sequence: number, type: string, payload: unknown) {
     type,
     payload,
   });
-}
-
-function toCommunityRepository(repository: typeof tideRepository) {
-  return {
-    ...repository,
-    latestRelease: repository.releases[0],
-    releaseHistory: repository.releases,
-    assetCounts: { archive: 47, seeds: repository.seeds, conflicts: 6 },
-    forkGraph: { repositoryId: repository.id, forks: [] },
-  };
 }
 
 function postData(request: ReturnType<Route["request"]>) {
