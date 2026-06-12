@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@worlddock/contract": "workspace:*",
     "zod": "latest"
   },
   "devDependencies": {

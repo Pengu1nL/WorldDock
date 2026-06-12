@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { worldPackageSchema } from "@worlddock/domain";
+import { worldPackageSchema } from "@worlddock/contract";
 
 type CliOptions = {
   env?: Record<string, string | undefined>;

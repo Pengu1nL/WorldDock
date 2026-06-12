@@ -30,6 +30,7 @@
     "@prisma/client": "latest",
     "@sentry/node": "^10.54.0",
     "@worlddock/config": "workspace:*",
+    "@worlddock/contract": "workspace:*",
     "@worlddock/db": "workspace:*",
     "@worlddock/domain": "workspace:*",
     "ai": "^6.0.0",

@@ -94,3 +94,15 @@ export type RollbackReleaseResponse = {
   activeRelease: ReleaseDetail;
 };
 export type ForkSyncResult = z.infer<typeof forkSyncResultSchema>;
+
+export {
+  contractVersionSchema,
+  releaseSnapshotAssetSchema as contractReleaseSnapshotAssetSchema,
+  releaseSnapshotRepositorySchema as contractReleaseSnapshotRepositorySchema,
+  releaseSnapshotSchema as contractReleaseSnapshotSchema,
+} from "@worlddock/contract/releases";
+export type {
+  ReleaseSnapshot as ContractReleaseSnapshot,
+  ReleaseSnapshotAsset as ContractReleaseSnapshotAsset,
+  ReleaseSnapshotRepository as ContractReleaseSnapshotRepository,
+} from "@worlddock/contract/releases";

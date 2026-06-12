@@ -1,0 +1,30 @@
+{
+  "name": "@worlddock/contract",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./assets": "./src/assets/index.ts",
+    "./hub-api": "./src/hub-api/index.ts",
+    "./releases": "./src/releases/index.ts",
+    "./world": "./src/world/index.ts",
+    "./worlds/world-package": "./src/worlds/world-package.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm lint && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

@@ -15,6 +15,7 @@
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-tooltip": "latest",
     "@tanstack/react-query": "latest",
+    "@worlddock/contract": "workspace:*",
     "@worlddock/domain": "workspace:*",
     "lucide-react": "latest",
     "next": "latest",

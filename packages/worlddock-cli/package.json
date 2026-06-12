@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@worlddock/domain": "workspace:*"
+    "@worlddock/contract": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "latest",
