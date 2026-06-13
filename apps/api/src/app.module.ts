@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { MiddlewareConsumer, Module, type NestModule } from "@nestjs/common";
 import { RequestIdMiddleware } from "./common/request-id.middleware";
 import { AgentModule } from "./modules/agent/agent.module";
+import { ConnectionsModule } from "./modules/connections/connections.module";
 import { ExportsModule } from "./modules/exports/exports.module";
 import { LocalStorageModule } from "./modules/local-storage/local-storage.module";
 import { SystemModule } from "./modules/system/system.module";
@@ -11,6 +12,7 @@ import { WorldsModule } from "./modules/worlds/worlds.module";
 @Module({
   imports: [
     AgentModule,
+    ConnectionsModule,
     ExportsModule,
     LocalStorageModule,
     SystemModule,
