@@ -4,6 +4,7 @@ import { releaseSnapshotSchema, type ReleaseSnapshot } from "@worlddock/contract
 import { z } from "zod";
 import { ConnectionsService } from "../connections/connections.service";
 import { ExportsService } from "../exports/exports.service";
+import { repoPathSegmentSchema } from "../repo-path-segment";
 import { scanReleaseSnapshotForSecrets } from "./no-secret-scan";
 
 export const PUSH_CLIENT_FETCH = Symbol("PUSH_CLIENT_FETCH");
@@ -21,8 +22,8 @@ export type PushWorldInput = {
 
 const pushWorldInputSchema = z.object({
   worldId: z.string().min(1),
-  owner: z.string().min(1),
-  slug: z.string().min(1),
+  owner: repoPathSegmentSchema,
+  slug: repoPathSegmentSchema,
   note: z.string().max(4000).optional(),
   selectedAssetIds: z.array(z.string().min(1)).min(1),
   allowSecretFindings: z.boolean().default(false),
@@ -37,7 +38,7 @@ export class PushClientService {
   ) {}
 
   async pushWorld(input: PushWorldInput): Promise<PushReleaseResponse> {
-    const parsed = pushWorldInputSchema.parse(input);
+    const parsed = parsePushWorldInput(input);
     const connection = await this.connections.getInternalHubConnection();
     if (!connection) {
       throw new NotFoundException({
@@ -167,4 +168,21 @@ async function readJson(response: Response) {
 
 function trimTrailingSlashes(value: string) {
   return value.replace(/\/+$/, "");
+}
+
+function parsePushWorldInput(input: PushWorldInput) {
+  const parsed = pushWorldInputSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new BadRequestException({
+      code: "VALIDATION_FAILED",
+      message: "Invalid push request.",
+      details: {
+        issues: parsed.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
+      },
+    });
+  }
+  return parsed.data;
 }

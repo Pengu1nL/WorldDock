@@ -67,6 +67,10 @@ export type WorldAssetRelationRecord = {
   targetAssetId: string;
 };
 
+export type CreateArchiveEntryInput = Omit<ArchiveEntryRecord, "id" | "createdAt" | "updatedAt"> & { id?: string };
+export type CreateStorySeedInput = Omit<StorySeedRecord, "id" | "createdAt" | "updatedAt"> & { id?: string };
+export type CreateConflictInput = Omit<ConflictRecord, "id" | "createdAt" | "updatedAt"> & { id?: string };
+
 export type WorldRepository = {
   createWorld(input: {
     name: string;
@@ -90,11 +94,11 @@ export type WorldRepository = {
   deleteWorld(id: string): Promise<WorldRecord | null>;
   duplicateWorldAssets(input: { sourceWorldId: string; targetWorldId: string }): Promise<void>;
   listArchiveEntries(worldId: string): Promise<ArchiveEntryRecord[]>;
-  createArchiveEntry(input: Omit<ArchiveEntryRecord, "id" | "createdAt" | "updatedAt">): Promise<ArchiveEntryRecord>;
+  createArchiveEntry(input: CreateArchiveEntryInput): Promise<ArchiveEntryRecord>;
   listStorySeeds(worldId: string): Promise<StorySeedRecord[]>;
-  createStorySeed(input: Omit<StorySeedRecord, "id" | "createdAt" | "updatedAt">): Promise<StorySeedRecord>;
+  createStorySeed(input: CreateStorySeedInput): Promise<StorySeedRecord>;
   listConflicts(worldId: string): Promise<ConflictRecord[]>;
-  createConflict(input: Omit<ConflictRecord, "id" | "createdAt" | "updatedAt">): Promise<ConflictRecord>;
+  createConflict(input: CreateConflictInput): Promise<ConflictRecord>;
   listAssetRelations(worldId: string): Promise<WorldAssetRelationRecord[]>;
   countAssets(worldId: string): Promise<AssetCounts>;
 };

@@ -75,6 +75,32 @@ describe("PushClientService", () => {
     expect(hubFetch).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { owner: "..", slug: "memory-market" },
+    { owner: "studio", slug: "memory/market" },
+    { owner: "studio", slug: "memory\\market" },
+  ])("rejects unsafe repository path segments before calling fetch: %o", async (input) => {
+    const worlds = await createWorldWithAssets();
+    const hubFetch = vi.fn(async () => jsonResponse({
+      repository: { owner: "studio", slug: "memory-market" },
+      release: {
+        id: "rel_1",
+        version: "1.0.0",
+        url: "https://hub.example.test/studio/memory-market/releases/rel_1",
+      },
+    }));
+    const service = createPushClientService(worlds, hubFetch);
+
+    await expect(service.pushWorld({
+      worldId: "world_1",
+      ...input,
+      selectedAssetIds: ["archive_1"],
+    })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "VALIDATION_FAILED" }),
+    });
+    expect(hubFetch).not.toHaveBeenCalled();
+  });
+
   it("blocks secret findings by default without exposing secret excerpts", async () => {
     const worlds = await createWorldWithAssets({ archiveBody: "Keep .env beside DATABASE_URL=postgres://user:secret@localhost/world" });
     const hubFetch = vi.fn(async () => jsonResponse({
@@ -296,6 +322,31 @@ describe("world push route", () => {
         owner: "studio",
         slug: "memory-market",
         selectedAssetIds: [],
+      })
+      .expect(400);
+
+    expect(response.body).toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(pushClient.pushWorld).not.toHaveBeenCalled();
+  });
+
+  it("returns VALIDATION_FAILED for unsafe push request path segments", async () => {
+    const pushClient = {
+      pushWorld: vi.fn(),
+    };
+    app = await createHttpTestApp({
+      controllers: [WorldsController],
+      providers: [
+        { provide: WORLD_REPOSITORY, useValue: createInMemoryWorlds() },
+        { provide: PushClientService, useValue: pushClient },
+      ],
+    });
+
+    const response = await request(app.getHttpServer())
+      .post("/v1/worlds/world_1/push")
+      .send({
+        owner: "..",
+        slug: "memory\\market",
+        selectedAssetIds: ["archive_1"],
       })
       .expect(400);
 

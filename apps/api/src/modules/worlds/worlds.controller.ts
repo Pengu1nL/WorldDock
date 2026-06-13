@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, Inject, NotFoundException, Optional, Param, Patch, Post, ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
+import { PullClientService } from "../pull-client/pull-client.service";
 import { PushClientService } from "../push-client/push-client.service";
+import { repoPathSegmentSchema } from "../repo-path-segment";
 import { mapWorld } from "./world.mapper";
 import type { WorldRecord, WorldRepository } from "./world.repository";
 import { WORLD_REPOSITORY } from "./world.repository";
@@ -51,17 +53,23 @@ const conflictSchema = z.object({
 });
 
 const pushWorldSchema = z.object({
-  owner: z.string().min(1),
-  slug: z.string().min(1),
+  owner: repoPathSegmentSchema,
+  slug: repoPathSegmentSchema,
   note: z.string().max(4000).optional(),
   selectedAssetIds: z.array(z.string().min(1)).min(1),
   allowSecretFindings: z.boolean().optional(),
+}).strict();
+
+const pullWorldSchema = z.object({
+  owner: repoPathSegmentSchema,
+  slug: repoPathSegmentSchema,
 }).strict();
 
 @Controller("worlds")
 export class WorldsController {
   constructor(
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    @Optional() @Inject(PullClientService) private readonly pullClient?: PullClientService,
     @Optional() @Inject(PushClientService) private readonly pushClient?: PushClientService,
   ) {}
 
@@ -114,6 +122,17 @@ export class WorldsController {
       });
     }
     return this.pushClient.pushWorld({ worldId, ...pushWorldSchema.parse(body) });
+  }
+
+  @Post("pull")
+  async pull(@Body() body: unknown) {
+    if (!this.pullClient) {
+      throw new ServiceUnavailableException({
+        code: "SERVICE_UNAVAILABLE",
+        message: "World pull is not configured.",
+      });
+    }
+    return this.pullClient.pullWorld(pullWorldSchema.parse(body));
   }
 
   @Get(":worldId")

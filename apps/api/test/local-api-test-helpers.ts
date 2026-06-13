@@ -193,7 +193,7 @@ export function createInMemoryWorlds(): InMemoryWorlds {
     async createArchiveEntry(input) {
       const timestamp = now();
       const entry: ArchiveEntryRecord = {
-        id: `archive_${counters.archive++}`,
+        id: input.id ?? `archive_${counters.archive++}`,
         worldId: input.worldId,
         title: input.title,
         category: input.category,
@@ -215,7 +215,7 @@ export function createInMemoryWorlds(): InMemoryWorlds {
     async createStorySeed(input) {
       const timestamp = now();
       const seed: StorySeedRecord = {
-        id: `seed_${counters.seed++}`,
+        id: input.id ?? `seed_${counters.seed++}`,
         worldId: input.worldId,
         title: input.title,
         hook: input.hook,
@@ -238,7 +238,7 @@ export function createInMemoryWorlds(): InMemoryWorlds {
     async createConflict(input) {
       const timestamp = now();
       const conflict: ConflictRecord = {
-        id: `conflict_${counters.conflict++}`,
+        id: input.id ?? `conflict_${counters.conflict++}`,
         worldId: input.worldId,
         title: input.title,
         summary: input.summary,

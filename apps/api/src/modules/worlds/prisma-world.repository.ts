@@ -140,7 +140,7 @@ export class PrismaWorldRepository implements WorldRepository, OnModuleDestroy {
   async listArchiveEntries(worldId: string) {
     return this.prisma.archiveEntry.findMany({
       where: { worldId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
   }
 
@@ -151,7 +151,7 @@ export class PrismaWorldRepository implements WorldRepository, OnModuleDestroy {
   async listStorySeeds(worldId: string) {
     return this.prisma.storySeed.findMany({
       where: { worldId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
   }
 
@@ -162,7 +162,7 @@ export class PrismaWorldRepository implements WorldRepository, OnModuleDestroy {
   async listConflicts(worldId: string) {
     return this.prisma.conflict.findMany({
       where: { worldId },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ position: "asc" }, { createdAt: "asc" }],
     });
   }
 

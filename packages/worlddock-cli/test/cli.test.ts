@@ -78,6 +78,30 @@ describe("worlddock cli", () => {
     expect(JSON.parse(stdout[1])).toEqual({ world: { id: "world_2", name: "Memory Market" } });
   });
 
+  it("pulls a world through the local API", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      world: { id: "world_2", name: "Memory Market" },
+      remap: { assets: [{ upstreamId: "hub_archive_1", localId: "archive_2" }], counts: { assets: 1, archive: 1, seeds: 0, conflicts: 0 } },
+    }));
+    const stdout: string[] = [];
+
+    await expect(runWorldDockCli(["worlds", "pull", "studio", "memory-market"], {
+      env,
+      fetch: fetchMock as typeof fetch,
+      stdout: (line) => stdout.push(line),
+    })).resolves.toBe(0);
+
+    expect(fetchMock).toHaveBeenCalledWith("https://api.worlddock.test/v1/worlds/pull", expect.objectContaining({
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ owner: "studio", slug: "memory-market" }),
+    }));
+    expect(JSON.parse(stdout[0])).toEqual({
+      world: { id: "world_2", name: "Memory Market" },
+      remap: { assets: [{ upstreamId: "hub_archive_1", localId: "archive_2" }], counts: { assets: 1, archive: 1, seeds: 0, conflicts: 0 } },
+    });
+  });
+
   it("treats cloud pull as unknown usage", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({}));
     const stderr: string[] = [];
@@ -89,7 +113,7 @@ describe("worlddock cli", () => {
     })).resolves.toBe(1);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(stderr[0]).toBe("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file>");
+    expect(stderr[0]).toBe("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file> | worlds pull <owner> <slug>");
   });
 });
 

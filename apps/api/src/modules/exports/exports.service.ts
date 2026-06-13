@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   releaseSnapshotAssetSchema,
   releaseSnapshotSchema,
@@ -18,9 +18,21 @@ type ExportRecord = {
 };
 
 type WorldPackageAsset = WorldPackage["assets"][number];
+type ImportableAsset = {
+  kind: WorldPackageAsset["kind"];
+  title: string;
+  summary: string;
+  body?: string;
+  payload: Record<string, unknown>;
+};
 type WorldPackageBuild = {
   worldPackage: WorldPackage;
   snapshotAssets: ReleaseSnapshotAsset[];
+};
+type ImportAssetOptions = {
+  id?: string;
+  assetIdMap?: Map<string, string>;
+  position?: number;
 };
 
 const exportsStore = new Map<string, ExportRecord>();
@@ -53,8 +65,50 @@ export class ExportsService {
       mode: "local",
       maturity: worldPackage.world.maturity,
     });
-    await Promise.all(worldPackage.assets.map((asset) => this.createImportedAsset(world.id, asset)));
+    await Promise.all(worldPackage.assets.map((asset, index) => this.createImportedAsset(world.id, asset, { position: index })));
     return { world: await this.toWorldResponse(world) };
+  }
+
+  async importReleaseSnapshot(input: { snapshot: unknown }) {
+    const snapshot = releaseSnapshotSchema.parse(input.snapshot);
+    assertUniqueSnapshotAssetIds(snapshot.assets);
+    const world = await this.worlds.createWorld({
+      name: snapshot.package.world.name,
+      type: snapshot.package.world.type,
+      summary: snapshot.package.world.summary,
+      tags: snapshot.package.world.tags,
+      mode: "local",
+      maturity: snapshot.package.world.maturity,
+    });
+    const assetIdMap = new Map<string, string>();
+    for (const asset of snapshot.assets) {
+      assetIdMap.set(asset.id, createLocalAssetId(asset.kind));
+    }
+
+    try {
+      for (const [index, asset] of snapshot.assets.entries()) {
+        await this.createImportedAsset(world.id, asset, {
+          id: assetIdMap.get(asset.id),
+          assetIdMap,
+          position: index,
+        });
+      }
+    } catch (error) {
+      try {
+        await this.worlds.deleteWorld(world.id);
+      } catch {
+        // Preserve the original import failure for callers.
+      }
+      throw error;
+    }
+
+    return {
+      world: await this.toWorldResponse(world),
+      remap: {
+        assets: [...assetIdMap.entries()].map(([upstreamId, localId]) => ({ upstreamId, localId })),
+        counts: countImportedAssets(snapshot.assets),
+      },
+    };
   }
 
   async buildReleaseSnapshot(input: { worldId: string; owner: string; slug: string; name?: string }): Promise<ReleaseSnapshot> {
@@ -139,19 +193,22 @@ export class ExportsService {
     return { worldPackage, snapshotAssets };
   }
 
-  private async createImportedAsset(worldId: string, asset: WorldPackage["assets"][number]) {
+  private async createImportedAsset(worldId: string, asset: ImportableAsset, options: ImportAssetOptions = {}) {
     if (asset.kind === "setting") {
       return this.worlds.createArchiveEntry({
+        id: options.id,
         worldId,
         title: asset.title,
         category: stringPayload(asset.payload.category) ?? "Imported",
         summary: asset.summary,
         body: asset.body ?? asset.summary,
-        relations: stringArrayPayload(asset.payload.relations),
+        relations: remapAssetIds(stringArrayPayload(asset.payload.relations), options.assetIdMap),
+        position: options.position,
       });
     }
     if (asset.kind === "seed") {
       return this.worlds.createStorySeed({
+        id: options.id,
         worldId,
         title: asset.title,
         hook: asset.summary,
@@ -159,15 +216,18 @@ export class ExportsService {
         conflict: asset.body ?? asset.summary,
         protagonists: stringPayload(asset.payload.protagonists),
         questions: stringArrayPayload(asset.payload.questions),
+        position: options.position,
       });
     }
     return this.worlds.createConflict({
+      id: options.id,
       worldId,
       title: asset.title,
       summary: asset.summary,
       body: asset.body ?? asset.summary,
-      related: stringArrayPayload(asset.payload.related),
-      derivedSeeds: stringArrayPayload(asset.payload.derivedSeeds),
+      related: remapAssetIds(stringArrayPayload(asset.payload.related), options.assetIdMap),
+      derivedSeeds: remapAssetIds(stringArrayPayload(asset.payload.derivedSeeds), options.assetIdMap),
+      position: options.position,
     });
   }
 
@@ -228,4 +288,43 @@ function stringPayload(value: unknown) {
 
 function stringArrayPayload(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function assertUniqueSnapshotAssetIds(assets: ReleaseSnapshotAsset[]) {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const asset of assets) {
+    if (seen.has(asset.id)) duplicates.add(asset.id);
+    seen.add(asset.id);
+  }
+  if (duplicates.size > 0) {
+    throw new BadRequestException({
+      code: "VALIDATION_FAILED",
+      message: "Release snapshot contains duplicate asset ids.",
+      details: { assetIds: [...duplicates] },
+    });
+  }
+}
+
+function remapAssetIds(values: string[], assetIdMap?: Map<string, string>) {
+  if (!assetIdMap) return values;
+  return values.map((value) => assetIdMap.get(value) ?? value);
+}
+
+function createLocalAssetId(kind: ReleaseSnapshotAsset["kind"]) {
+  const prefix = kind === "setting" ? "archive" : kind;
+  return `${prefix}_${crypto.randomUUID()}`;
+}
+
+function countImportedAssets(assets: ReleaseSnapshotAsset[]) {
+  return assets.reduce(
+    (counts, asset) => {
+      counts.assets += 1;
+      if (asset.kind === "setting") counts.archive += 1;
+      if (asset.kind === "seed") counts.seeds += 1;
+      if (asset.kind === "conflict") counts.conflicts += 1;
+      return counts;
+    },
+    { assets: 0, archive: 0, seeds: 0, conflicts: 0 },
+  );
 }

@@ -51,7 +51,15 @@ export async function runWorldDockCli(argv = process.argv.slice(2), options: Cli
       return 0;
     }
 
-    error("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file>");
+    if (command === "worlds" && argv[1] === "pull" && argv[2] && argv[3]) {
+      output(JSON.stringify(await client.request("/v1/worlds/pull", {
+        method: "POST",
+        body: { owner: argv[2], slug: argv[3] },
+      }), null, 2));
+      return 0;
+    }
+
+    error("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file> | worlds pull <owner> <slug>");
     return 1;
   } catch (caught) {
     error(caught instanceof Error ? caught.message : "Unknown WorldDock CLI error.");
