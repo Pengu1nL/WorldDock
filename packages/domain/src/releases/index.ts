@@ -27,12 +27,16 @@ export {
   contractVersionSchema,
   releaseSnapshotAssetSchema as contractReleaseSnapshotAssetSchema,
   releaseSnapshotAssetSchema,
+  releaseSnapshotRepositorySchema as contractReleaseSnapshotRepositorySchema,
+  releaseSnapshotRepositorySchema,
   releaseSnapshotSchema as contractReleaseSnapshotSchema,
   releaseSnapshotSchema,
 } from "@worlddock/contract/releases";
 export type {
   ReleaseSnapshot as ContractReleaseSnapshot,
   ReleaseSnapshotAsset as ContractReleaseSnapshotAsset,
+  ReleaseSnapshotRepository as ContractReleaseSnapshotRepository,
   ReleaseSnapshot,
   ReleaseSnapshotAsset,
+  ReleaseSnapshotRepository,
 } from "@worlddock/contract/releases";

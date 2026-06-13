@@ -1,5 +1,12 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { worldPackageSchema, type WorldPackage } from "@worlddock/domain";
+import {
+  releaseSnapshotAssetSchema,
+  releaseSnapshotSchema,
+  worldPackageSchema,
+  type ReleaseSnapshot,
+  type ReleaseSnapshotAsset,
+  type WorldPackage,
+} from "@worlddock/domain";
 import { WORLD_REPOSITORY, type WorldRecord, type WorldRepository } from "../worlds/world.repository";
 
 type ExportRecord = {
@@ -8,6 +15,12 @@ type ExportRecord = {
   status: "ready";
   payload: unknown;
   createdAt: Date;
+};
+
+type WorldPackageAsset = WorldPackage["assets"][number];
+type WorldPackageBuild = {
+  worldPackage: WorldPackage;
+  snapshotAssets: ReleaseSnapshotAsset[];
 };
 
 const exportsStore = new Map<string, ExportRecord>();
@@ -44,14 +57,71 @@ export class ExportsService {
     return { world: await this.toWorldResponse(world) };
   }
 
+  async buildReleaseSnapshot(input: { worldId: string; owner: string; slug: string; name?: string }): Promise<ReleaseSnapshot> {
+    const world = await this.requireWorld(input.worldId);
+    const built = await this.buildWorldPackagePayload(world);
+
+    return releaseSnapshotSchema.parse({
+      contractVersion: "1.0.0",
+      repository: {
+        owner: input.owner,
+        slug: input.slug,
+        name: input.name ?? world.name,
+      },
+      package: built.worldPackage,
+      assets: built.snapshotAssets,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
   private async buildWorldPackage(world: WorldRecord): Promise<WorldPackage> {
+    return (await this.buildWorldPackagePayload(world)).worldPackage;
+  }
+
+  private async buildWorldPackagePayload(world: WorldRecord): Promise<WorldPackageBuild> {
     const [archiveEntries, storySeeds, conflicts] = await Promise.all([
       this.worlds.listArchiveEntries(world.id),
       this.worlds.listStorySeeds(world.id),
       this.worlds.listConflicts(world.id),
     ]);
+    const assets = [
+      ...archiveEntries.map((entry) => ({
+        id: entry.id,
+        asset: {
+          kind: "setting" as const,
+          title: entry.title,
+          summary: entry.summary,
+          body: entry.body,
+          payload: { category: entry.category, relations: entry.relations ?? [] },
+        },
+      })),
+      ...storySeeds.map((seed) => ({
+        id: seed.id,
+        asset: {
+          kind: "seed" as const,
+          title: seed.title,
+          summary: seed.hook,
+          body: seed.conflict,
+          payload: {
+            trigger: seed.trigger ?? null,
+            protagonists: seed.protagonists ?? null,
+            questions: seed.questions ?? [],
+          },
+        },
+      })),
+      ...conflicts.map((conflict) => ({
+        id: conflict.id,
+        asset: {
+          kind: "conflict" as const,
+          title: conflict.title,
+          summary: conflict.summary,
+          body: conflict.body,
+          payload: { related: conflict.related ?? [], derivedSeeds: conflict.derivedSeeds ?? [] },
+        },
+      })),
+    ] satisfies Array<{ id: string; asset: WorldPackageAsset }>;
 
-    return worldPackageSchema.parse({
+    const worldPackage = worldPackageSchema.parse({
       format: "worlddock.world-package.v1",
       exportedAt: new Date().toISOString(),
       world: {
@@ -61,35 +131,12 @@ export class ExportsService {
         tags: world.tags,
         maturity: world.maturity,
       },
-      assets: [
-        ...archiveEntries.map((entry) => ({
-          kind: "setting",
-          title: entry.title,
-          summary: entry.summary,
-          body: entry.body,
-          payload: { category: entry.category, relations: entry.relations ?? [] },
-        })),
-        ...storySeeds.map((seed) => ({
-          kind: "seed",
-          title: seed.title,
-          summary: seed.hook,
-          body: seed.conflict,
-          payload: {
-            trigger: seed.trigger ?? null,
-            protagonists: seed.protagonists ?? null,
-            questions: seed.questions ?? [],
-          },
-        })),
-        ...conflicts.map((conflict) => ({
-          kind: "conflict",
-          title: conflict.title,
-          summary: conflict.summary,
-          body: conflict.body,
-          payload: { related: conflict.related ?? [], derivedSeeds: conflict.derivedSeeds ?? [] },
-        })),
-      ],
+      assets: assets.map(({ asset }) => asset),
       releases: [],
     });
+    const snapshotAssets = assets.map(({ id, asset }) => releaseSnapshotAssetSchema.parse({ id, ...asset }));
+
+    return { worldPackage, snapshotAssets };
   }
 
   private async createImportedAsset(worldId: string, asset: WorldPackage["assets"][number]) {

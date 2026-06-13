@@ -49,6 +49,11 @@ describe("@worlddock/domain contracts", () => {
   it("keeps local release snapshots on the root domain surface", () => {
     const parsed: ReleaseSnapshot = releaseSnapshotSchema.parse({
       contractVersion: "0.1.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-house",
+        name: "回忆所",
+      },
       package: {
         format: "worlddock.world-package.v1",
         exportedAt: "2026-06-12T00:00:00.000Z",

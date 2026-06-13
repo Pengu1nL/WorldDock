@@ -13,8 +13,15 @@ export const releaseSnapshotAssetSchema = z.object({
   contentHash: z.string().min(1).optional(),
 });
 
+export const releaseSnapshotRepositorySchema = z.object({
+  owner: z.string().min(1),
+  slug: z.string().min(1),
+  name: z.string().min(1),
+});
+
 export const releaseSnapshotSchema = z.object({
   contractVersion: contractVersionSchema,
+  repository: releaseSnapshotRepositorySchema,
   package: worldPackageSchema,
   assets: z.array(releaseSnapshotAssetSchema).default([]),
   createdAt: z.string().datetime(),
@@ -22,3 +29,4 @@ export const releaseSnapshotSchema = z.object({
 
 export type ReleaseSnapshot = z.infer<typeof releaseSnapshotSchema>;
 export type ReleaseSnapshotAsset = z.infer<typeof releaseSnapshotAssetSchema>;
+export type ReleaseSnapshotRepository = z.infer<typeof releaseSnapshotRepositorySchema>;

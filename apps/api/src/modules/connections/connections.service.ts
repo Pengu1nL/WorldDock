@@ -109,6 +109,10 @@ export class ConnectionsService {
     return { connection: connection ? toSafeConnection(connection) : null };
   }
 
+  async getInternalHubConnection() {
+    return this.store.get();
+  }
+
   async saveHubConnection(body: unknown) {
     const input = saveHubConnectionSchema.parse(body);
     const connection = await this.store.save({

@@ -6,6 +6,11 @@ describe("release snapshot contract", () => {
   it("accepts a minimal published snapshot with contractVersion", () => {
     const parsed = releaseSnapshotSchema.parse({
       contractVersion: "0.1.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-market",
+        name: "Memory Market",
+      },
       package: {
         format: "worlddock.world-package.v1",
         exportedAt: "2026-06-12T00:00:00.000Z",

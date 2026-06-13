@@ -1,15 +1,25 @@
 import { Module } from "@nestjs/common";
+import { ConnectionsModule } from "../connections/connections.module";
+import { ExportsService } from "../exports/exports.service";
+import { PUSH_CLIENT_FETCH, PushClientService } from "../push-client/push-client.service";
 import { PrismaWorldRepository } from "./prisma-world.repository";
 import { WORLD_REPOSITORY } from "./world.repository";
 import { WorldsController } from "./worlds.controller";
 
 @Module({
+  imports: [ConnectionsModule],
   controllers: [WorldsController],
   providers: [
     PrismaWorldRepository,
+    ExportsService,
+    PushClientService,
     {
       provide: WORLD_REPOSITORY,
       useExisting: PrismaWorldRepository,
+    },
+    {
+      provide: PUSH_CLIENT_FETCH,
+      useValue: fetch.bind(globalThis),
     },
   ],
   exports: [WORLD_REPOSITORY],

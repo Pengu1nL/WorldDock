@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Inject, NotFoundException, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Inject, NotFoundException, Optional, Param, Patch, Post, ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
+import { PushClientService } from "../push-client/push-client.service";
 import { mapWorld } from "./world.mapper";
 import type { WorldRecord, WorldRepository } from "./world.repository";
 import { WORLD_REPOSITORY } from "./world.repository";
@@ -49,9 +50,20 @@ const conflictSchema = z.object({
   derivedSeeds: z.array(z.string()).optional(),
 });
 
+const pushWorldSchema = z.object({
+  owner: z.string().min(1),
+  slug: z.string().min(1),
+  note: z.string().max(4000).optional(),
+  selectedAssetIds: z.array(z.string().min(1)).min(1),
+  allowSecretFindings: z.boolean().optional(),
+}).strict();
+
 @Controller("worlds")
 export class WorldsController {
-  constructor(@Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository) {}
+  constructor(
+    @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    @Optional() @Inject(PushClientService) private readonly pushClient?: PushClientService,
+  ) {}
 
   @Get()
   async list() {
@@ -91,6 +103,17 @@ export class WorldsController {
       throw error;
     }
     return { world: await this.toWorld(record) };
+  }
+
+  @Post(":worldId/push")
+  async push(@Param("worldId") worldId: string, @Body() body: unknown) {
+    if (!this.pushClient) {
+      throw new ServiceUnavailableException({
+        code: "SERVICE_UNAVAILABLE",
+        message: "World push is not configured.",
+      });
+    }
+    return this.pushClient.pushWorld({ worldId, ...pushWorldSchema.parse(body) });
   }
 
   @Get(":worldId")
