@@ -7,12 +7,14 @@ import {
   createStorySeed,
   createWorld,
   createWorldAsset,
+  deleteHubConnection,
   deleteWorld,
   deleteWorldAsset,
   duplicateWorld,
   exportWorldPackage,
   fetchAgentEvents,
   generateWorldDraft,
+  getHubConnection,
   getWorldExport,
   importWorldPackage,
   listArchiveEntries,
@@ -20,10 +22,13 @@ import {
   listStorySeeds,
   listWorldAssets,
   listWorlds,
+  pushWorldRelease,
   relateWorldAssets,
   reorderWorldAssets,
   saveAgentSuggestion,
+  saveHubConnection,
   streamAgentEvents,
+  testHubConnection,
   unrelateWorldAssets,
   updateWorldAsset,
 } from "./api";
@@ -240,6 +245,68 @@ describe("worlddock local API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/export", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/exports/export_1", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/worlds/import", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("uses Hub connection endpoints and saves with PUT", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ connection: { hubUrl: "https://hub.worlddock.test", tokenPrefix: "wdpat_12" } }))
+      .mockResolvedValueOnce(jsonResponse({ connection: { hubUrl: "https://hub.worlddock.test", tokenPrefix: "wdpat_12" } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true }))
+      .mockResolvedValueOnce(jsonResponse({ connection: null }));
+
+    await getHubConnection({ fetcher });
+    await saveHubConnection(
+      { hubUrl: "https://hub.worlddock.test/", token: "wdpat_1234567890_secret" },
+      { fetcher },
+    );
+    await testHubConnection({ fetcher });
+    await deleteHubConnection({ fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/connections/hub", {
+      method: "GET",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/connections/hub", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ hubUrl: "https://hub.worlddock.test/", token: "wdpat_1234567890_secret" }),
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/connections/hub/test", {
+      method: "POST",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/connections/hub", {
+      method: "DELETE",
+      headers: {},
+    });
+  });
+
+  it("pushes selected assets to a Hub repository", async () => {
+    const input = {
+      owner: "ren",
+      slug: "tide-book",
+      note: "首次发布",
+      selectedAssetIds: ["asset_1", "asset_2"],
+      allowSecretFindings: true,
+    };
+    const fetcher = vi.fn(async () => jsonResponse({
+      repository: { owner: "ren", slug: "tide-book" },
+      release: {
+        id: "rel_1",
+        version: "0.1.0",
+        url: "https://hub.worlddock.test/ren/tide-book/releases/rel_1",
+      },
+    }));
+
+    const result = await pushWorldRelease("world_1", input, { fetcher });
+
+    expect(result.release.url).toBe("https://hub.worlddock.test/ren/tide-book/releases/rel_1");
+    expect(fetcher).toHaveBeenCalledWith("http://localhost:4000/v1/worlds/world_1/push", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
   });
 });
 

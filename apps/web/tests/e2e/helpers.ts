@@ -48,15 +48,52 @@ const memoryTradeLawAsset = {
   updatedAt: "2026-05-28T10:00:00.000Z",
 };
 
-export async function gotoApp(page: Page, options: { installMocks?: boolean } = {}) {
+const tideLawAsset = {
+  id: "tide_law",
+  worldId: "tide",
+  kind: "setting",
+  title: "潮汐律",
+  category: "世界规则",
+  summary: "潮汐律定义文明周期。",
+  body: "潮汐每 13 年一次反向，税制与航线许可随之切换。",
+  payload: { relations: [] },
+  position: 0,
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+};
+
+const tideSecretAsset = {
+  id: "tide_secret",
+  worldId: "tide",
+  kind: "setting",
+  title: "临时调试残留",
+  category: "世界规则",
+  summary: "发布前需要确认的调试片段。",
+  body: "临时调试 Authorization: Bearer sk-e2e-secret-should-not-render",
+  payload: { relations: [] },
+  position: 1,
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+};
+
+type ApiMockOptions = {
+  onPushWorld?: (push: { worldId: string; input: Record<string, any> }) => void;
+};
+
+export async function gotoApp(page: Page, options: { installMocks?: boolean; mockOptions?: ApiMockOptions } = {}) {
   if (options.installMocks ?? true) {
-    await installApiMocks(page);
+    await installApiMocks(page, options.mockOptions);
   }
   await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
 }
 
-async function installApiMocks(page: Page) {
+export async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
+  let hubConnection: { hubUrl: string; tokenPrefix: string } | null = {
+    hubUrl: "https://hub.worlddock.test",
+    tokenPrefix: "wdpat_e2",
+  };
+
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -65,6 +102,30 @@ async function installApiMocks(page: Page) {
 
     if (method === "GET" && path === "/v1/worlds") {
       return json(route, { worlds: [tideWorld, ledgerWorld] });
+    }
+
+    if (method === "GET" && path === "/v1/connections/hub") {
+      return json(route, { connection: hubConnection });
+    }
+
+    if (method === "PUT" && path === "/v1/connections/hub") {
+      const input = postData(request);
+      hubConnection = {
+        hubUrl: String(input.hubUrl ?? "https://hub.worlddock.test").replace(/\/+$/, ""),
+        tokenPrefix: String(input.token ?? "wdpat_mock").slice(0, 8),
+      };
+      return json(route, { connection: hubConnection });
+    }
+
+    if (method === "DELETE" && path === "/v1/connections/hub") {
+      hubConnection = null;
+      return json(route, { connection: null });
+    }
+
+    if (method === "POST" && path === "/v1/connections/hub/test") {
+      return hubConnection
+        ? json(route, { ok: true })
+        : json(route, { message: "Hub connection is not configured." }, 404);
     }
 
     if (method === "POST" && path === "/v1/worlds") {
@@ -116,10 +177,30 @@ async function installApiMocks(page: Page) {
 
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/assets$/.test(path)) {
       const worldId = path.split("/")[3];
+      if (worldId === "tide") {
+        return json(route, {
+          assets: [tideLawAsset, tideSecretAsset],
+          nextCursor: null,
+        });
+      }
       return json(route, {
         assets: worldId === "world_created" ? [memoryTradeLawAsset] : [],
         nextCursor: null,
       });
+    }
+
+    if (method === "POST" && /\/v1\/worlds\/[^/]+\/push$/.test(path)) {
+      const worldId = path.split("/")[3];
+      const input = postData(request);
+      options.onPushWorld?.({ worldId, input });
+      return json(route, {
+        repository: { owner: input.owner, slug: input.slug },
+        release: {
+          id: "rel_e2e",
+          version: "0.1.0",
+          url: `https://hub.worlddock.test/${input.owner}/${input.slug}/releases/rel_e2e`,
+        },
+      }, 201);
     }
 
     if (method === "GET" && /\/v1\/worlds\/[^/]+\/archive$/.test(path)) {

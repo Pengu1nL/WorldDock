@@ -44,6 +44,7 @@ import {
   PendingDrawer,
   SuggestionDetail,
 } from "./view-workbench";
+import { PublishView } from "./view-publish";
 import { SettingsView } from "./view-settings";
 import { getSuggestionKey, normalizeSuggestionForSave } from "./suggestion-utils";
 import { CreateView, WorldsView } from "./view-worlds";
@@ -89,7 +90,7 @@ function WorldDockRuntime() {
   useEffect(() => { document.documentElement.dataset.appTheme = t.appTheme; }, [t.appTheme]);
 
   // ────────── App state ──────────
-  const [view, setView] = useState<any>("worlds");  // worlds | create | workbench | archive | seeds | conflicts | settings
+  const [view, setView] = useState<any>("worlds");  // worlds | create | workbench | archive | seeds | conflicts | publish | settings
   const [currentWorld, setCurrentWorld] = useState<any>(null);
   const [worlds, setWorlds] = useState<any[]>([]);
   const [createInspiration, setCreateInspiration] = useState("");
@@ -923,6 +924,14 @@ function WorldDockRuntime() {
               onReorderAssets={reorderAssets}
               onRelateAssets={openAssetRelation}
               onBackToWorkbench={() => setView("workbench")}/>
+          )}
+          {view === "publish" && currentWorld && (
+            <PublishView
+              currentWorld={currentWorld}
+              assets={allSavedAssets}
+              onToast={pushToast}
+              onBack={() => setView("workbench")}
+            />
           )}
           {view === "settings" && (
             <SettingsView

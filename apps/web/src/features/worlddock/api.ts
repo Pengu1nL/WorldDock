@@ -160,6 +160,40 @@ export type ExportSummary = {
   createdAt: string;
 };
 
+export type HubConnection = {
+  hubUrl: string;
+  tokenPrefix: string;
+};
+
+export type HubConnectionResponse = {
+  connection: HubConnection | null;
+};
+
+export type SaveHubConnectionInput = {
+  hubUrl: string;
+  token: string;
+};
+
+export type PushWorldReleaseInput = {
+  owner: string;
+  slug: string;
+  note?: string;
+  selectedAssetIds: string[];
+  allowSecretFindings?: boolean;
+};
+
+export type PushWorldReleaseResponse = {
+  repository: {
+    owner: string;
+    slug: string;
+  };
+  release: {
+    id: string;
+    version: string;
+    url: string;
+  };
+};
+
 export async function listWorlds(options: ApiClientOptions = {}) {
   return requestJson("/v1/worlds", {
     method: "GET",
@@ -226,6 +260,50 @@ export async function importWorldPackage(input: WorldPackage, options: ApiClient
   return requestJson("/v1/worlds/import", {
     method: "POST",
     body: { package: input },
+    ...options,
+  });
+}
+
+export async function getHubConnection(options: ApiClientOptions = {}): Promise<HubConnectionResponse> {
+  return requestJson("/v1/connections/hub", {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function saveHubConnection(
+  input: SaveHubConnectionInput,
+  options: ApiClientOptions = {},
+): Promise<HubConnectionResponse> {
+  return requestJson("/v1/connections/hub", {
+    method: "PUT",
+    body: input,
+    ...options,
+  });
+}
+
+export async function deleteHubConnection(options: ApiClientOptions = {}): Promise<HubConnectionResponse> {
+  return requestJson("/v1/connections/hub", {
+    method: "DELETE",
+    ...options,
+  });
+}
+
+export async function testHubConnection(options: ApiClientOptions = {}): Promise<{ ok: true }> {
+  return requestJson("/v1/connections/hub/test", {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function pushWorldRelease(
+  worldId: string,
+  input: PushWorldReleaseInput,
+  options: ApiClientOptions = {},
+): Promise<PushWorldReleaseResponse> {
+  return requestJson(`/v1/worlds/${worldId}/push`, {
+    method: "POST",
+    body: input,
     ...options,
   });
 }
@@ -484,7 +562,7 @@ function getBoundaryLength(text: string, boundary: number) {
 async function requestJson<T>(
   path: string,
   options: ApiClientOptions & {
-    method: "GET" | "POST" | "PATCH" | "DELETE";
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     body?: unknown;
   },
 ): Promise<T> {

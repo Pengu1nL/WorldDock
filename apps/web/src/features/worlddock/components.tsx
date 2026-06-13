@@ -129,6 +129,7 @@ export const Rail = ({ view, onNav, world, pendingCount }: any) => {
     { id: "archive",   label: "档案", ico: "archive" },
     { id: "seeds",     label: "种子", ico: "seed" },
     { id: "conflicts", label: "冲突", ico: "conflict" },
+    { id: "publish",   label: "发布", ico: "push" },
   ] : [];
   return (
     <div className="rail">
