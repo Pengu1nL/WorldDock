@@ -6,7 +6,8 @@ test-results/
 playwright-report/
 dist/
 coverage/
-docs/
+docs/*
+!docs/contract-rfc.md
 *.tsbuildinfo
 .env
 .env.*
