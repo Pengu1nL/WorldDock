@@ -16,6 +16,8 @@ import { normalizeWorldSuggestion } from "./suggestion-normalizer";
 import { AGENT_PROVIDER, type AgentProvider, type AgentProviderChunk } from "./agent.provider";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord } from "./agent.repository";
 
+const LEGACY_AGENT_RUN_MODE: AgentRunRecord["mode"] = "expand";
+
 type CreateWorldDraftInput = {
   inspiration: string;
   name?: string;
@@ -33,6 +35,7 @@ type WorldDraftTool = {
 type WorldCreationDraft = {
   suggestedName: string;
   suggestedType: string;
+  shortSummary: string;
   styles: string[];
   coreSetting: string;
   coreConflict: string;
@@ -51,16 +54,16 @@ export class AgentService {
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
   ) {}
 
-  async createRun(worldId: string, input: { prompt: string; mode: "expand" | "challenge" | "fork" | "polish" }) {
+  async createRun(worldId: string, input: { prompt: string }) {
     await this.requireWorld(worldId);
     const run = await this.agents.createRun({
       worldId,
-      mode: input.mode,
+      mode: LEGACY_AGENT_RUN_MODE,
       prompt: input.prompt,
       model: resolveRunModel(process.env),
       provider: parseAgentProvider(process.env.AI_PROVIDER),
     });
-    await this.append(run.id, 1, "run.started", { runId: run.id, mode: input.mode });
+    await this.append(run.id, 1, "run.started", { runId: run.id });
     return { run, suggestions: [] };
   }
 
@@ -74,7 +77,6 @@ export class AgentService {
     try {
       for await (const chunk of this.provider.stream({
         prompt,
-        mode: "expand",
         runId: `draft_${Date.now()}`,
         model: resolveRunModel(process.env),
         world: {
@@ -155,7 +157,6 @@ export class AgentService {
 
       const providerInput = {
         prompt: run.prompt,
-        mode: run.mode,
         runId: run.id,
         model: run.model,
         world: { id: world.id, name: world.name, summary: world.summary },
@@ -484,8 +485,9 @@ function buildWorldDraftPrompt(input: CreateWorldDraftInput) {
   return [
     "请基于用户的初始灵感生成一个 WorldDock 创建世界雏形。",
     "只返回一个 JSON 对象，不要 Markdown，不要解释。",
-    "JSON 字段必须为：suggestedName, suggestedType, styles, coreSetting, coreConflict, directions, firstQuestion。",
+    "JSON 字段必须为：suggestedName, suggestedType, shortSummary, styles, coreSetting, coreConflict, directions, firstQuestion。",
     "styles 和 directions 必须是简体中文字符串数组；directions 给 3 条。",
+    "shortSummary 是世界卡片用的一句话概括，24-42 个汉字，必须简短，不要包含「核心矛盾」「初始灵感」等标签。",
     "风格要具体，设定要可继续推演，避免套话。",
     `初始灵感：${input.inspiration}`,
     input.name ? `用户给定名称：${input.name}` : "",
@@ -558,6 +560,11 @@ function normalizeWorldCreationDraft(
       fallbackStyles.length > 0 ? fallbackStyles.join(" / ") : undefined,
       "未分类世界",
     ]),
+    shortSummary: firstNonEmptyString([
+      stringField(parsed, "shortSummary", "short_summary", "summary"),
+      compactWorldSummary(coreSetting),
+      compactWorldSummary(input.inspiration),
+    ]),
     styles: styles.length > 0 ? styles : (fallbackStyles.length > 0 ? fallbackStyles : ["待探索"]),
     coreSetting,
     coreConflict: firstNonEmptyString([
@@ -595,6 +602,19 @@ function nonEmptyStrings(value: unknown) {
 
 function firstNonEmptyString(values: Array<string | undefined>) {
   return values.find((value) => value && value.trim())?.trim() ?? "";
+}
+
+function compactWorldSummary(value?: string) {
+  const cleaned = (value ?? "")
+    .replace(/\r/g, "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^(?:核心设定|核心矛盾|初始灵感|风格关键词|避开的方向)\s*[:：]\s*/, "").trim())
+    .find(Boolean);
+  if (!cleaned) return undefined;
+  const sentence = cleaned.match(/^(.{1,80}?[。！？!?])/)?.[1] ?? cleaned;
+  const chars = Array.from(sentence.trim());
+  if (chars.length <= 56) return sentence.trim();
+  return `${chars.slice(0, 55).join("").replace(/[，,、；;：:\s]+$/, "")}…`;
 }
 
 function suggestionExcerpt(suggestion?: WorldSuggestion) {

@@ -23,7 +23,6 @@ export type AgentProviderInput = {
   tools?: readonly WorldToolDefinition[];
   skills?: Array<{ name: string; path: string; description: string }>;
   model?: string | null;
-  mode: "expand" | "challenge" | "fork" | "polish";
   signal?: AbortSignal;
 };
 
@@ -96,7 +95,6 @@ export class OpenAiAgentProvider implements AgentProvider {
           {
             role: "user",
             content: [
-              `模式：${input.mode}`,
               `世界：${input.world.name}`,
               `世界摘要：${input.world.summary}`,
               formatContextForPrompt(input.context ?? []),
@@ -205,7 +203,7 @@ export class VercelAiSdkAgentProvider implements AgentProvider {
     const result = streamText({
       model: input.model ?? process.env.AI_MODEL ?? "openai/gpt-5.4",
       prompt: [
-        `你是 WorldDock 世界观推演 Agent，模式：${input.mode}`,
+        "你是 WorldDock 世界观推演 Agent。",
         `世界：${input.world.name}`,
         `摘要：${input.world.summary}`,
         formatContextForPrompt(input.context ?? []),
@@ -268,7 +266,6 @@ export class PiAgentProvider implements AgentProvider {
     for await (const event of this.runner.run({
       runId: input.runId ?? "run_pending",
       worldId: input.world.id ?? "world_pending",
-      mode: input.mode,
       prompt: input.prompt,
       model: input.model ?? process.env.PI_MODEL_ID ?? process.env.AI_MODEL ?? "pi-mock",
       context,

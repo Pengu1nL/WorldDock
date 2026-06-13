@@ -45,6 +45,9 @@ export class PiSessionRunner {
       this.safetyGate.assertToolAllowed(toolCall, disclosedAssetIds);
       const result = await this.tools.execute(toolCall.name, toolCall.arguments);
       const contextEvents = contextEventsFromToolResult(toolCall.name, result);
+      for (const assetId of disclosedAssetIdsFromToolResult(toolCall.name, result)) {
+        disclosedAssetIds.add(assetId);
+      }
       for (const contextEvent of contextEvents) {
         if (contextEvent.type === "context.used" && contextEvent.targetId) disclosedAssetIds.add(contextEvent.targetId);
       }
@@ -55,4 +58,18 @@ export class PiSessionRunner {
       yield event;
     }
   }
+}
+
+function disclosedAssetIdsFromToolResult(toolName: PiToolName, result: Record<string, unknown>) {
+  if (toolName !== "get_world_manifest" || !isRecord(result.manifest)) return [];
+  const index = result.manifest.index;
+  if (!Array.isArray(index)) return [];
+
+  return index
+    .map((item) => isRecord(item) && typeof item.targetId === "string" ? item.targetId.trim() : "")
+    .filter(Boolean);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

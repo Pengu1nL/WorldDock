@@ -1,56 +1,59 @@
 /* WorldDock — Design Tokens
- * Dark professional IDE aesthetic
- * Linear whitespace × VS Code status bar × GitHub repo tags
+ * 观象 Observatory: 冷白纸面 × 黛蓝轨道 × 轻盈圆角
  */
 
 :root {
-  /* Surfaces — deep cool charcoal, low saturation */
-  --bg:           #0b0d10;   /* app background */
-  --bg-1:        #101317;   /* sunken */
-  --surface:     #14171c;   /* card / panel */
-  --surface-2:   #191d23;   /* raised / hover */
-  --surface-3:   #1f242b;   /* active / selected */
-  --overlay:     #0e1115ee;
+  --ink:         #171a21;
+  --paper:       #ffffff;
 
-  /* Borders — barely-there */
-  --border:      #23272d;   /* default */
-  --border-2:    #2c3138;   /* visible */
-  --border-3:    #3a3f47;   /* focus */
-  --hairline:    #1c2026;   /* dividers */
+  /* Surfaces */
+  --bg:           #fafbfd;
+  --bg-1:         #f1f4f8;
+  --surface:      #ffffff;
+  --surface-2:    #f1f4f8;
+  --surface-3:    #e5e9f0;
+  --overlay:      #fafbfdee;
+
+  /* Borders */
+  --border:       #e5e9f0;
+  --border-2:     #c9d2e4;
+  --border-3:     #3d4ea6;
+  --hairline:     #eef1f6;
 
   /* Text */
-  --fg:          #e8e6e1;   /* primary */
-  --fg-1:        #c8c5be;   /* secondary */
-  --fg-2:        #8e8d87;   /* muted */
-  --fg-3:        #6a6c70;   /* tertiary */
-  --fg-4:        #4b4d51;   /* faint */
+  --fg:           #171a21;
+  --fg-1:         #3c4252;
+  --fg-2:         #5b6271;
+  --fg-3:         #98a0ae;
+  --fg-4:         #c4cad6;
 
-  /* Accents — sage / amber / brick + cool slate-blue */
-  --sage:        #7fb39a;   /* success, save, connected, ready */
-  --sage-dim:    #5c8275;
-  --sage-bg:     #1a2620;
+  /* Accents */
+  --sage:         #1e7f5c;
+  --sage-dim:     #6aa891;
+  --sage-bg:      #e3f2ec;
 
-  --amber:       #c9a96e;   /* warning, pending, draft, unsaved */
-  --amber-dim:   #8b774a;
-  --amber-bg:    #261f12;
+  --amber:        #9a6b1f;
+  --amber-dim:    #c1a265;
+  --amber-bg:     #f5eedb;
 
-  --brick:       #c87060;   /* conflict, danger, disconnect */
-  --brick-dim:   #8a4f44;
-  --brick-bg:    #261612;
+  --brick:        #bd4035;
+  --brick-dim:    #d8847c;
+  --brick-bg:     #f9e8e5;
 
-  --slate:       #7a96b8;   /* info accent */
-  --slate-dim:   #506a87;
-  --slate-bg:    #141a22;
+  --slate:        #3d4ea6;
+  --slate-dim:    #8e99d8;
+  --slate-bg:     #e8ecf8;
 
-  --violet:      #9a8fc4;   /* seeds, accents */
-  --violet-bg:   #1a1722;
+  --violet:       #6a4fc9;
+  --violet-bg:    #ede8fa;
 
   /* Type */
-  --font-sans:   "Geist", "Inter Tight", -apple-system, BlinkMacSystemFont,
+  --font-sans:   "Noto Sans SC", -apple-system, BlinkMacSystemFont,
                  "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
                  "Helvetica Neue", system-ui, sans-serif;
-  --font-mono:   "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
-  --font-serif:  "Source Serif 4", "Noto Serif SC", "Songti SC", Georgia, serif;
+  --font-mono:   "IBM Plex Mono", "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
+  --font-serif:  "Space Grotesk", "Noto Sans SC", -apple-system,
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
 
   /* Sizing — compact density baseline */
   --t-12: 11.5px;
@@ -63,21 +66,27 @@
   --t-28: 26px;
   --t-36: 34px;
 
-  --r-2: 2px;
-  --r-3: 3px;
-  --r-4: 4px;
-  --r-6: 6px;
-  --r-8: 8px;
+  --r-2: 4px;
+  --r-3: 6px;
+  --r-4: 8px;
+  --r-6: 12px;
+  --r-8: 16px;
 
   /* Layout */
-  --statusbar-h: 36px;
+  --statusbar-h: 38px;
   --rail-w:      52px;
   --drawer-w:    400px;
   --max-chat:    760px;
 
   /* Motion */
-  --ease-out: cubic-bezier(.2,.7,.2,1);
-  --ease-in:  cubic-bezier(.4,0,.7,.3);
+  --ease-out: cubic-bezier(.34, 1.3, .5, 1);
+  --ease-in:  cubic-bezier(.4, 0, .6, 1);
+
+  /* Component-level */
+  --btn-primary-fg: #ffffff;
+  --sage-hover: #2c3a85;
+  --badge-fg: #ffffff;
+  --maturity-fill: #3d4ea6;
 }
 
 /* Density variants — driven by tweak panel */
@@ -98,49 +107,59 @@
   --max-chat: 720px;
 }
 
-/* Light theme — default; activated by :root[data-app-theme="light"] on <html> */
+/* Light theme is the default Observatory palette. */
 :root[data-app-theme="light"] {
-  --bg:           #f6f4ee;
-  --bg-1:         #ede9df;
-  --surface:      #fcfbf6;
-  --surface-2:    #f1ede2;
-  --surface-3:    #e6e1d3;
-  --overlay:      #fdfcf8ee;
+  color-scheme: light;
+}
 
-  --border:       #d4cebd;
-  --border-2:     #b8b1a0;
-  --border-3:     #8a8475;
-  --hairline:     #e3ddcc;
+/* 观象 × 深色 — 夜空台站 */
+:root[data-app-theme="dark"] {
+  color-scheme: dark;
 
-  --fg:           #1c1c1d;
-  --fg-1:         #3e3e40;
-  --fg-2:         #6a6863;
-  --fg-3:         #8c897f;
-  --fg-4:         #b3afa3;
+  --ink:          #e8ebf2;
+  --paper:        #14161c;
 
-  --sage:         #3f7160;
-  --sage-dim:     #6e9587;
-  --sage-bg:      #e1ebe4;
+  --bg:           #14161c;
+  --bg-1:         #191c24;
+  --surface:      #1a1d26;
+  --surface-2:    #232734;
+  --surface-3:    #2d3242;
+  --overlay:      #14161cee;
 
-  --amber:        #936c1e;
-  --amber-dim:    #b8985a;
-  --amber-bg:     #f1e7cd;
+  --border:       #2a2f3d;
+  --border-2:     #3a4153;
+  --border-3:     #8a92ff;
+  --hairline:     #232734;
 
-  --brick:        #ad4936;
-  --brick-dim:    #c47b6c;
-  --brick-bg:     #f3dcd3;
+  --fg:           #e8ebf2;
+  --fg-1:         #c3c9d6;
+  --fg-2:         #8d94a6;
+  --fg-3:         #646b7e;
+  --fg-4:         #3d4354;
 
-  --slate:        #455e7a;
-  --slate-dim:    #7d92ab;
-  --slate-bg:     #dde4ed;
+  --sage:         #4fbd8f;
+  --sage-dim:     #2e7a54;
+  --sage-bg:      #142921;
 
-  --violet:       #574b87;
-  --violet-bg:    #e4e0ed;
+  --amber:        #d9b04f;
+  --amber-dim:    #8a701f;
+  --amber-bg:     #2b2412;
 
-  /* Light-theme component-level overrides */
-  --btn-primary-fg: #fdfdfb;
-  --sage-hover: #4d8771;
-  --badge-fg: #fdfdfb;
+  --brick:        #e0695c;
+  --brick-dim:    #8f3c30;
+  --brick-bg:     #2e1816;
+
+  --slate:        #8a92ff;
+  --slate-dim:    #4a52b3;
+  --slate-bg:     #20244d;
+
+  --violet:       #a78bf0;
+  --violet-bg:    #241a3c;
+
+  --btn-primary-fg: #ffffff;
+  --sage-hover: #a3aaff;
+  --badge-fg: #14161c;
+  --maturity-fill: #8a92ff;
 }
 
 /* Title font tweak */
@@ -148,5 +167,6 @@
 :root[data-title-font="serif"] h1,
 :root[data-title-font="serif"] h2 {
   font-family: var(--font-serif);
-  letter-spacing: -0.005em;
+  font-weight: 700;
+  letter-spacing: 0;
 }

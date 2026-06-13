@@ -140,6 +140,7 @@ describe("worlddock local API client", () => {
       draft: {
         suggestedName: "雾港",
         suggestedType: "港口奇幻 / 悬疑",
+        shortSummary: "雾港每天清晨都会吐出居民遗忘的秘密。",
         styles: ["低魔", "悬疑"],
         coreSetting: "雾港每天清晨都会吐出居民遗忘的秘密。",
         coreConflict: "秘密既是私人记忆，也是城市权力的燃料。",
@@ -156,6 +157,7 @@ describe("worlddock local API client", () => {
     );
 
     expect(result.draft.suggestedName).toBe("雾港");
+    expect(result.draft.shortSummary).toBe("雾港每天清晨都会吐出居民遗忘的秘密。");
     expect(fetcher).toHaveBeenCalledWith("http://localhost:4000/v1/world-drafts", {
       method: "POST",
       headers: {
@@ -183,7 +185,7 @@ describe("worlddock local API client", () => {
       } as Response)
       .mockResolvedValueOnce(jsonResponse({ suggestion: { id: "ags_1", status: "saved" } }));
 
-    await createAgentRun("world_1", { prompt: "继续推演", mode: "expand" }, { fetcher });
+    await createAgentRun("world_1", { prompt: "继续推演" }, { fetcher });
     const events = await fetchAgentEvents("run_1", { fetcher });
     await saveAgentSuggestion("ags_1", { fetcher });
 

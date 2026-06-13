@@ -35,7 +35,6 @@ describe("pi agent runtime boundary", () => {
     for await (const event of runner.run({
       runId: "run_1",
       worldId: "world_1",
-      mode: "expand",
       prompt: "继续推演",
       context: [],
       tools: localPiTools(),
@@ -46,6 +45,70 @@ describe("pi agent runtime boundary", () => {
 
     expect(events.map((event) => event.type)).toEqual(["tool.requested", "tool.completed", "context.used", "session.completed"]);
     expect(events[2]).toMatchObject({ type: "context.used", source: "tool", targetId: "asset_1" });
+  });
+
+  it("treats manifest index cards as disclosed for later detail expansion", async () => {
+    const runtime: PiRuntimeClient = {
+      async *runSession(_input, executeTool) {
+        const manifestCall = {
+          id: "call_manifest",
+          name: "get_world_manifest" as const,
+          arguments: { worldId: "world_1" },
+        };
+        yield { type: "tool.requested", toolCall: manifestCall };
+        const manifest = await executeTool?.(manifestCall);
+        yield { type: "tool.completed", toolCallId: manifestCall.id, result: manifest?.result ?? {} };
+        for (const contextEvent of manifest?.contextEvents ?? []) yield contextEvent;
+
+        const detailCall = {
+          id: "call_detail",
+          name: "get_asset_detail" as const,
+          arguments: { worldId: "world_1", assetId: "seed_1" },
+        };
+        yield { type: "tool.requested", toolCall: detailCall };
+        const detail = await executeTool?.(detailCall);
+        yield { type: "tool.completed", toolCallId: detailCall.id, result: detail?.result ?? {} };
+        for (const contextEvent of detail?.contextEvents ?? []) yield contextEvent;
+        yield { type: "session.completed" };
+      },
+    };
+    const registry = new WorldToolRegistry();
+    registry.register("get_world_manifest", async () => ({
+      manifest: {
+        worldId: "world_1",
+        name: "回忆所",
+        summary: "记忆可以被买卖。",
+        index: [{ kind: "seed", title: "继承的童年", excerpt: "陌生童年。", targetId: "seed_1" }],
+      },
+    }));
+    registry.register("get_asset_detail", async () => ({
+      found: true,
+      detail: { kind: "seed", title: "继承的童年", body: "一枚继承来的记忆触发旧案。", targetId: "seed_1" },
+    }));
+    const runner = new PiSessionRunner(runtime, registry, new SafetyGate());
+
+    const events: PiRuntimeEvent[] = [];
+    for await (const event of runner.run({
+      runId: "run_1",
+      worldId: "world_1",
+      prompt: "看看已有故事种子",
+      context: [],
+      tools: localPiTools(),
+      skills: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events.map((event) => event.type)).toEqual([
+      "tool.requested",
+      "tool.completed",
+      "context.used",
+      "tool.requested",
+      "tool.completed",
+      "context.used",
+      "session.completed",
+    ]);
+    expect(events[5]).toMatchObject({ type: "context.used", level: "detail", targetId: "seed_1" });
   });
 
   it("turns proposal tool results into pending suggestions without writing product assets", async () => {
@@ -115,7 +178,6 @@ describe("pi agent runtime boundary", () => {
     for await (const event of runner.run({
       runId: "run_1",
       worldId: "world_1",
-      mode: "expand",
       prompt: "生成制度建议",
       context: [],
       tools: localPiTools(),
@@ -213,7 +275,6 @@ describe("pi agent runtime boundary", () => {
     for await (const chunk of provider.stream({
       runId: "run_1",
       prompt: "继续推演记忆交易",
-      mode: "expand",
       world: { id: "world_1", name: "回忆所", summary: "记忆可以被买卖。" },
     })) {
       chunks.push(chunk);

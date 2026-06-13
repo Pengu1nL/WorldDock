@@ -48,6 +48,7 @@ import { PublishView } from "./view-publish";
 import { SettingsView } from "./view-settings";
 import { getSuggestionKey, normalizeSuggestionForSave } from "./suggestion-utils";
 import { CreateView, WorldsView } from "./view-worlds";
+import { getWorldStoredSummary } from "./world-summary";
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "mode": "local",
@@ -85,6 +86,7 @@ function WorldDockRuntime() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
   // Apply density / font tweaks
+  useEffect(() => { document.documentElement.dataset.direction = "obs"; }, []);
   useEffect(() => { document.documentElement.dataset.density = t.density; }, [t.density]);
   useEffect(() => { document.documentElement.dataset.titleFont = t.titleFont; }, [t.titleFont]);
   useEffect(() => { document.documentElement.dataset.appTheme = t.appTheme; }, [t.appTheme]);
@@ -98,7 +100,6 @@ function WorldDockRuntime() {
 
   // Workbench state — per current world (live copies for the open world; archived in worldStatesRef)
   const [messages, setMessages] = useState<any[]>([]);
-  const [agentMode, setAgentMode] = useState("expand");
   const [agentBusy, setAgentBusy] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState<any>(null);  // { kind: 'detail'|'context'|'pending', item, readonly? }
   const [savedSettings, setSavedSettings] = useState<any[]>([]);
@@ -108,7 +109,6 @@ function WorldDockRuntime() {
   const [savedIds, setSavedIds] = useState<any[]>([]);
   const [toasts, setToasts] = useState<any[]>([]);
   const [runTokens, setRunTokens] = useState(0);
-  const [modeFlash, setModeFlash] = useState<any>(null);  // flash banner when agent mode changes mid-thread
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
   const [agentContextRefs, setAgentContextRefs] = useState<AgentContextRef[]>([]);
   const [agentToolEvents, setAgentToolEvents] = useState<AgentToolEvent[]>([]);
@@ -123,7 +123,7 @@ function WorldDockRuntime() {
 
   const agentAbortRef = useRef<AbortController | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
-  // worldId → { messages, savedSettings, savedSeeds, savedConflicts, savedIds, agentMode }
+  // worldId → { messages, savedSettings, savedSeeds, savedConflicts, savedIds }
   const worldStatesRef = useRef<any>({});
 
   const worldsQuery = useQuery({
@@ -209,7 +209,7 @@ function WorldDockRuntime() {
   useEffect(() => {
     if (!currentWorld) return;
     worldStatesRef.current[currentWorld.id] = {
-      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds, agentMode,
+      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds,
       agentContextRefs, agentToolEvents, agentRunStatus, runTokens,
     };
   }, [
@@ -220,7 +220,6 @@ function WorldDockRuntime() {
     savedConflicts,
     savedIssues,
     savedIds,
-    agentMode,
     agentContextRefs,
     agentToolEvents,
     agentRunStatus,
@@ -262,7 +261,6 @@ function WorldDockRuntime() {
     const agentMsg = {
       id: "m_" + Date.now(),
       role: "agent",
-      mode: agentMode,
       text: "",
       tools: null,
       suggestions: null,
@@ -276,7 +274,7 @@ function WorldDockRuntime() {
     try {
       const created: any = await createAgentRun(
         targetWorld.id,
-        { prompt: userText, mode: getBackendAgentMode(agentMode) },
+        { prompt: userText },
       );
       if (agentAbortRef.current !== abortController) {
         void cancelAgentRun(created.run.id);
@@ -384,7 +382,7 @@ function WorldDockRuntime() {
       setActiveAgentRunId(null);
       pushToast({ kind: "warn", text: "Agent 调用失败 · 请检查后端、Provider 和 API Key" });
     }
-  }, [agentBusy, agentMode, currentWorld, pushToast]);
+  }, [agentBusy, currentWorld, pushToast]);
 
   const stopAgent = useCallback(() => {
     if (activeAgentRunId) {
@@ -432,7 +430,6 @@ function WorldDockRuntime() {
           savedConflicts,
           savedIssues,
           savedIds,
-          agentMode,
           agentContextRefs,
           agentToolEvents,
           agentRunStatus: "failed",
@@ -456,7 +453,6 @@ function WorldDockRuntime() {
       setSavedConflicts(saved.savedConflicts || []);
       setSavedIssues(saved.savedIssues || []);
       setSavedIds(saved.savedIds || []);
-      setAgentMode(saved.agentMode || "expand");
       setAgentContextRefs(saved.agentContextRefs || []);
       setAgentToolEvents(saved.agentToolEvents || []);
       setAgentRunStatus(saved.agentRunStatus || "idle");
@@ -468,7 +464,6 @@ function WorldDockRuntime() {
       setSavedConflicts([]);
       setSavedIssues([]);
       setSavedIds([]);
-      setAgentMode("expand");
       setAgentContextRefs([]);
       setAgentToolEvents([]);
       setAgentRunStatus("idle");
@@ -862,18 +857,9 @@ function WorldDockRuntime() {
             <Workbench
               world={currentWorld}
               messages={messages}
-              agentMode={agentMode}
               agentBusy={agentBusy}
               savedIds={savedIds}
               pendingCount={pendingItems.length}
-              onModeChange={(m: any) => {
-                if (m !== agentMode) {
-                  setAgentMode(m);
-                  setModeFlash(m);
-                  setTimeout(() => setModeFlash((cur: any) => cur === m ? null : cur), 1600);
-                }
-              }}
-              modeFlash={modeFlash}
               contextRefs={(() => {
                 // Last completed agent message's contextRefs
                 for (let i = messages.length - 1; i >= 0; i--) {
@@ -1104,9 +1090,9 @@ const AgentContextDrawer = ({ snapshot }: { snapshot: AgentContextSnapshot }) =>
 
 // ────────── Workbench (composes Message + Composer) ──────────
 const Workbench = ({
-  world, messages, agentMode, agentBusy, savedIds, pendingCount,
-  onModeChange, onSend, onStop, onSave, onOpenDetail,
-  onOpenContext, onOpenSuggestions, modeFlash, contextRefs,
+  world, messages, agentBusy, savedIds, pendingCount,
+  onSend, onStop, onSave, onOpenDetail,
+  onOpenContext, onOpenSuggestions, contextRefs,
 }: any) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // Auto-scroll on new content
@@ -1141,14 +1127,11 @@ const Workbench = ({
         )}
       </div>
       <Composer
-        mode={agentMode}
-        onModeChange={onModeChange}
         onSend={onSend}
         busy={agentBusy}
         onStop={onStop}
         pendingCount={pendingCount}
         contextRefs={contextRefs}
-        modeFlash={modeFlash}
         onOpenSuggestions={onOpenSuggestions}
         onOpenContext={() => onOpenContext()}
       />
@@ -1162,7 +1145,7 @@ const WorkbenchEmpty = ({ world }: any) => (
     textAlign: "center",
   }}>
     <div className="title-font" style={{
-      fontSize: "var(--t-28)", color: "var(--fg)", marginBottom: 12, letterSpacing: "-0.01em",
+      fontSize: "var(--t-28)", color: "var(--fg)", marginBottom: 12, letterSpacing: 0,
     }}>{world.name}</div>
     <p style={{ fontSize: "var(--t-14)", color: "var(--fg-2)", lineHeight: 1.7, marginBottom: 30 }}>
       这是一个会继续长出故事的世界。<br/>
@@ -1174,9 +1157,7 @@ const WorkbenchEmpty = ({ world }: any) => (
         <span className="mono" style={{ fontSize: 11, color: "var(--fg-2)" }}>下一步</span>
       </div>
       <p style={{ fontSize: "var(--t-13)", color: "var(--fg-1)", lineHeight: 1.6 }}>
-        在下方输入一个推演方向。Agent 会自动判断该走哪条路——
-        <strong style={{ color: "var(--fg)" }}>追问</strong>、<strong style={{ color: "var(--fg)" }}>扩展</strong>、
-        <strong style={{ color: "var(--fg)" }}>挑刺</strong>、<strong style={{ color: "var(--fg)" }}>找张力</strong>，或<strong style={{ color: "var(--fg)" }}>收束为设定</strong>。
+        在下方输入一个推演方向。Agent 会围绕当前世界继续推演，并把值得保留的内容整理成待确认建议。
       </p>
     </div>
   </div>
@@ -1195,20 +1176,17 @@ type CreateWorldDraft = {
 export function buildCreateWorldInput(draft: CreateWorldDraft): CreateWorldInput {
   const inspiration = draft.inspiration.trim();
   const styleKw = draft.styleKw?.trim();
-  const avoid = draft.avoid?.trim();
   const generated = draft.draft;
   const styleTags = parseStyleTags(styleKw);
 
   return {
     name: draft.name?.trim() || generated?.suggestedName?.trim() || inferWorldName(inspiration),
     type: draft.type?.trim() || generated?.suggestedType?.trim() || "未分类世界",
-    summary: [
-      generated?.coreSetting?.trim() || "",
-      generated?.coreConflict?.trim() ? `核心矛盾：${generated.coreConflict.trim()}` : "",
-      `初始灵感：${inspiration}`,
-      styleKw ? `风格关键词：${styleKw}` : "",
-      avoid ? `避开的方向：${avoid}` : "",
-    ].filter(Boolean).join("\n"),
+    summary: getWorldStoredSummary({
+      shortSummary: generated?.shortSummary,
+      coreSetting: generated?.coreSetting,
+      inspiration,
+    }),
     tags: styleTags.length > 0 ? styleTags : (generated?.styles ?? []).slice(0, 8),
     mode: draft.mode === "local" ? "local" : "cloud",
   };
@@ -1484,11 +1462,4 @@ function toWorldAssetUpdateInput(item: any) {
     body: input.body,
     payload: input.payload,
   };
-}
-
-function getBackendAgentMode(mode: string): "expand" | "challenge" | "fork" | "polish" {
-  if (mode === "critique" || mode === "tension" || mode === "consequence") return "challenge";
-  if (mode === "fork") return "fork";
-  if (mode === "polish" || mode === "settle") return "polish";
-  return "expand";
 }

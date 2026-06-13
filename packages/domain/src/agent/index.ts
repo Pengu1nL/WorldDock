@@ -78,14 +78,12 @@ export const tokenUsageSchema = z.object({
 });
 
 export const agentRunStatusSchema = z.enum(["queued", "running", "completed", "failed", "cancelled"]);
-export const agentRunModeSchema = z.enum(["expand", "challenge", "fork", "polish"]);
 
 export const agentRunSchema = z.object({
   id: z.string().min(1),
   worldId: z.string().min(1),
   userId: z.string().min(1),
   status: agentRunStatusSchema,
-  mode: agentRunModeSchema,
   prompt: z.string().min(1),
   model: z.string().min(1).optional(),
   tokenUsage: tokenUsageSchema.optional(),
@@ -145,7 +143,7 @@ const agentPiToolCallSchema = z.object({
 export const agentEventSchema = z.discriminatedUnion("type", [
   baseAgentEventSchema.extend({
     type: z.literal("run.started"),
-    payload: z.object({ runId: z.string().min(1), mode: agentRunModeSchema }),
+    payload: z.object({ runId: z.string().min(1) }),
   }),
   baseAgentEventSchema.extend({
     type: z.literal("context.used"),

@@ -79,7 +79,6 @@ describe("createPiAgentCoreAdapter", () => {
         {
           runId: "run_1",
           worldId: "world_1",
-          mode: "expand",
           prompt: "继续推演记忆交易制度",
           model: "phase5-test-model",
           context: [
@@ -533,7 +532,6 @@ function baseInput(overrides: Partial<Parameters<ReturnType<typeof createPiAgent
   return {
     runId: "run_1",
     worldId: "world_1",
-    mode: "expand" as const,
     prompt: "继续推演记忆交易制度",
     model: "phase5-test-model",
     context: [],

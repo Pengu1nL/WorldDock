@@ -63,6 +63,7 @@ export type WorldDraftTool = {
 export type WorldCreationDraft = {
   suggestedName: string;
   suggestedType: string;
+  shortSummary?: string;
   styles: string[];
   coreSetting: string;
   coreConflict: string;
@@ -111,8 +112,6 @@ export type CreateConflictInput = {
   derivedSeeds?: string[];
 };
 
-export type AgentRunMode = "expand" | "challenge" | "fork" | "polish";
-
 export type AgentContextRef = {
   id: string;
   kind: "world" | "archive" | "seed" | "conflict";
@@ -131,7 +130,7 @@ export type AgentEventBase = {
 };
 
 export type AgentEvent =
-  | (AgentEventBase & { type: "run.started"; payload: { runId: string; mode: AgentRunMode } })
+  | (AgentEventBase & { type: "run.started"; payload: { runId: string } })
   | (AgentEventBase & { type: "pi.session.started"; payload: { piSessionId: string } })
   | (AgentEventBase & { type: "context.used"; payload: { contextRef: AgentContextRef } })
   | (AgentEventBase & { type: "message.delta"; payload: { text: string } })
@@ -439,7 +438,7 @@ export async function createConflict(worldId: string, input: CreateConflictInput
 
 export async function createAgentRun(
   worldId: string,
-  input: { prompt: string; mode: AgentRunMode },
+  input: { prompt: string },
   options: ApiClientOptions = {},
 ) {
   return requestJson(`/v1/worlds/${worldId}/agent-runs`, {

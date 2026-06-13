@@ -4,7 +4,6 @@ import type { WorldContextRef } from "@worlddock/domain/agent/context";
 export type PiSessionInput = {
   runId: string;
   worldId: string;
-  mode: "expand" | "challenge" | "fork" | "polish";
   prompt: string;
   model?: string | null;
   context: WorldContextRef[];

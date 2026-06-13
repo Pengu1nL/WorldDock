@@ -175,7 +175,7 @@ export const Drawer = ({ open, onClose, title, subtitle, children, width }: any)
           width: width || "var(--drawer-w)",
           background: "var(--surface)",
           borderLeft: "1px solid var(--border)",
-          boxShadow: "-20px 0 40px rgba(0,0,0,0.3)",
+          boxShadow: "-18px 0 44px rgba(23, 26, 33, 0.14)",
           transform: "translateX(0)",
           transition: "transform .22s var(--ease-out)",
           display: "flex", flexDirection: "column",
@@ -188,7 +188,7 @@ export const Drawer = ({ open, onClose, title, subtitle, children, width }: any)
           gap: 12, flex: "none",
         }}>
           <div className="col" style={{ gap: 2, minWidth: 0 }}>
-            <Dialog.Title style={{ fontSize: "var(--t-14)", fontWeight: 600, letterSpacing: "-0.005em" }}>{title}</Dialog.Title>
+            <Dialog.Title style={{ fontSize: "var(--t-14)", fontWeight: 600, letterSpacing: 0 }}>{title}</Dialog.Title>
             {subtitle ? (
               <Dialog.Description style={{ fontSize: "var(--t-12)", color: "var(--fg-2)" }}>{subtitle}</Dialog.Description>
             ) : (
@@ -217,7 +217,7 @@ export const Toasts = ({ toasts }: any) => (
     display: "flex", flexDirection: "column", gap: 8, zIndex: 1000, pointerEvents: "none",
   }}>
     {toasts.map((t: any) => (
-      <div key={t.id} className="fade-in" style={{
+      <div key={t.id} className="toast fade-in" style={{
         background: "var(--surface-2)", border: "1px solid var(--border-2)",
         borderLeft: "2px solid " + (t.kind === "save" ? "var(--sage)" : t.kind === "warn" ? "var(--amber)" : "var(--slate)"),
         borderRadius: 4, padding: "8px 12px",

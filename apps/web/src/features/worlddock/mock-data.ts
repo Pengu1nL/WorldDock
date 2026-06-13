@@ -107,7 +107,7 @@ export const SEEDS = {
       "历史事件": 0, "冲突": 0, "待定设定": 0, "故事种子": 0
     },
 
-    // 一致性问题（待修矛盾池）— 由「挑刺」模式发现，需要用户三选一
+    // 一致性问题（待修矛盾池）— 由 Agent 推演发现，需要用户三选一
     // involves: 数组内是 settings/conflicts/seeds 的 id；UI 通过 id 反查标题与红点位置
     issues: [
       {

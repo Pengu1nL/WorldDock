@@ -5,7 +5,6 @@ import { AgentService } from "./agent.service";
 
 const createRunSchema = z.object({
   prompt: z.string().min(1),
-  mode: z.enum(["expand", "challenge", "fork", "polish"]).default("expand"),
 });
 
 const createWorldDraftSchema = z.object({
@@ -30,7 +29,7 @@ export class AgentController {
     const input = createRunSchema.parse(body);
     const result = await this.agentService.createRun(worldId, input);
     return {
-      run: result.run,
+      run: serializeAgentRun(result.run),
       suggestions: result.suggestions,
     };
   }
@@ -61,7 +60,7 @@ export class AgentController {
   @Post("agent-runs/:runId/cancel")
   @HttpCode(200)
   async cancel(@Param("runId") runId: string) {
-    return { run: await this.agentService.cancelRun(runId) };
+    return { run: serializeAgentRun(await this.agentService.cancelRun(runId)) };
   }
 
   @Post("agent-suggestions/:suggestionId/save")
@@ -79,4 +78,10 @@ export class AgentController {
   async discard(@Param("suggestionId") suggestionId: string) {
     return { suggestion: await this.agentService.discardSuggestion(suggestionId) };
   }
+}
+
+function serializeAgentRun<T extends { mode?: unknown }>(run: T) {
+  const response = { ...run };
+  delete response.mode;
+  return response;
 }

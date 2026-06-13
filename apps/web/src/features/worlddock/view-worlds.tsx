@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { generateWorldDraft, type GenerateWorldDraftResponse, type WorldCreationDraft, type WorldDraftTool } from "./api";
 import { Icon, Maturity } from "./components";
+import { formatWorldUpdatedDate, getWorldCardSummary } from "./world-summary";
 
 const DRAFT_GENERATION_TOOLS: WorldDraftTool[] = [
   { id: "ctx", label: "分析灵感主题", detail: "提取核心概念、类型线索与世界运行规则" },
@@ -25,6 +26,8 @@ const WorldCard = ({ world, onOpen, onDelete, onDuplicate }: any) => {
     if (world.status === "unpublished") return { cls: "amber", label: "未公开" };
     return { cls: "", label: "草稿" };
   })();
+  const summary = getWorldCardSummary(world.summary);
+  const updatedDate = formatWorldUpdatedDate(world.updated);
   return (
     <div className="card hover" onClick={(e: any) => { if (e.target.closest('[data-menu]')) return; onOpen(world.id); }}
       style={{
@@ -50,10 +53,10 @@ const WorldCard = ({ world, onOpen, onDelete, onDuplicate }: any) => {
                 <span style={{ letterSpacing: 1, fontSize: 13, lineHeight: 1 }}>···</span>
               </button>
               {menuOpen && (
-                <div onClick={(e: any) => e.stopPropagation()} style={{
+                <div className="world-menu-pop" onClick={(e: any) => e.stopPropagation()} style={{
                   position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 10,
                   background: "var(--surface)", border: "1px solid var(--border-2)",
-                  borderRadius: 6, padding: 4, minWidth: 140,
+                  borderRadius: "var(--r-6)", padding: 4, minWidth: 140,
                   boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
                 }}>
                   <button className="menu-item" onClick={() => { setMenuOpen(false); if (onDuplicate) onDuplicate(world.id); }}>
@@ -74,8 +77,21 @@ const WorldCard = ({ world, onOpen, onDelete, onDuplicate }: any) => {
             </div>
           </div>
         </div>
-        <p className="prose" style={{ fontSize: "var(--t-13)", color: "var(--fg-1)", lineHeight: 1.55, flex: 1 }}>
-          {world.summary}
+        <p
+          className="prose"
+          title={String(world.summary ?? "")}
+          style={{
+            fontSize: "var(--t-13)",
+            color: "var(--fg-1)",
+            lineHeight: 1.55,
+            flex: 1,
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {summary}
         </p>
         <div className="row gap-2" style={{ flexWrap: "wrap" }}>
           {world.tags.map((t: any) => <span key={t} className="tag">{t}</span>)}
@@ -83,14 +99,19 @@ const WorldCard = ({ world, onOpen, onDelete, onDuplicate }: any) => {
       </div>
       <div style={{
         padding: "8px 16px", borderTop: "1px solid var(--hairline)",
-        display: "flex", gap: 16, fontSize: 11,
+        display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        alignItems: "center", columnGap: 10, fontSize: 11, minWidth: 0,
       }} className="mono">
-        <span className="row gap-2"><Icon name="archive" size={11} style={{ color: "var(--fg-3)" }}/><span>{world.archive}</span></span>
-        <span className="row gap-2"><Icon name="seed" size={11} style={{ color: "var(--fg-3)" }}/><span>{world.seeds}</span></span>
-        <span className="row gap-2"><Icon name="conflict" size={11} style={{ color: "var(--fg-3)" }}/><span>{world.conflicts}</span></span>
-        <div className="flex"/>
-        <Maturity value={world.maturity} w={42}/>
-        <span style={{ color: "var(--fg-3)", whiteSpace: "nowrap" }}>{world.updated}</span>
+        <div className="row" style={{ gap: 10, minWidth: 0 }}>
+          <span className="row gap-2" style={{ flex: "none" }}><Icon name="archive" size={11} style={{ color: "var(--fg-3)" }}/><span>{world.archive}</span></span>
+          <span className="row gap-2" style={{ flex: "none" }}><Icon name="seed" size={11} style={{ color: "var(--fg-3)" }}/><span>{world.seeds}</span></span>
+          <span className="row gap-2" style={{ flex: "none" }}><Icon name="conflict" size={11} style={{ color: "var(--fg-3)" }}/><span>{world.conflicts}</span></span>
+        </div>
+        <span/>
+        <div className="row" style={{ gap: 8, justifyContent: "flex-end", minWidth: 0 }}>
+          <Maturity value={world.maturity} w={36}/>
+          <span title={String(world.updated ?? "")} style={{ color: "var(--fg-3)", whiteSpace: "nowrap", width: 50, textAlign: "right" }}>{updatedDate}</span>
+        </div>
       </div>
     </div>
   );
@@ -111,11 +132,9 @@ const EmptyWorldCard = ({ inspirations, onPick }: any) => (
     </p>
     <div className="col gap-2" style={{ marginTop: "auto", gap: 6 }}>
       {inspirations.map((s: any, i: number) => (
-        <button key={i} onClick={() => onPick(s)} className="row gap-2"
+        <button key={i} onClick={() => onPick(s)} className="inspire-chip row gap-2"
           style={{
-            background: "transparent", border: "1px solid var(--hairline)",
-            borderRadius: 4, padding: "8px 10px", textAlign: "left",
-            fontSize: "var(--t-12)", color: "var(--fg-1)", cursor: "pointer",
+            width: "100%",
           }}>
           <Icon name="spark" size={11} style={{ color: "var(--amber)", flex: "none" }}/>
           <span style={{ flex: 1 }}>{s}</span>
@@ -167,7 +186,6 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
           <button className="btn primary" onClick={() => onCreate()}>
             <Icon name="plus" size={13}/>
             <span>新建世界</span>
-            <span className="kbd" style={{ marginLeft: 4 }}>⌘N</span>
           </button>
         </div>
       </div>

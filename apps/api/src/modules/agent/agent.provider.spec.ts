@@ -55,7 +55,6 @@ describe("OpenAiAgentProvider", () => {
     const chunks = [];
     for await (const chunk of provider.stream({
       prompt: "hello",
-      mode: "expand",
       world: { id: "world_1", name: "测试世界", summary: "测试摘要" },
     })) {
       chunks.push(chunk);

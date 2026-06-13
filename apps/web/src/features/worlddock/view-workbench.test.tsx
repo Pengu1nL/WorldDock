@@ -13,7 +13,6 @@ describe("WorldDock workbench message rendering", () => {
         msg={{
           id: "m1",
           role: "agent",
-          mode: "expand",
           text: "## 扩写完成\n\n- 世界规则：**天梯**连接地月轨道。\n- 后果：债务成为通行权。",
         }}
         savedIds={[]}
@@ -36,7 +35,6 @@ describe("WorldDock workbench message rendering", () => {
         msg={{
           id: "m1",
           role: "agent",
-          mode: "expand",
           text: [
             "## 推演清单",
             "",
@@ -68,7 +66,6 @@ describe("WorldDock workbench message rendering", () => {
         msg={{
           id: "m1",
           role: "agent",
-          mode: "expand",
           text: "工具调用失败前的部分回复。",
           streaming: false,
           suggestions: [],
@@ -94,7 +91,6 @@ describe("WorldDock workbench message rendering", () => {
         msg={{
           id: "m1",
           role: "agent",
-          mode: "expand",
           text: "建议如下。",
           suggestions: [
             {

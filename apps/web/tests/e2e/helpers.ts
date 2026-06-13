@@ -156,6 +156,7 @@ export async function installApiMocks(page: Page, options: ApiMockOptions = {}) 
         draft: {
           suggestedName: input.name || "回忆所",
           suggestedType: input.type || "近未来 / 软科幻 / 社会派",
+          shortSummary: "在一个允许记忆交易的近未来社会，私人体验成为可继承资产。",
           styles: input.styleKw ? String(input.styleKw).split(/\s+/).filter(Boolean) : ["冷静观察", "制度细节", "道德灰度"],
           coreSetting: "在一个允许记忆作为资产交易的近未来社会，个人最私密的体验成为了可估值、可转让、可继承的财产。",
           coreConflict: "记忆是不可让渡的人格延伸，还是可以定价的私有财产？",

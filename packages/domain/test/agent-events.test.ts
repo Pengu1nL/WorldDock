@@ -49,7 +49,6 @@ describe("agent event contracts", () => {
       worldId: "world_1",
       userId: "user_1",
       status: "completed",
-      mode: "expand",
       prompt: "推演记忆交易制度",
       createdAt: "2026-05-26T12:00:00.000Z",
       updatedAt: "2026-05-26T12:00:02.000Z",

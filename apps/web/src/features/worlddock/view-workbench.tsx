@@ -10,20 +10,6 @@ import {
   normalizeSuggestionForSave,
 } from "./suggestion-utils";
 
-// Agent modes per PRD §8.3.2
-// 关键区分：
-//   挑刺 (critique) — 找 bug、找漏洞，产出"一致性问题"（这些是要修的）
-//   找张力 (tension) — 找值得保留的戏剧矛盾，产出"冲突"（这些是要培育的）
-export const AGENT_MODES = [
-  { id: "ask",      label: "追问",      ico: "info",      hint: "向用户提问以澄清设定" },
-  { id: "expand",   label: "扩展",      ico: "plus",      hint: "从已有设定生长更多细节" },
-  { id: "critique", label: "挑刺",      ico: "asterisk",  hint: "找漏洞、找不合理处（→ 产出可修复的一致性问题）" },
-  { id: "consequence", label: "推演后果", ico: "bolt",   hint: "假设此设定成立后的连锁反应" },
-  { id: "settle",   label: "收束",      ico: "save",      hint: "把对话内容收束为结构化设定" },
-  { id: "seed",     label: "生成种子",  ico: "seed",      hint: "从冲突中孵化具体故事种子" },
-  { id: "tension",  label: "找张力",    ico: "conflict",  hint: "找出值得保留的戏剧矛盾（→ 进入冲突池）" },
-];
-
 // ────────── Inline suggestion card (inside agent message) ──────────
 const InlineSuggestionsBlock = ({ suggestions, savedIds, onSave, onOpenDetail }: any) => {
   const settings  = suggestions.filter((s: any) => s.kind === "setting");
@@ -145,7 +131,7 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
           display: "inline-flex", alignItems: "center", justifyContent: "center",
           fontFamily: "var(--font-serif)", fontSize: 13, color: "var(--fg)",
         }}>界</span>
-        <span style={{ fontSize: "var(--t-12)", color: "var(--fg-1)", whiteSpace: "nowrap" }}>Agent · {AGENT_MODES.find(m => m.id === msg.mode)?.label}</span>
+        <span style={{ fontSize: "var(--t-12)", color: "var(--fg-1)", whiteSpace: "nowrap" }}>Agent</span>
         {msg.tools && (
           <span className="mono" style={{ fontSize: 10.5, color: "var(--fg-3)", whiteSpace: "nowrap" }}>
             · {msg.tools.length} tool calls
@@ -369,7 +355,7 @@ const renderInlineMarkdown = (text: string) => {
 };
 
 // ────────── Composer ──────────
-export const Composer = ({ mode, onModeChange, onSend, busy, onStop, pendingCount, onOpenSuggestions, onOpenContext, contextRefs = 0, modeFlash }: any) => {
+export const Composer = ({ onSend, busy, onStop, pendingCount, onOpenSuggestions, onOpenContext, contextRefs = 0 }: any) => {
   const [val, setVal] = useStateWB("");
   const send = () => {
     if (!val.trim() || busy) return;
@@ -392,28 +378,6 @@ export const Composer = ({ mode, onModeChange, onSend, busy, onStop, pendingCoun
           transition: "border-color .12s",
         }} onFocus={(e) => e.currentTarget.style.borderColor = "var(--border-3)"}
            onBlur={(e) => e.currentTarget.style.borderColor = "var(--border-2)"}>
-          <div className="row gap-2" style={{ marginBottom: 8, flexWrap: "wrap" }}>
-            {AGENT_MODES.map((agentMode) => (
-              <button
-                key={agentMode.id}
-                className={"sb-btn " + (mode === agentMode.id ? "primary" : "")}
-                onClick={() => onModeChange(agentMode.id)}
-                title={agentMode.hint}
-                type="button"
-              >
-                <Icon name={agentMode.ico} size={11} />
-                <span>{agentMode.label}</span>
-              </button>
-            ))}
-          </div>
-          {modeFlash && (
-            <div
-              className="badge slate"
-              style={{ marginBottom: 8, height: 20, width: "fit-content" }}
-            >
-              已切换为 {AGENT_MODES.find((agentMode) => agentMode.id === modeFlash)?.label}
-            </div>
-          )}
           <textarea
             aria-label="继续推演"
             value={val} onChange={(e: any) => setVal(e.target.value)}
@@ -441,9 +405,6 @@ export const Composer = ({ mode, onModeChange, onSend, busy, onStop, pendingCoun
               )}
             </button>
             <div style={{ flex: 1 }}/>
-            <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
-              当前模式：{AGENT_MODES.find((agentMode) => agentMode.id === mode)?.label}
-            </span>
             {busy ? (
               <button className="btn sm" onClick={onStop} style={{ borderColor: "var(--brick-dim)", color: "var(--brick)" }}>
                 <Icon name="stop" size={10}/>
@@ -459,7 +420,7 @@ export const Composer = ({ mode, onModeChange, onSend, busy, onStop, pendingCoun
         </div>
 
         <div className="row gap-2" style={{ justifyContent: "center", marginTop: 8, fontSize: 11, color: "var(--fg-3)", whiteSpace: "nowrap" }}>
-          <span>Agent 会推演、挑刺、收束</span>
+          <span>Agent 会推演并沉淀可保存建议</span>
           <span>·</span>
           <span>不会替你写完正文</span>
         </div>
@@ -581,7 +542,7 @@ export const SuggestionDetail = ({ item, onSave, onClose, onDiscard, onBackToWor
           {item.category}
         </span>
         <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
-          {readonly ? "已归档 · v1 · 只读视图" : `来源：Agent · ${AGENT_MODES.find(m => m.id === "expand")?.label}模式`}
+          {readonly ? "已归档 · v1 · 只读视图" : "来源：Agent"}
         </span>
       </div>
       <div>
@@ -628,7 +589,7 @@ export const SuggestionDetail = ({ item, onSave, onClose, onDiscard, onBackToWor
                 padding: "10px 12px", fontSize: 12, color: "var(--fg-2)",
                 background: "var(--bg-1)", border: "1px dashed var(--hairline)", borderRadius: 4, lineHeight: 1.6,
               }}>
-                这道张力还没有具体故事种子。回工作台用「生成种子」模式让它孵化第一个。
+                这道张力还没有具体故事种子。回工作台继续推演，让它孵化第一个。
               </div>
             ) : (
               <div className="col" style={{ gap: 6 }}>
@@ -757,7 +718,7 @@ export const IssuesDrawer = ({ issues, savedSettings, focusEntryId, onResolve, o
           世界目前没有一致性问题
         </h3>
         <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6 }}>
-          继续推演时，Agent 用「挑刺」模式发现的矛盾会出现在这里。
+          继续推演时，Agent 发现的矛盾会出现在这里。
         </p>
       </div>
     );

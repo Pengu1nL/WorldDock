@@ -225,7 +225,7 @@ export const ArchiveView = ({
               本世界有 {savedIssues.length} 项一致性问题待处理
             </div>
             <div style={{ fontSize: 11.5, color: "var(--fg-2)", marginTop: 2 }}>
-              Agent 在「挑刺」模式下发现的矛盾——每条可选：修 / 留为冲突 / 弃
+              Agent 发现的矛盾——每条可选：修 / 留为冲突 / 弃
             </div>
           </div>
           <button className="btn sm" onClick={() => onOpenIssues && onOpenIssues(null)}
@@ -507,11 +507,11 @@ const SeedsEmpty = ({ onBackToWorkbench }: any) => (
     <Icon name="seed" size={28} style={{ color: "var(--violet)", opacity: 0.5 }}/>
     <h3 style={{ marginTop: 12, color: "var(--fg-1)" }}>故事种子来自世界内部的矛盾</h3>
     <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6 }}>
-      在工作台用「生成种子」模式，或者从冲突池里挑一个冲突推演——
+      回到工作台继续推演，或者从冲突池里挑一个冲突推演——
       种子会从矛盾里自然长出，沉淀到这里。
     </p>
     <button className="btn primary" onClick={onBackToWorkbench} style={{ marginTop: 16 }}>
-      <Icon name="seed" size={12}/><span>去生成种子</span>
+      <Icon name="seed" size={12}/><span>去继续推演</span>
     </button>
   </div>
 );
@@ -605,11 +605,11 @@ export const ConflictsView = ({
             <Icon name="conflict" size={28} style={{ color: "var(--brick)", opacity: 0.5 }}/>
             <h3 style={{ marginTop: 12, color: "var(--fg-1)" }}>世界还没有戏剧张力</h3>
             <p style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6 }}>
-              在工作台用「<strong style={{ color: "var(--fg-1)" }}>找张力</strong>」模式让 Agent 找出值得保留的戏剧矛盾。<br/>
+              回到工作台继续推演，让 Agent 找出值得保留的戏剧矛盾。<br/>
               注意：这里的"冲突"不是 bug——是世界的发电机。
             </p>
             <button className="btn primary" onClick={onBackToWorkbench} style={{ marginTop: 16 }}>
-              <Icon name="conflict" size={12}/><span>去找张力</span>
+              <Icon name="conflict" size={12}/><span>去继续推演</span>
             </button>
           </div>
         ) : filtered.length === 0 ? (
