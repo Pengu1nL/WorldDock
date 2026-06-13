@@ -52,9 +52,10 @@ describe("agent local endpoints", () => {
       .expect(201);
     const runId = created.body.run.id;
     expect(created.body).toMatchObject({
-      run: { worldId: world.id, status: "running", mode: "expand", prompt: "继续推演记忆交易" },
+      run: { worldId: world.id, status: "running", prompt: "继续推演记忆交易" },
       suggestions: [],
     });
+    expect(created.body.run).not.toHaveProperty("mode");
 
     const streamed = await request(app.getHttpServer())
       .get(`/v1/agent-runs/${runId}/events`)
