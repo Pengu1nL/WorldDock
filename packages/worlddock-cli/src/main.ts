@@ -12,9 +12,11 @@ type CliOptions = {
 };
 
 type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PUT";
   body?: unknown;
 };
+
+const USAGE = "Usage: worlddock login --hub-url <url> --token <token> | worlddock push <worldId> --repo <owner>/<slug> --asset <assetId> [--asset <assetId> ...] [--note <note>] | worlddock pull <owner>/<slug> | worlds list | worlds export <worldId> | worlds import <file> | worlds pull <owner> <slug>";
 
 export async function runWorldDockCli(argv = process.argv.slice(2), options: CliOptions = {}) {
   const env = options.env ?? process.env;
@@ -23,14 +25,48 @@ export async function runWorldDockCli(argv = process.argv.slice(2), options: Cli
   const command = argv[0];
 
   try {
-    if (command === "login") {
-      return login(output);
-    }
-
     const client = createApiClient({
       apiUrl: env.WORLD_DOCK_API_URL ?? "http://localhost:4000",
       fetch: options.fetch ?? fetch,
     });
+
+    if (command === "login") {
+      const parsed = parseFlags(argv.slice(1), new Set(["--hub-url", "--token"]));
+      const hubUrl = getSingleFlag(parsed, "--hub-url");
+      const token = getSingleFlag(parsed, "--token");
+      if (!parsed.ok || !hubUrl || !token) return usage(error);
+
+      await client.request("/v1/connections/hub", { method: "PUT", body: { hubUrl, token } });
+      output("WorldHub connection saved.");
+      return 0;
+    }
+
+    if (command === "push" && argv[1]) {
+      const parsed = parseFlags(argv.slice(2), new Set(["--repo", "--asset", "--note"]), new Set(["--asset"]));
+      const repo = parseRepo(getSingleFlag(parsed, "--repo"));
+      const selectedAssetIds = parsed.values.get("--asset") ?? [];
+      const note = getSingleFlag(parsed, "--note");
+      if (!parsed.ok || !repo || selectedAssetIds.length === 0) return usage(error);
+
+      const pushed = await client.request<{ release?: { url?: string } }>(`/v1/worlds/${encodeURIComponent(argv[1])}/push`, {
+        method: "POST",
+        body: { owner: repo.owner, slug: repo.slug, note, selectedAssetIds },
+      });
+      output(`Pushed release: ${pushed.release?.url ?? JSON.stringify(pushed)}`);
+      return 0;
+    }
+
+    if (command === "pull" && argv[1] && argv.length === 2) {
+      const repo = parseRepo(argv[1]);
+      if (!repo) return usage(error);
+
+      const pulled = await client.request<PullWorldResponse>("/v1/worlds/pull", {
+        method: "POST",
+        body: { owner: repo.owner, slug: repo.slug },
+      });
+      output(`Pulled world: ${getPulledWorldId(pulled) ?? JSON.stringify(pulled)}`);
+      return 0;
+    }
 
     if (command === "worlds" && argv[1] === "list") {
       output(JSON.stringify(await client.request("/v1/worlds"), null, 2));
@@ -51,25 +87,21 @@ export async function runWorldDockCli(argv = process.argv.slice(2), options: Cli
       return 0;
     }
 
-    if (command === "worlds" && argv[1] === "pull" && argv[2] && argv[3]) {
-      output(JSON.stringify(await client.request("/v1/worlds/pull", {
+    if (command === "worlds" && argv[1] === "pull") {
+      if (argv.length !== 4 || !isRepoPathSegment(argv[2]) || !isRepoPathSegment(argv[3])) return usage(error);
+      const pulled = await client.request<PullWorldResponse>("/v1/worlds/pull", {
         method: "POST",
         body: { owner: argv[2], slug: argv[3] },
-      }), null, 2));
+      });
+      output(JSON.stringify(pulled, null, 2));
       return 0;
     }
 
-    error("Usage: worlddock login | worlds list | worlds export <worldId> | worlds import <file> | worlds pull <owner> <slug>");
-    return 1;
+    return usage(error);
   } catch (caught) {
     error(caught instanceof Error ? caught.message : "Unknown WorldDock CLI error.");
     return 1;
   }
-}
-
-function login(output: (line: string) => void) {
-  output("WorldDock Hub login is not configured yet. Run P4 to enable PAT connections.");
-  return 0;
 }
 
 function createApiClient(input: { apiUrl: string; fetch: typeof fetch }) {
@@ -89,6 +121,70 @@ function createApiClient(input: { apiUrl: string; fetch: typeof fetch }) {
       return await response.json() as T;
     },
   };
+}
+
+type ParsedFlags = {
+  ok: boolean;
+  values: Map<string, string[]>;
+};
+
+type PullWorldResponse = {
+  id?: string;
+  createdWorldId?: string;
+  world?: {
+    id?: string;
+  };
+};
+
+function usage(error: (line: string) => void) {
+  error(USAGE);
+  return 1;
+}
+
+function parseFlags(args: string[], allowed: Set<string>, repeatable = new Set<string>()): ParsedFlags {
+  const values = new Map<string, string[]>();
+
+  for (let index = 0; index < args.length; index += 2) {
+    const flag = args[index];
+    const value = args[index + 1];
+    if (!flag?.startsWith("--") || !allowed.has(flag) || !value || value.startsWith("--")) {
+      return { ok: false, values };
+    }
+    if (!repeatable.has(flag) && values.has(flag)) {
+      return { ok: false, values };
+    }
+    values.set(flag, [...(values.get(flag) ?? []), value]);
+  }
+
+  return { ok: true, values };
+}
+
+function getSingleFlag(parsed: ParsedFlags, flag: string) {
+  const values = parsed.values.get(flag);
+  return values?.length === 1 ? values[0] : undefined;
+}
+
+function parseRepo(repo: string | undefined) {
+  const parts = repo?.split("/");
+  if (!parts || parts.length !== 2) return undefined;
+  const [owner, slug] = parts;
+  if (!isRepoPathSegment(owner) || !isRepoPathSegment(slug)) return undefined;
+  return { owner, slug };
+}
+
+function getPulledWorldId(response: PullWorldResponse) {
+  return response.world?.id ?? response.createdWorldId ?? response.id;
+}
+
+function isRepoPathSegment(value: string | undefined) {
+  return Boolean(
+    value &&
+    value.trim().length > 0 &&
+    value !== "." &&
+    value !== ".." &&
+    !value.includes("/") &&
+    !value.includes("\\"),
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
