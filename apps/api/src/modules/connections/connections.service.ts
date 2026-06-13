@@ -138,7 +138,7 @@ export class ConnectionsService {
 
     let response: Response;
     try {
-      response = await this.hubFetch(`${connection.hubUrl}/v1/account/me`, {
+      response = await this.hubFetch(`${connection.hubUrl}/v1/me`, {
         method: "GET",
         headers: {
           accept: "application/json",

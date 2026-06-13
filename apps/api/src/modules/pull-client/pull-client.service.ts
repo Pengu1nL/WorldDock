@@ -22,8 +22,8 @@ const pullWorldInputSchema = z.object({
 @Injectable()
 export class PullClientService {
   constructor(
-    private readonly connections: ConnectionsService,
-    private readonly exportsService: ExportsService,
+    @Inject(ConnectionsService) private readonly connections: ConnectionsService,
+    @Inject(ExportsService) private readonly exportsService: ExportsService,
     @Inject(PULL_CLIENT_FETCH) private readonly hubFetch: PullClientFetch,
   ) {}
 

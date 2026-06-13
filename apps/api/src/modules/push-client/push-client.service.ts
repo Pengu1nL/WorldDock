@@ -32,8 +32,8 @@ const pushWorldInputSchema = z.object({
 @Injectable()
 export class PushClientService {
   constructor(
-    private readonly connections: ConnectionsService,
-    private readonly exportsService: ExportsService,
+    @Inject(ConnectionsService) private readonly connections: ConnectionsService,
+    @Inject(ExportsService) private readonly exportsService: ExportsService,
     @Inject(PUSH_CLIENT_FETCH) private readonly hubFetch: PushClientFetch,
   ) {}
 

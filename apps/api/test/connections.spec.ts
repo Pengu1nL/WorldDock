@@ -98,7 +98,7 @@ describe("connections local endpoints", () => {
     }
   });
 
-  it("tests the stored hub connection against the WorldHub account endpoint", async () => {
+  it("tests the stored hub connection against the WorldHub current-user endpoint", async () => {
     const store = createInMemoryHubConnectionStore();
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ account: { id: "acct_1" } }), { status: 200 }));
     const timeoutSignal = new AbortController().signal;
@@ -117,7 +117,7 @@ describe("connections local endpoints", () => {
 
     expect(response.body).toEqual({ ok: true });
     expect(timeoutSpy).toHaveBeenCalledWith(5000);
-    expect(fetchMock).toHaveBeenCalledWith("https://hub.example.com/v1/account/me", {
+    expect(fetchMock).toHaveBeenCalledWith("https://hub.example.com/v1/me", {
       method: "GET",
       headers: {
         accept: "application/json",
