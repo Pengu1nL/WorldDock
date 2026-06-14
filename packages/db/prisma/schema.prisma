@@ -231,6 +231,7 @@ model AgentSessionSubject {
   sessionId String
   kind      String
   targetId  String
+  role      String       @default("primary")
   title     String?
   metadata  Json         @default("{}")
   createdAt DateTime     @default(now())

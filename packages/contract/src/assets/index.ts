@@ -60,7 +60,7 @@ export const worldAssetIndexSchema = z.object({
   id: z.string().min(1),
   assetId: z.string().min(1),
   title: z.string().min(1),
-  summary: z.string().min(1).optional(),
+  summary: z.string().min(1).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime().optional(),
 });
@@ -70,7 +70,7 @@ export const worldAssetRevisionSchema = z.object({
   assetId: z.string().min(1),
   version: z.number().int().min(1),
   markdown: z.string(),
-  summary: z.string().min(1).optional(),
+  summary: z.string().min(1).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime(),
 });
@@ -78,11 +78,11 @@ export const worldAssetRevisionSchema = z.object({
 export const worldAssetPatchSchema = z.object({
   id: z.string().min(1),
   assetId: z.string().min(1),
-  batchId: z.string().min(1).optional(),
+  batchId: z.string().min(1).nullable().optional(),
   status: worldAssetPatchStatusSchema,
   beforeRevisionId: z.string().min(1).nullable().optional(),
   afterRevisionId: z.string().min(1).nullable().optional(),
-  diff: z.string().optional(),
+  diff: z.string().nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime(),
   appliedAt: z.string().datetime().nullable().optional(),

@@ -2273,6 +2273,7 @@ export const AgentSessionSubjectScalarFieldEnum = {
   sessionId: 'sessionId',
   kind: 'kind',
   targetId: 'targetId',
+  role: 'role',
   title: 'title',
   metadata: 'metadata',
   createdAt: 'createdAt',

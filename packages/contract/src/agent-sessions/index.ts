@@ -20,6 +20,12 @@ export const agentSessionSubjectKindSchema = z.enum([
   "potential_asset",
 ]);
 
+export const agentSessionSubjectRoleSchema = z.enum([
+  "primary",
+  "context",
+  "repair_target",
+]);
+
 export const agentSessionContextItemKindSchema = z.enum([
   "asset_index",
   "asset_document",
@@ -43,18 +49,27 @@ export const agentSessionMessageStatusSchema = z.enum([
 ]);
 
 export const agentSessionSubjectSchema = z.object({
+  id: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
   kind: agentSessionSubjectKindSchema,
-  id: z.string().min(1),
-  title: z.string().min(1).optional(),
+  targetId: z.string().min(1),
+  role: agentSessionSubjectRoleSchema.default("primary"),
+  title: z.string().min(1).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
 });
 
 export const agentSessionContextItemSchema = z.object({
+  id: z.string().min(1).optional(),
+  sessionId: z.string().min(1).optional(),
   kind: agentSessionContextItemKindSchema,
-  id: z.string().min(1),
-  title: z.string().min(1).optional(),
-  summary: z.string().min(1).optional(),
+  targetId: z.string().min(1),
+  title: z.string().min(1).nullable().optional(),
+  summary: z.string().min(1).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
 });
 
 export const agentSessionSchema = z.object({
@@ -64,8 +79,8 @@ export const agentSessionSchema = z.object({
   title: z.string().min(1),
   status: agentSessionStatusSchema,
   current: z.boolean().default(false),
-  subject: agentSessionSubjectSchema.optional(),
-  context: z.array(agentSessionContextItemSchema).default([]),
+  subjects: z.array(agentSessionSubjectSchema).default([]),
+  contextItems: z.array(agentSessionContextItemSchema).default([]),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -86,20 +101,23 @@ export const createAgentSessionInputSchema = z.object({
   worldId: z.string().min(1),
   kind: agentSessionKindSchema,
   title: z.string().min(1).optional(),
-  subject: agentSessionSubjectSchema.optional(),
-  context: z.array(agentSessionContextItemSchema).default([]),
+  subjects: z.array(agentSessionSubjectSchema).default([]),
+  contextItems: z.array(agentSessionContextItemSchema).default([]),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const createAgentSessionRunInputSchema = z.object({
   sessionId: z.string().min(1),
   message: z.string().min(1).optional(),
-  context: z.array(agentSessionContextItemSchema).default([]),
+  contextItems: z.array(agentSessionContextItemSchema).default([]),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 export type AgentSessionKind = z.infer<typeof agentSessionKindSchema>;
 export type AgentSessionStatus = z.infer<typeof agentSessionStatusSchema>;
+export type AgentSessionSubjectRole = z.infer<
+  typeof agentSessionSubjectRoleSchema
+>;
 export type AgentSession = z.infer<typeof agentSessionSchema>;
 export type AgentSessionSubject = z.infer<typeof agentSessionSubjectSchema>;
 export type AgentSessionContextItem = z.infer<typeof agentSessionContextItemSchema>;
