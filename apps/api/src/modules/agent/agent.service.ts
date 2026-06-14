@@ -153,6 +153,7 @@ export class AgentService {
   async *streamEvents(runId: string): AsyncGenerator<AgentEventRecord> {
     const run = await this.agents.findRunById(runId);
     if (!run) throw this.notFound("Agent run not found.");
+    if (run.sessionId) throw this.notFound("Agent run not found.");
     const world = await this.requireWorld(run.worldId);
 
     const existingEvents = await this.agents.listEvents(run.id);

@@ -168,6 +168,44 @@ describe("agent session run local endpoints", () => {
     expect(first.text).toContain("run.completed");
     expect(second.text).toContain("run.completed");
   });
+
+  it("rejects legacy run events for session runs without driving the provider", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const provider = createMockStreamingAgentProvider();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "记忆交易推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "继续推演记忆交易" })
+      .expect(201);
+
+    const legacyStream = await request(app.getHttpServer())
+      .get(`/v1/agent-runs/${created.body.run.id}/events`)
+      .set("accept", "text/event-stream");
+
+    expect(legacyStream.status).not.toBe(200);
+    expect(provider.calls).toHaveLength(0);
+    expect((await sessions.listMessages(session.id)).map((message) => message.role)).toEqual(["user"]);
+    expect(await agents.listSuggestions(created.body.run.id)).toHaveLength(0);
+  });
 });
 
 async function createAgentSessionRunApp(
