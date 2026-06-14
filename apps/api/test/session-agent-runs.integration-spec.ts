@@ -78,7 +78,9 @@ describe("agent session run local endpoints", () => {
 
     expect(streamed.text).toContain("run.started");
     expect(streamed.text).toContain("message.delta");
+    expect(streamed.text).toContain("suggestion.created");
     expect(streamed.text).toContain("run.completed");
+    expect(await agents.listSuggestions(created.body.run.id)).toHaveLength(1);
 
     const detail = await request(app.getHttpServer())
       .get(`/v1/worlds/${world.id}/agent-sessions/${session.id}`)
