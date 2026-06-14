@@ -52,6 +52,7 @@ type WorldCreationDraft = {
 @Injectable()
 export class AgentService {
   private readonly runAbortControllers = new Map<string, AbortController>();
+  private readonly activeSessionRunStreams = new Map<string, Promise<void>>();
 
   constructor(
     @Inject(AGENT_REPOSITORY) private readonly agents: AgentRepository,
@@ -87,9 +88,8 @@ export class AgentService {
       model: resolveRunModel(process.env),
       provider: parseAgentProvider(process.env.AI_PROVIDER),
     });
-    await sessions.appendMessage({
+    await sessions.appendMessageAtEnd({
       sessionId,
-      sequence: await this.nextSessionMessageSequence(sessionId),
       role: "user",
       content: input.prompt,
       status: "complete",
@@ -344,20 +344,41 @@ export class AgentService {
     const world = await this.requireWorld(run.worldId);
 
     const existingEvents = await this.agents.listEvents(run.id);
-    for (const event of existingEvents) {
-      yield event;
+    if (run.status !== "running") {
+      for (const event of existingEvents) {
+        yield event;
+      }
+      return;
     }
 
-    if (run.status !== "running") return;
+    let lastYieldedSequence = existingEvents.reduce((max, event) => Math.max(max, event.sequence), 0);
 
-    let sequence = existingEvents.reduce((max, event) => Math.max(max, event.sequence), 0) + 1;
-    let lastYieldedSequence = sequence - 1;
+    const activeStream = this.activeSessionRunStreams.get(run.id);
+    if (activeStream) {
+      for (const event of existingEvents) {
+        yield event;
+      }
+      yield* this.streamEventsFromActiveSessionRun(run.id, lastYieldedSequence, activeStream);
+      return;
+    }
+
+    let finishActiveStream = () => {};
+    const currentStream = new Promise<void>((resolve) => {
+      finishActiveStream = resolve;
+    });
+    this.activeSessionRunStreams.set(run.id, currentStream);
+
+    let sequence = lastYieldedSequence + 1;
     let assistantText = "";
     let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
     const controller = new AbortController();
     this.runAbortControllers.set(run.id, controller);
 
     try {
+      for (const event of existingEvents) {
+        yield event;
+      }
+
       const context = selectInitialWorldContext({
         prompt: run.prompt,
         manifest: await buildDisclosureManifest(this.worlds, world),
@@ -497,9 +518,8 @@ export class AgentService {
           completedAt: new Date(),
         });
         if (!completed) return;
-        await sessions.appendMessage({
+        await sessions.appendMessageAtEnd({
           sessionId: run.sessionId,
-          sequence: await this.nextSessionMessageSequence(run.sessionId),
           role: "assistant",
           content: assistantText,
           status: "complete",
@@ -524,9 +544,8 @@ export class AgentService {
           errorMessage: failure.message,
         });
         if (!failed) return;
-        await sessions.appendMessage({
+        await sessions.appendMessageAtEnd({
           sessionId: run.sessionId,
-          sequence: await this.nextSessionMessageSequence(run.sessionId),
           role: "assistant",
           content: assistantText,
           status: "failed",
@@ -538,6 +557,10 @@ export class AgentService {
       if (this.runAbortControllers.get(run.id) === controller) {
         this.runAbortControllers.delete(run.id);
       }
+      if (this.activeSessionRunStreams.get(run.id) === currentStream) {
+        this.activeSessionRunStreams.delete(run.id);
+      }
+      finishActiveStream();
     }
   }
 
@@ -679,10 +702,25 @@ export class AgentService {
     return this.sessions;
   }
 
-  private async nextSessionMessageSequence(sessionId: string) {
-    const sessions = this.requireSessionsRepository();
-    const messages = await sessions.listMessages(sessionId);
-    return messages.reduce((max, message) => Math.max(max, message.sequence), 0) + 1;
+  private async *streamEventsFromActiveSessionRun(
+    runId: string,
+    lastYieldedSequence: number,
+    activeStream: Promise<void>,
+  ): AsyncGenerator<AgentEventRecord> {
+    let settled = false;
+    void activeStream.then(() => {
+      settled = true;
+    });
+
+    while (true) {
+      const events = await this.listEventsAfter(runId, lastYieldedSequence);
+      for (const event of events) {
+        yield event;
+        lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+      }
+      if (settled) return;
+      await Promise.race([delay(10), activeStream]);
+    }
   }
 
   private async appendSessionContextItem(

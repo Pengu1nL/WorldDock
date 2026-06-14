@@ -560,6 +560,28 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
   };
   const counters = { session: 1, subject: 1, contextItem: 1, message: 1 };
 
+  const appendStoredMessage = (input: Parameters<AgentSessionsRepository["appendMessage"]>[0]) => {
+    const duplicate = stores.messages.some((message) =>
+      message.sessionId === input.sessionId &&
+      message.sequence === input.sequence,
+    );
+    if (duplicate) throw new Error(`Agent session message sequence already exists: ${input.sessionId}#${input.sequence}`);
+    const timestamp = now();
+    const message: AgentSessionMessageRecord = {
+      id: `agent_session_message_${counters.message++}`,
+      sessionId: input.sessionId,
+      sequence: input.sequence,
+      role: input.role,
+      content: input.content,
+      status: input.status ?? "complete",
+      metadata: input.metadata ?? {},
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    stores.messages.push(message);
+    return message;
+  };
+
   return {
     stores,
     async createSession(input) {
@@ -712,25 +734,13 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
         .sort(compareCreatedAsc);
     },
     async appendMessage(input) {
-      const duplicate = stores.messages.some((message) =>
-        message.sessionId === input.sessionId &&
-        message.sequence === input.sequence,
-      );
-      if (duplicate) throw new Error(`Agent session message sequence already exists: ${input.sessionId}#${input.sequence}`);
-      const timestamp = now();
-      const message: AgentSessionMessageRecord = {
-        id: `agent_session_message_${counters.message++}`,
-        sessionId: input.sessionId,
-        sequence: input.sequence,
-        role: input.role,
-        content: input.content,
-        status: input.status ?? "complete",
-        metadata: input.metadata ?? {},
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      };
-      stores.messages.push(message);
-      return message;
+      return appendStoredMessage(input);
+    },
+    async appendMessageAtEnd(input) {
+      const sequence = stores.messages
+        .filter((message) => message.sessionId === input.sessionId)
+        .reduce((max, message) => Math.max(max, message.sequence), 0) + 1;
+      return appendStoredMessage({ ...input, sequence });
     },
     async listMessages(sessionId) {
       return stores.messages

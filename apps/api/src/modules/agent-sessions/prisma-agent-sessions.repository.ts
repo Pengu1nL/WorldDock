@@ -34,6 +34,7 @@ const contextItemKinds = [
 ] as const;
 const messageRoles = ["user", "assistant", "system", "tool"] as const;
 const messageStatuses = ["streaming", "complete", "failed"] as const;
+const APPEND_MESSAGE_AT_END_MAX_ATTEMPTS = 3;
 
 class CurrentWorldExplorationSwitchFailed extends Error {}
 
@@ -233,6 +234,35 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
     return mapMessage(created);
   }
 
+  async appendMessageAtEnd(input: Parameters<AgentSessionsRepository["appendMessageAtEnd"]>[0]) {
+    for (let attempt = 1; attempt <= APPEND_MESSAGE_AT_END_MAX_ATTEMPTS; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const latest = await tx.agentSessionMessage.findFirst({
+            where: { sessionId: input.sessionId },
+            orderBy: { sequence: "desc" },
+            select: { sequence: true },
+          });
+          const created = await tx.agentSessionMessage.create({
+            data: {
+              sessionId: input.sessionId,
+              sequence: (latest?.sequence ?? 0) + 1,
+              role: input.role,
+              content: input.content,
+              status: input.status ?? "complete",
+              metadata: (input.metadata ?? {}) as never,
+            },
+          });
+          return mapMessage(created);
+        });
+      } catch (error) {
+        if (attempt < APPEND_MESSAGE_AT_END_MAX_ATTEMPTS && isUniqueConstraintError(error)) continue;
+        throw error;
+      }
+    }
+    throw new Error("Unable to append agent session message.");
+  }
+
   async listMessages(sessionId: string) {
     const messages = await this.prisma.agentSessionMessage.findMany({
       where: { sessionId },
@@ -378,4 +408,8 @@ function parseEnum<T extends string>(value: string, allowed: readonly T[], field
 function parseMetadata(value: unknown): Record<string, unknown> {
   if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
   return {};
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }

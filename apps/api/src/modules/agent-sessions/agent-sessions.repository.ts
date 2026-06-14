@@ -154,5 +154,9 @@ export type AgentSessionsRepository = {
     input: Pick<AgentSessionMessageRecord, "sessionId" | "sequence" | "role" | "content"> &
       Partial<Pick<AgentSessionMessageRecord, "status" | "metadata">>,
   ): Promise<AgentSessionMessageRecord>;
+  appendMessageAtEnd(
+    input: Pick<AgentSessionMessageRecord, "sessionId" | "role" | "content"> &
+      Partial<Pick<AgentSessionMessageRecord, "status" | "metadata">>,
+  ): Promise<AgentSessionMessageRecord>;
   listMessages(sessionId: string): Promise<AgentSessionMessageRecord[]>;
 };
