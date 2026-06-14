@@ -59,10 +59,12 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
   }
 
   async listSessions(worldId: string, query: Parameters<AgentSessionsRepository["listSessions"]>[1] = {}) {
+    if (query.status === "archived" && !query.includeArchived) return [];
+
     const where: Record<string, unknown> = { worldId };
     if (query.kind) where.kind = query.kind;
     if (query.current !== undefined) where.current = query.current;
-    if (query.status && (query.includeArchived || query.status !== "archived")) {
+    if (query.status) {
       where.status = query.status;
     } else if (!query.includeArchived) {
       where.status = { not: "archived" };
