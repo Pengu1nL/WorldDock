@@ -82,6 +82,23 @@ describe("agent event contracts", () => {
     }).status).toBe("pending");
   });
 
+  it("accepts session asset write tools in persisted tool request events", () => {
+    expect(agentEventSchema.parse({
+      id: "evt_tool_1",
+      runId: "run_1",
+      type: "tool.requested",
+      sequence: 4,
+      createdAt: "2026-05-26T12:00:03.000Z",
+      payload: {
+        toolCall: {
+          id: "tool_1",
+          name: "create_world_asset",
+          arguments: { title: "记忆交易所" },
+        },
+      },
+    }).payload.toolCall.name).toBe("create_world_asset");
+  });
+
   it("keeps Pi tools and context references local-only", () => {
     expect(piToolNameSchema.parse("list_local_releases")).toBe("list_local_releases");
     expect(() => piToolNameSchema.parse(`list_${"repo"}sitory_releases`)).toThrow();
