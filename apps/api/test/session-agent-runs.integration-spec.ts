@@ -123,6 +123,53 @@ describe("agent session run local endpoints", () => {
     }));
   });
 
+  it("persists default provider context as source fragments", async () => {
+    const provider = createMockStreamingAgentProvider([
+      {
+        type: "context",
+        contextRef: {
+          kind: "archive",
+          title: "记忆交易法",
+          excerpt: "许可制度决定谁能合法买卖记忆。",
+          targetId: "archive_1",
+        },
+      },
+      { type: "delta", text: "亲属记忆交易会暴露许可继承漏洞。" },
+      {
+        type: "usage",
+        tokenUsage: { inputTokens: 8, outputTokens: 13, totalTokens: 21 },
+      },
+    ]);
+    const created = await createAndStreamSessionRun("检查亲属记忆交易的制度漏洞", provider);
+    app = created.app;
+
+    const detail = await request(created.app.getHttpServer())
+      .get(`/v1/worlds/${created.world.id}/agent-sessions/${created.sessionId}`)
+      .expect(200);
+
+    expect(detail.body.contextItems).toEqual([
+      expect.objectContaining({
+        sessionId: created.sessionId,
+        kind: "source_fragment",
+        targetId: "archive_1",
+        title: "记忆交易法",
+        summary: "许可制度决定谁能合法买卖记忆。",
+        source: "initial",
+        metadata: expect.objectContaining({
+          runId: created.runId,
+          providerKind: "archive",
+          providerLevel: "card",
+          source: "initial",
+        }),
+      }),
+    ]);
+
+    const contextUsed = created.events.find((event) => event.type === "context.used");
+    expect(contextUsed?.data.payload).toEqual(expect.objectContaining({
+      contextItemId: detail.body.contextItems[0].id,
+    }));
+  });
+
   it("does not create official suggestions for world exploration session runs", async () => {
     const worlds = createInMemoryWorlds();
     const agents = createInMemoryAgents();
@@ -278,9 +325,37 @@ describe("agent session run local endpoints", () => {
     expect((await sessions.listMessages(session.id)).map((message) => message.role)).toEqual(["user"]);
     expect(await agents.listSuggestions(created.body.run.id)).toHaveLength(0);
   });
+
+  it("parses CRLF SSE messages with optional data spacing", () => {
+    const parsed = parseSseMessages([
+      "id: event_1",
+      "event: context.used",
+      "data:{\"payload\":{\"contextItemId\":\"ctx_1\"}}",
+      "",
+      "id: event_2",
+      "event: run.completed",
+      "data: {\"payload\":{\"tokenUsage\":{\"totalTokens\":1}}}",
+    ].join("\r\n"));
+
+    expect(parsed).toEqual([
+      expect.objectContaining({
+        id: "event_1",
+        type: "context.used",
+        data: { payload: { contextItemId: "ctx_1" } },
+      }),
+      expect.objectContaining({
+        id: "event_2",
+        type: "run.completed",
+        data: { payload: { tokenUsage: { totalTokens: 1 } } },
+      }),
+    ]);
+  });
 });
 
-async function createAndStreamSessionRun(prompt: string) {
+async function createAndStreamSessionRun(
+  prompt: string,
+  provider: AgentProvider = createMockStreamingAgentProvider(),
+) {
   const worlds = createInMemoryWorlds();
   const agents = createInMemoryAgents();
   const sessions = createInMemoryAgentSessions();
@@ -309,7 +384,7 @@ async function createAndStreamSessionRun(prompt: string) {
     current: true,
     metadata: {},
   });
-  const app = await createAgentSessionRunApp(worlds, agents, sessions);
+  const app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
 
   const created = await request(app.getHttpServer())
     .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)

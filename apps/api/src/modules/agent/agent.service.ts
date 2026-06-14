@@ -26,7 +26,7 @@ const LEGACY_AGENT_RUN_MODE: AgentRunRecord["mode"] = "expand";
 type AgentProviderChunkContext = Extract<AgentProviderChunk, { type: "context" }>["contextRef"];
 type SessionContextItemFromProvider = Omit<CreateAgentSessionContextItemInput, "sessionId" | "targetId"> & {
   targetId?: string | null;
-  source: string;
+  source: NonNullable<AgentProviderChunkContext["source"]>;
 };
 
 type CreateWorldDraftInput = {
