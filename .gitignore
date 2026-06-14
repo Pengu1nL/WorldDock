@@ -13,3 +13,5 @@ docs/*
 .env.*
 !.env.example
 packages/db/src/generated/
+.repo-split
+.codegraph
