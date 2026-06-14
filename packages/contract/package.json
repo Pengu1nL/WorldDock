@@ -7,8 +7,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./agent-sessions": "./src/agent-sessions/index.ts",
     "./assets": "./src/assets/index.ts",
+    "./consistency": "./src/consistency/index.ts",
     "./hub-api": "./src/hub-api/index.ts",
+    "./potential-assets": "./src/potential-assets/index.ts",
     "./releases": "./src/releases/index.ts",
     "./world": "./src/world/index.ts",
     "./worlds/world-package": "./src/worlds/world-package.ts"
