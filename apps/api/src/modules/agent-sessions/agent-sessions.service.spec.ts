@@ -140,7 +140,7 @@ function atomicRepository(overrides: Partial<AgentSessionsRepository> & Record<s
     createSession: async () => sessionRecord({}),
     findSessionById: async () => null,
     findSessionForWorld: async () => null,
-    listSessions: async () => [],
+    listSessions: async () => ({ sessions: [], nextCursor: null }),
     updateSession: async () => null,
     clearCurrentWorldExploration: async () => {},
     createSubject: async () => subjectRecord(),

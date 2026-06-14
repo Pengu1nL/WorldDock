@@ -124,6 +124,66 @@ describe("agent sessions local endpoints", () => {
     ]);
   });
 
+  it("lists sessions by kind, status, and title query", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await createWorld(worlds);
+    app = await createAgentSessionsApp(worlds, createInMemoryAgentSessions());
+    const server = app.getHttpServer();
+    const createSession = (
+      title: string,
+      kind: "world_exploration" | "consistency_repair",
+      input: Partial<{ issueId: string }> = {},
+    ) =>
+      request(server)
+        .post(`/v1/worlds/${world.id}/agent-sessions`)
+        .send({ kind, title, ...input })
+        .expect(201);
+
+    await createSession("记忆交易推演", "world_exploration");
+    await createSession("白塔巡检", "world_exploration");
+    await createSession("白塔时间修复", "consistency_repair", { issueId: "issue_1" });
+
+    const listed = await request(app.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-sessions`)
+      .query({ kind: "world_exploration", status: "active", q: "记忆" })
+      .expect(200);
+
+    expect(listed.body.nextCursor).toBeNull();
+    expect(listed.body.sessions).toHaveLength(1);
+    expect(listed.body.sessions[0]).toMatchObject({ title: "记忆交易推演" });
+  });
+
+  it("paginates sessions with limit and cursor", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await createWorld(worlds);
+    app = await createAgentSessionsApp(worlds, createInMemoryAgentSessions());
+    const server = app.getHttpServer();
+
+    for (const title of ["第一轮", "第二轮", "第三轮"]) {
+      await request(server)
+        .post(`/v1/worlds/${world.id}/agent-sessions`)
+        .send({ kind: "world_exploration", title })
+        .expect(201);
+    }
+
+    const firstPage = await request(server)
+      .get(`/v1/worlds/${world.id}/agent-sessions`)
+      .query({ limit: 2 })
+      .expect(200);
+
+    expect(firstPage.body.sessions).toHaveLength(2);
+    expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+    const secondPage = await request(server)
+      .get(`/v1/worlds/${world.id}/agent-sessions`)
+      .query({ limit: 2, cursor: firstPage.body.nextCursor })
+      .expect(200);
+
+    expect(secondPage.body.nextCursor).toBeNull();
+    expect(secondPage.body.sessions).toHaveLength(1);
+    expect(new Set([...firstPage.body.sessions, ...secondPage.body.sessions].map((session) => session.id)).size).toBe(3);
+  });
+
   it("archives a session and switches the current world exploration session", async () => {
     const worlds = createInMemoryWorlds();
     const world = await createWorld(worlds);

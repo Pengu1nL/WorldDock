@@ -68,8 +68,54 @@ export type ListAgentSessionsQuery = {
   current?: boolean;
   includeArchived?: boolean;
   q?: string;
+  cursor?: string;
   limit?: number;
 };
+
+export type ListAgentSessionsResult = {
+  sessions: AgentSessionRecord[];
+  nextCursor: string | null;
+};
+
+export const DEFAULT_AGENT_SESSION_LIST_LIMIT = 20;
+export const MAX_AGENT_SESSION_LIST_LIMIT = 50;
+
+export type AgentSessionListCursor = {
+  updatedAt: Date;
+  id: string;
+};
+
+export class InvalidAgentSessionListCursorError extends Error {
+  constructor() {
+    super("Invalid agent session cursor.");
+  }
+}
+
+export function normalizeAgentSessionListLimit(limit?: number) {
+  if (limit === undefined || !Number.isFinite(limit) || limit < 1) return DEFAULT_AGENT_SESSION_LIST_LIMIT;
+  return Math.min(Math.trunc(limit), MAX_AGENT_SESSION_LIST_LIMIT);
+}
+
+export function encodeAgentSessionListCursor(session: Pick<AgentSessionRecord, "id" | "updatedAt">) {
+  return Buffer.from(JSON.stringify({ updatedAt: session.updatedAt.toISOString(), id: session.id })).toString("base64url");
+}
+
+export function decodeAgentSessionListCursor(cursor: string): AgentSessionListCursor {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    if (!parsed || typeof parsed !== "object") throw new InvalidAgentSessionListCursorError();
+    const { updatedAt, id } = parsed as Record<string, unknown>;
+    if (typeof updatedAt !== "string" || typeof id !== "string" || !id) {
+      throw new InvalidAgentSessionListCursorError();
+    }
+    const parsedUpdatedAt = new Date(updatedAt);
+    if (Number.isNaN(parsedUpdatedAt.getTime())) throw new InvalidAgentSessionListCursorError();
+    return { updatedAt: parsedUpdatedAt, id };
+  } catch (error) {
+    if (error instanceof InvalidAgentSessionListCursorError) throw error;
+    throw new InvalidAgentSessionListCursorError();
+  }
+}
 
 export type CreateSessionWithSubjectInput = {
   session: Pick<AgentSessionRecord, "worldId" | "kind" | "title"> &
@@ -87,7 +133,7 @@ export type AgentSessionsRepository = {
   createSessionWithSubject(input: CreateSessionWithSubjectInput): Promise<AgentSessionRecord>;
   findSessionById(id: string): Promise<AgentSessionRecord | null>;
   findSessionForWorld(worldId: string, sessionId: string): Promise<AgentSessionRecord | null>;
-  listSessions(worldId: string, query?: ListAgentSessionsQuery): Promise<AgentSessionRecord[]>;
+  listSessions(worldId: string, query?: ListAgentSessionsQuery): Promise<ListAgentSessionsResult>;
   updateSession(
     id: string,
     input: Partial<Pick<AgentSessionRecord, "title" | "status" | "current" | "metadata">>,

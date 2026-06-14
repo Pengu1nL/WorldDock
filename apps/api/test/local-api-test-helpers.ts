@@ -18,6 +18,11 @@ import type {
   AgentSessionsRepository,
   AgentSessionSubjectRecord,
 } from "../src/modules/agent-sessions/agent-sessions.repository";
+import {
+  decodeAgentSessionListCursor,
+  encodeAgentSessionListCursor,
+  normalizeAgentSessionListLimit,
+} from "../src/modules/agent-sessions/agent-sessions.repository";
 import type {
   ArchiveEntryRecord,
   ConflictRecord,
@@ -618,15 +623,25 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
     },
     async listSessions(worldId, query = {}) {
       const q = query.q?.trim().toLocaleLowerCase();
-      return [...stores.sessions.values()]
+      if (query.status === "archived" && !query.includeArchived) return { sessions: [], nextCursor: null };
+
+      const cursor = query.cursor ? decodeAgentSessionListCursor(query.cursor) : null;
+      const limit = normalizeAgentSessionListLimit(query.limit);
+      const sessions = [...stores.sessions.values()]
         .filter((session) => session.worldId === worldId)
         .filter((session) => query.includeArchived || session.status !== "archived")
         .filter((session) => !query.kind || session.kind === query.kind)
         .filter((session) => !query.status || session.status === query.status)
         .filter((session) => query.current === undefined || session.current === query.current)
         .filter((session) => !q || session.title.toLocaleLowerCase().includes(q))
+        .filter((session) => !cursor || isAfterAgentSessionCursor(session, cursor))
         .sort(compareUpdatedDesc)
-        .slice(0, query.limit);
+        .slice(0, limit + 1);
+      const page = sessions.slice(0, limit);
+      return {
+        sessions: page,
+        nextCursor: sessions.length > limit ? encodeAgentSessionListCursor(page[page.length - 1]) : null,
+      };
     },
     async updateSession(id, input) {
       const session = stores.sessions.get(id);
@@ -912,8 +927,17 @@ function compareCreatedAsc<T extends { createdAt: Date }>(left: T, right: T) {
   return left.createdAt.getTime() - right.createdAt.getTime();
 }
 
-function compareUpdatedDesc<T extends { updatedAt: Date; createdAt: Date }>(left: T, right: T) {
-  return right.updatedAt.getTime() - left.updatedAt.getTime() || right.createdAt.getTime() - left.createdAt.getTime();
+function compareUpdatedDesc<T extends { updatedAt: Date; id: string }>(left: T, right: T) {
+  return right.updatedAt.getTime() - left.updatedAt.getTime() || left.id.localeCompare(right.id);
+}
+
+function isAfterAgentSessionCursor(
+  session: AgentSessionRecord,
+  cursor: { updatedAt: Date; id: string },
+) {
+  const sessionUpdatedAt = session.updatedAt.getTime();
+  const cursorUpdatedAt = cursor.updatedAt.getTime();
+  return sessionUpdatedAt < cursorUpdatedAt || (sessionUpdatedAt === cursorUpdatedAt && session.id > cursor.id);
 }
 
 function archiveEntriesFor(worlds: InMemoryWorlds, worldId: string) {

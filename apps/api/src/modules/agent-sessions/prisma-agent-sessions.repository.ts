@@ -1,5 +1,10 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
+import {
+  decodeAgentSessionListCursor,
+  encodeAgentSessionListCursor,
+  normalizeAgentSessionListLimit,
+} from "./agent-sessions.repository";
 import type {
   AgentSessionContextItemKind,
   AgentSessionContextItemRecord,
@@ -94,7 +99,7 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
   }
 
   async listSessions(worldId: string, query: Parameters<AgentSessionsRepository["listSessions"]>[1] = {}) {
-    if (query.status === "archived" && !query.includeArchived) return [];
+    if (query.status === "archived" && !query.includeArchived) return { sessions: [], nextCursor: null };
 
     const where: Record<string, unknown> = { worldId };
     if (query.kind) where.kind = query.kind;
@@ -107,13 +112,25 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
     if (query.q?.trim()) {
       where.title = { contains: query.q.trim(), mode: "insensitive" };
     }
+    if (query.cursor) {
+      const cursor = decodeAgentSessionListCursor(query.cursor);
+      where.OR = [
+        { updatedAt: { lt: cursor.updatedAt } },
+        { updatedAt: cursor.updatedAt, id: { gt: cursor.id } },
+      ];
+    }
 
+    const limit = normalizeAgentSessionListLimit(query.limit);
     const sessions = await this.prisma.agentSession.findMany({
       where: where as never,
-      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-      take: query.limit,
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+      take: limit + 1,
     });
-    return sessions.map(mapSession);
+    const page = sessions.slice(0, limit).map(mapSession);
+    return {
+      sessions: page,
+      nextCursor: sessions.length > limit ? encodeAgentSessionListCursor(page[page.length - 1]) : null,
+    };
   }
 
   async updateSession(id: string, input: Parameters<AgentSessionsRepository["updateSession"]>[1]) {

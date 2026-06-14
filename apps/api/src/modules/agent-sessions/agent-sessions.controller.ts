@@ -35,12 +35,22 @@ const queryBooleanSchema = z.union([
   z.literal("true").transform(() => true),
   z.literal("false").transform(() => false),
 ]);
+const includeArchivedQuerySchema = z.union([
+  z.boolean(),
+  z.literal("1"),
+  z.literal("true"),
+  z.literal("0"),
+  z.literal("false"),
+]).transform((value) => value === true || value === "1" || value === "true");
 
 const listSessionsQuerySchema = z.object({
   kind: sessionKindSchema.optional(),
   status: sessionStatusSchema.optional(),
   current: queryBooleanSchema.optional(),
-  includeArchived: queryBooleanSchema.optional(),
+  includeArchived: includeArchivedQuerySchema.optional(),
+  q: z.string().trim().optional(),
+  cursor: z.string().trim().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
 @Controller("worlds/:worldId/agent-sessions")
@@ -60,8 +70,8 @@ export class AgentSessionsController {
   @Get()
   async list(@Param("worldId") worldId: string, @Query() query: unknown) {
     await this.requireWorld(worldId);
-    const sessions = await this.agentSessions.listSessions(worldId, listSessionsQuerySchema.parse(query));
-    return { sessions: sessions.map(serializeSession) };
+    const { sessions, nextCursor } = await this.agentSessions.listSessions(worldId, listSessionsQuerySchema.parse(query));
+    return { sessions: sessions.map(serializeSession), nextCursor };
   }
 
   @Get(":sessionId")

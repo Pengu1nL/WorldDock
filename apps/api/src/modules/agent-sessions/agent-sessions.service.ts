@@ -1,8 +1,10 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   AGENT_SESSIONS_REPOSITORY,
+  InvalidAgentSessionListCursorError,
   type AgentSessionRecord,
   type AgentSessionsRepository,
+  decodeAgentSessionListCursor,
 } from "./agent-sessions.repository";
 
 type CreateAgentSessionInput =
@@ -51,6 +53,19 @@ export class AgentSessionsService {
   }
 
   async listSessions(worldId: string, query?: ListAgentSessionsInput) {
+    if (query?.cursor) {
+      try {
+        decodeAgentSessionListCursor(query.cursor);
+      } catch (error) {
+        if (error instanceof InvalidAgentSessionListCursorError) {
+          throw new BadRequestException({
+            code: "BAD_REQUEST",
+            message: "Invalid agent session cursor.",
+          });
+        }
+        throw error;
+      }
+    }
     return this.sessions.listSessions(worldId, query);
   }
 
