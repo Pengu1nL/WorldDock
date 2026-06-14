@@ -28,6 +28,13 @@ model World {
   assetRelations    WorldAssetRelation[]
   agentRuns         AgentRun[]
   agentSuggestions  AgentSuggestion[]
+  agentSessions     AgentSession[]
+  potentialAssets   PotentialAsset[]
+  officialAssets    OfficialWorldAsset[]
+  officialAssetRevisions OfficialWorldAssetRevision[]
+  officialAssetIndexes   OfficialWorldAssetIndex[]
+  officialAssetPatches   WorldAssetPatch[]
+  officialAssetBatches   WorldAssetPatchBatch[]
 
   @@index([coverObjectId])
   @@map("worlds")
@@ -86,17 +93,24 @@ model Conflict {
 }
 
 model ConsistencyIssue {
-  id          String   @id @default(cuid())
-  worldId     String
-  title       String
-  description String
-  involves    String[] @default([])
-  severity    String   @default("normal")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  world       World    @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  id              String                 @id @default(cuid())
+  worldId         String
+  title           String
+  description     String
+  involves        String[]               @default([])
+  severity        String                 @default("normal")
+  status          String                 @default("open")
+  subjectAssetIds String[]               @default([])
+  evidence        Json                   @default("[]")
+  metadata        Json                   @default("{}")
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  resolvedAt      DateTime?
+  world           World                  @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  patchBatches    WorldAssetPatchBatch[]
 
   @@index([worldId])
+  @@index([worldId, status])
   @@map("consistency_issues")
 }
 
@@ -135,6 +149,7 @@ model AgentRun {
   events       AgentEvent[]
   suggestions  AgentSuggestion[]
   contextRefs  ContextRef[]
+  potentialAssets PotentialAsset[]
 
   @@index([worldId])
   @@index([piSessionId])
@@ -187,6 +202,213 @@ model ContextRef {
   @@index([runId])
   @@index([runId, level])
   @@map("context_refs")
+}
+
+model AgentSession {
+  id              String                    @id @default(cuid())
+  worldId         String
+  kind            String
+  title           String
+  status          String                    @default("active")
+  current         Boolean                   @default(false)
+  metadata        Json                      @default("{}")
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+  world           World                     @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  subjects        AgentSessionSubject[]
+  contextItems    AgentSessionContextItem[]
+  messages        AgentSessionMessage[]
+  potentialAssets PotentialAsset[]
+  patchBatches    WorldAssetPatchBatch[]
+
+  @@index([worldId, kind, status])
+  @@index([worldId, current])
+  @@map("agent_sessions")
+}
+
+model AgentSessionSubject {
+  id        String       @id @default(cuid())
+  sessionId String
+  kind      String
+  targetId  String
+  title     String?
+  metadata  Json         @default("{}")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("agent_session_subjects")
+}
+
+model AgentSessionContextItem {
+  id        String       @id @default(cuid())
+  sessionId String
+  kind      String
+  targetId  String
+  title     String?
+  summary   String?
+  metadata  Json         @default("{}")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("agent_session_context_items")
+}
+
+model AgentSessionMessage {
+  id        String       @id @default(cuid())
+  sessionId String
+  sequence  Int
+  role      String
+  content   String
+  status    String       @default("complete")
+  metadata  Json         @default("{}")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId])
+  @@map("agent_session_messages")
+}
+
+model PotentialAsset {
+  id              String              @id @default(cuid())
+  worldId         String
+  sessionId       String
+  runId           String?
+  type            String
+  title           String
+  summary         String
+  evidence        Json                @default("[]")
+  status          String              @default("active")
+  promotedAssetId String?
+  metadata        Json                @default("{}")
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  world           World               @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  session         AgentSession        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  run             AgentRun?           @relation(fields: [runId], references: [id], onDelete: SetNull)
+  promotedAsset   OfficialWorldAsset? @relation("PromotedPotentialAssets", fields: [promotedAssetId], references: [id], onDelete: SetNull)
+
+  @@index([worldId, sessionId])
+  @@index([worldId, type, status])
+  @@index([runId])
+  @@index([promotedAssetId])
+  @@map("potential_assets")
+}
+
+model OfficialWorldAsset {
+  id                       String                       @id @default(cuid())
+  worldId                  String
+  type                     String
+  name                     String
+  summary                  String
+  documentKey              String
+  status                   String                       @default("active")
+  version                  Int                          @default(1)
+  tags                     String[]                     @default([])
+  metadata                 Json                         @default("{}")
+  createdAt                DateTime                     @default(now())
+  updatedAt                DateTime                     @updatedAt
+  archivedAt               DateTime?
+  world                    World                        @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  revisions                OfficialWorldAssetRevision[]
+  indexes                  OfficialWorldAssetIndex[]
+  patches                  WorldAssetPatch[]
+  promotedPotentialAssets  PotentialAsset[]             @relation("PromotedPotentialAssets")
+
+  @@unique([worldId, documentKey])
+  @@index([worldId, type, status])
+  @@map("official_world_assets")
+}
+
+model OfficialWorldAssetRevision {
+  id        String             @id @default(cuid())
+  worldId   String
+  assetId   String
+  version   Int
+  markdown  String
+  summary   String?
+  metadata  Json               @default("{}")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  world     World              @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  asset     OfficialWorldAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, version])
+  @@index([worldId, assetId])
+  @@map("official_world_asset_revisions")
+}
+
+model OfficialWorldAssetIndex {
+  id        String             @id @default(cuid())
+  worldId   String
+  assetId   String
+  title     String
+  summary   String?
+  metadata  Json               @default("{}")
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  world     World              @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  asset     OfficialWorldAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([worldId, assetId])
+  @@map("official_world_asset_indexes")
+}
+
+model WorldAssetPatchBatch {
+  id               String            @id @default(cuid())
+  worldId          String
+  sessionId        String
+  issueId          String?
+  status           String            @default("applied")
+  metadata         Json              @default("{}")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  appliedAt        DateTime?
+  revertedAt       DateTime?
+  world            World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  session          AgentSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  consistencyIssue ConsistencyIssue? @relation(fields: [issueId], references: [id], onDelete: SetNull)
+  patches          WorldAssetPatch[]
+
+  @@index([worldId, sessionId])
+  @@index([worldId, status])
+  @@index([issueId])
+  @@map("world_asset_patch_batches")
+}
+
+model WorldAssetPatch {
+  id               String                @id @default(cuid())
+  worldId          String
+  assetId          String
+  batchId          String?
+  beforeRevisionId String?
+  afterRevisionId  String?
+  beforeMarkdown   String
+  afterMarkdown    String
+  diff             String?
+  assetVersionFrom Int
+  assetVersionTo   Int
+  status           String                @default("applied")
+  metadata         Json                  @default("{}")
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  appliedAt        DateTime?
+  revertedAt       DateTime?
+  world            World                 @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  asset            OfficialWorldAsset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  batch            WorldAssetPatchBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([worldId, assetId])
+  @@index([worldId, batchId])
+  @@index([worldId, status])
+  @@index([assetId, status])
+  @@index([batchId])
+  @@map("world_asset_patches")
 }
 
 model LocalStorageObject {
