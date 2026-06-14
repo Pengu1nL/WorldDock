@@ -132,6 +132,11 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
 
   async setCurrentWorldExploration(worldId: string, sessionId: string) {
     return this.prisma.$transaction(async (tx) => {
+      const target = await tx.agentSession.findFirst({
+        where: { id: sessionId, worldId, kind: "world_exploration", status: "active" },
+      });
+      if (!target) return null;
+
       await tx.agentSession.updateMany({
         where: { worldId, kind: "world_exploration", current: true },
         data: { current: false },

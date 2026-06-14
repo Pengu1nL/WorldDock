@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentSessionRecord, AgentSessionsRepository } from "./agent-sessions.repository";
 import { AgentSessionsService } from "./agent-sessions.service";
+import { PrismaAgentSessionsRepository } from "./prisma-agent-sessions.repository";
 
 describe("AgentSessionsService", () => {
   it("creates a session and primary subject through the repository atomic method", async () => {
@@ -72,6 +73,36 @@ describe("AgentSessionsService", () => {
 
     expect(result).toBe(session);
     expect(calls).toEqual([{ worldId: "world_1", sessionId: "session_1" }]);
+  });
+});
+
+describe("PrismaAgentSessionsRepository", () => {
+  it("does not clear the existing current session when switching to an invalid target", async () => {
+    const sessions = new Map<string, AgentSessionRecord>([
+      [
+        "session_current",
+        sessionRecord({
+          id: "session_current",
+          current: true,
+        }),
+      ],
+      [
+        "session_archived",
+        sessionRecord({
+          id: "session_archived",
+          status: "archived",
+          current: false,
+        }),
+      ],
+    ]);
+    const repository = new PrismaAgentSessionsRepository();
+    Object.defineProperty(repository, "prisma", { value: fakePrismaClient(sessions) });
+
+    const result = await repository.setCurrentWorldExploration("world_1", "session_archived");
+
+    expect(result).toBeNull();
+    expect(sessions.get("session_current")).toMatchObject({ current: true });
+    expect(sessions.get("session_archived")).toMatchObject({ current: false });
   });
 });
 
@@ -151,4 +182,37 @@ function messageRecord() {
     createdAt: timestamp,
     updatedAt: timestamp,
   };
+}
+
+function fakePrismaClient(sessions: Map<string, AgentSessionRecord>) {
+  const tx = {
+    agentSession: {
+      async findFirst(input: { where: Partial<AgentSessionRecord> }) {
+        return [...sessions.values()].find((session) => matchesWhere(session, input.where)) ?? null;
+      },
+      async findUnique(input: { where: Pick<AgentSessionRecord, "id"> }) {
+        return sessions.get(input.where.id) ?? null;
+      },
+      async updateMany(input: { where: Partial<AgentSessionRecord>; data: Partial<AgentSessionRecord> }) {
+        let count = 0;
+        for (const [id, session] of sessions) {
+          if (!matchesWhere(session, input.where)) continue;
+          sessions.set(id, { ...session, ...input.data });
+          count++;
+        }
+        return { count };
+      },
+    },
+  };
+
+  return {
+    async $transaction<T>(callback: (client: typeof tx) => Promise<T>) {
+      return callback(tx);
+    },
+    async $disconnect() {},
+  };
+}
+
+function matchesWhere(session: AgentSessionRecord, where: Partial<AgentSessionRecord>) {
+  return Object.entries(where).every(([key, value]) => session[key as keyof AgentSessionRecord] === value);
 }
