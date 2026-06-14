@@ -765,6 +765,20 @@ export function createMockStreamingAgentProvider(chunks: AgentProviderChunk[] = 
   return provider;
 }
 
+export function parseSseMessages(text: string): Array<{ id?: string; type?: string; data?: any }> {
+  return text.trim().split(/\n\n+/).filter(Boolean).map((block) => {
+    const message: { id?: string; type?: string; data?: any } = {};
+    const dataLines: string[] = [];
+    for (const line of block.split(/\n/)) {
+      if (line.startsWith("id:")) message.id = line.slice(3).trim();
+      if (line.startsWith("event:")) message.type = line.slice(6).trim();
+      if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (dataLines.length > 0) message.data = JSON.parse(dataLines.join("\n"));
+    return message;
+  });
+}
+
 function defaultAgentChunks(): AgentProviderChunk[] {
   return [
     {

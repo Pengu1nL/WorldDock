@@ -152,7 +152,10 @@ export const agentEventSchema = z.discriminatedUnion("type", [
   }),
   baseAgentEventSchema.extend({
     type: z.literal("context.used"),
-    payload: z.object({ contextRef: contextRefSchema.omit({ runId: true }) }),
+    payload: z.object({
+      contextRef: contextRefSchema.omit({ runId: true }),
+      contextItemId: z.string().min(1).optional(),
+    }),
   }),
   baseAgentEventSchema.extend({
     type: z.literal("pi.session.started"),

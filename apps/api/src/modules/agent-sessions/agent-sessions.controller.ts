@@ -145,8 +145,10 @@ function serializeSubject(record: AgentSessionSubjectRecord) {
 }
 
 function serializeContextItem(record: AgentSessionContextItemRecord) {
+  const source = typeof record.metadata.source === "string" ? record.metadata.source : undefined;
   return {
     ...record,
+    ...(source ? { source } : {}),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };

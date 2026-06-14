@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException, Optional, ServiceUnavailableExce
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
 import {
   AGENT_SESSIONS_REPOSITORY,
-  type AgentSessionContextItemKind,
+  type CreateAgentSessionContextItemInput,
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
 import {
@@ -22,6 +22,12 @@ import { AGENT_PROVIDER, type AgentProvider, type AgentProviderChunk } from "./a
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord } from "./agent.repository";
 
 const LEGACY_AGENT_RUN_MODE: AgentRunRecord["mode"] = "expand";
+
+type AgentProviderChunkContext = Extract<AgentProviderChunk, { type: "context" }>["contextRef"];
+type SessionContextItemFromProvider = Omit<CreateAgentSessionContextItemInput, "sessionId" | "targetId"> & {
+  targetId?: string | null;
+  source: string;
+};
 
 type CreateWorldDraftInput = {
   inspiration: string;
@@ -440,7 +446,7 @@ export class AgentService {
 
           if (chunk.type === "context") {
             const created = await this.agents.createContextRef({ runId: run.id, ...chunk.contextRef });
-            await this.appendSessionContextItem(run.sessionId, run.id, chunk.contextRef);
+            const contextItem = await this.appendSessionContextItem(run.sessionId, run.id, chunk.contextRef);
             const event = await this.append(run.id, sequence++, "context.used", {
               contextRef: {
                 id: created.id,
@@ -451,6 +457,7 @@ export class AgentService {
                 level: created.level ?? "card",
                 source: created.source ?? "initial",
               },
+              contextItemId: contextItem.id,
             });
             yield event;
             lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
@@ -719,27 +726,19 @@ export class AgentService {
   private async appendSessionContextItem(
     sessionId: string,
     runId: string,
-    contextRef: {
-      kind: "world" | "archive" | "seed" | "conflict";
-      title: string;
-      excerpt: string;
-      targetId?: string | null;
-      level?: string;
-      source?: string;
-    },
+    contextRef: AgentProviderChunkContext,
   ) {
     const sessions = this.requireSessionsRepository();
-    await sessions.createContextItem({
+    const mapped = mapProviderContextToSessionItem(contextRef);
+    const { source, targetId, metadata, ...contextItem } = mapped;
+    return sessions.createContextItem({
       sessionId,
-      kind: sessionContextKindFromContextRef(contextRef.kind),
-      targetId: contextRef.targetId ?? runId,
-      title: contextRef.title,
-      summary: contextRef.excerpt,
+      ...contextItem,
+      targetId: targetId ?? runId,
       metadata: {
+        ...metadata,
         runId,
-        contextKind: contextRef.kind,
-        level: contextRef.level ?? "card",
-        source: contextRef.source ?? "initial",
+        source,
       },
     });
   }
@@ -1026,9 +1025,20 @@ function parseAgentProvider(value: string | undefined): AgentRunRecord["provider
   throw new Error(`Unsupported agent provider: ${value}`);
 }
 
-function sessionContextKindFromContextRef(kind: "world" | "archive" | "seed" | "conflict"): AgentSessionContextItemKind {
-  if (kind === "world") return "asset_index";
-  return "asset_document";
+function mapProviderContextToSessionItem(contextRef: AgentProviderChunkContext): SessionContextItemFromProvider {
+  const providerLevel = contextRef.level ?? "card";
+  const source = contextRef.source ?? "initial";
+  return {
+    kind: providerLevel === "manifest" ? "asset_index" : "source_fragment",
+    title: contextRef.title,
+    summary: contextRef.excerpt,
+    targetId: contextRef.targetId,
+    source,
+    metadata: {
+      providerKind: contextRef.kind,
+      providerLevel,
+    },
+  };
 }
 
 function resolveRunModel(env: Record<string, string | undefined>) {

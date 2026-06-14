@@ -15,6 +15,7 @@ import {
   createInMemoryAgents,
   createInMemoryWorlds,
   createMockStreamingAgentProvider,
+  parseSseMessages,
   type InMemoryAgentSessions,
   type InMemoryAgents,
   type InMemoryWorlds,
@@ -88,6 +89,38 @@ describe("agent session run local endpoints", () => {
 
     expect(detail.body.messages.map((message: any) => message.role)).toEqual(["user", "assistant"]);
     expect(detail.body.messages[0].content).toBe("继续推演记忆交易");
+  });
+
+  it("persists provider context as session context items", async () => {
+    const created = await createAndStreamSessionRun("检查亲属记忆交易的制度漏洞");
+    app = created.app;
+
+    const detail = await request(created.app.getHttpServer())
+      .get(`/v1/worlds/${created.world.id}/agent-sessions/${created.sessionId}`)
+      .expect(200);
+
+    expect(detail.body.contextItems).toEqual([
+      expect.objectContaining({
+        sessionId: created.sessionId,
+        kind: "asset_index",
+        targetId: created.world.id,
+        title: "回忆所 · 世界摘要",
+        summary: "记忆可以被买卖。",
+        source: "initial",
+        metadata: expect.objectContaining({
+          runId: created.runId,
+          providerKind: "world",
+          providerLevel: "manifest",
+          source: "initial",
+        }),
+      }),
+    ]);
+
+    const contextUsed = created.events.find((event) => event.type === "context.used");
+    expect(contextUsed?.data.payload).toEqual(expect.objectContaining({
+      contextItemId: detail.body.contextItems[0].id,
+      contextRef: expect.objectContaining({ title: "回忆所 · 世界摘要", source: "initial" }),
+    }));
   });
 
   it("does not create official suggestions for world exploration session runs", async () => {
@@ -246,6 +279,56 @@ describe("agent session run local endpoints", () => {
     expect(await agents.listSuggestions(created.body.run.id)).toHaveLength(0);
   });
 });
+
+async function createAndStreamSessionRun(prompt: string) {
+  const worlds = createInMemoryWorlds();
+  const agents = createInMemoryAgents();
+  const sessions = createInMemoryAgentSessions();
+  const world = await worlds.createWorld({
+    name: "回忆所",
+    type: "近未来",
+    summary: "记忆可以被买卖。",
+    tags: ["记忆"],
+    mode: "local",
+    maturity: 20,
+  });
+  await worlds.createArchiveEntry({
+    worldId: world.id,
+    title: "记忆交易法",
+    category: "世界规则",
+    summary: "记忆交易需要登记。",
+    body: "许可制度决定谁能合法买卖记忆。",
+    relations: [],
+    position: 0,
+  });
+  const session = await sessions.createSession({
+    worldId: world.id,
+    kind: "world_exploration",
+    title: "记忆交易推演",
+    status: "active",
+    current: true,
+    metadata: {},
+  });
+  const app = await createAgentSessionRunApp(worlds, agents, sessions);
+
+  const created = await request(app.getHttpServer())
+    .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+    .send({ prompt })
+    .expect(201);
+
+  const streamed = await request(app.getHttpServer())
+    .get(`/v1/agent-session-runs/${created.body.run.id}/events`)
+    .set("accept", "text/event-stream")
+    .expect(200);
+
+  return {
+    world,
+    app,
+    sessionId: session.id,
+    runId: created.body.run.id,
+    events: parseSseMessages(streamed.text),
+  };
+}
 
 async function createAgentSessionRunApp(
   worlds: InMemoryWorlds,

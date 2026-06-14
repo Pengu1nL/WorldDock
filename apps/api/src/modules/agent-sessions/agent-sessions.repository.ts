@@ -50,6 +50,9 @@ export type AgentSessionContextItemRecord = {
   updatedAt: Date;
 };
 
+export type CreateAgentSessionContextItemInput = Pick<AgentSessionContextItemRecord, "sessionId" | "kind" | "targetId"> &
+  Partial<Pick<AgentSessionContextItemRecord, "title" | "summary" | "metadata">>;
+
 export type AgentSessionMessageRecord = {
   id: string;
   sessionId: string;
@@ -146,8 +149,7 @@ export type AgentSessionsRepository = {
   ): Promise<AgentSessionSubjectRecord>;
   listSubjects(sessionId: string): Promise<AgentSessionSubjectRecord[]>;
   createContextItem(
-    input: Pick<AgentSessionContextItemRecord, "sessionId" | "kind" | "targetId"> &
-      Partial<Pick<AgentSessionContextItemRecord, "title" | "summary" | "metadata">>,
+    input: CreateAgentSessionContextItemInput,
   ): Promise<AgentSessionContextItemRecord>;
   listContextItems(sessionId: string): Promise<AgentSessionContextItemRecord[]>;
   appendMessage(
