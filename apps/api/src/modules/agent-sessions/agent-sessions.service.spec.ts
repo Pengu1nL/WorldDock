@@ -104,6 +104,35 @@ describe("PrismaAgentSessionsRepository", () => {
     expect(sessions.get("session_current")).toMatchObject({ current: true });
     expect(sessions.get("session_archived")).toMatchObject({ current: false });
   });
+
+  it("rolls back the current clear when the target becomes invalid after validation", async () => {
+    const sessions = new Map<string, AgentSessionRecord>([
+      [
+        "session_current",
+        sessionRecord({
+          id: "session_current",
+          current: true,
+        }),
+      ],
+      [
+        "session_target",
+        sessionRecord({
+          id: "session_target",
+          current: false,
+        }),
+      ],
+    ]);
+    const repository = new PrismaAgentSessionsRepository();
+    Object.defineProperty(repository, "prisma", {
+      value: fakePrismaClient(sessions, { archiveTargetAfterCurrentClear: "session_target" }),
+    });
+
+    const result = await repository.setCurrentWorldExploration("world_1", "session_target");
+
+    expect(result).toBeNull();
+    expect(sessions.get("session_current")).toMatchObject({ current: true });
+    expect(sessions.get("session_target")).toMatchObject({ status: "active", current: false });
+  });
 });
 
 function atomicRepository(overrides: Partial<AgentSessionsRepository> & Record<string, unknown>) {
@@ -184,7 +213,11 @@ function messageRecord() {
   };
 }
 
-function fakePrismaClient(sessions: Map<string, AgentSessionRecord>) {
+type FakePrismaOptions = {
+  archiveTargetAfterCurrentClear?: string;
+};
+
+function fakePrismaClient(sessions: Map<string, AgentSessionRecord>, options: FakePrismaOptions = {}) {
   const tx = {
     agentSession: {
       async findFirst(input: { where: Partial<AgentSessionRecord> }) {
@@ -200,6 +233,15 @@ function fakePrismaClient(sessions: Map<string, AgentSessionRecord>) {
           sessions.set(id, { ...session, ...input.data });
           count++;
         }
+        if (
+          options.archiveTargetAfterCurrentClear &&
+          input.where.kind === "world_exploration" &&
+          input.where.current === true &&
+          input.data.current === false
+        ) {
+          const target = sessions.get(options.archiveTargetAfterCurrentClear);
+          if (target) sessions.set(target.id, { ...target, status: "archived" });
+        }
         return { count };
       },
     },
@@ -207,7 +249,13 @@ function fakePrismaClient(sessions: Map<string, AgentSessionRecord>) {
 
   return {
     async $transaction<T>(callback: (client: typeof tx) => Promise<T>) {
-      return callback(tx);
+      const snapshot = cloneSessions(sessions);
+      try {
+        return await callback(tx);
+      } catch (error) {
+        restoreSessions(sessions, snapshot);
+        throw error;
+      }
     },
     async $disconnect() {},
   };
@@ -215,4 +263,15 @@ function fakePrismaClient(sessions: Map<string, AgentSessionRecord>) {
 
 function matchesWhere(session: AgentSessionRecord, where: Partial<AgentSessionRecord>) {
   return Object.entries(where).every(([key, value]) => session[key as keyof AgentSessionRecord] === value);
+}
+
+function cloneSessions(sessions: Map<string, AgentSessionRecord>) {
+  return new Map([...sessions.entries()].map(([id, session]) => [id, { ...session }]));
+}
+
+function restoreSessions(sessions: Map<string, AgentSessionRecord>, snapshot: Map<string, AgentSessionRecord>) {
+  sessions.clear();
+  for (const [id, session] of snapshot) {
+    sessions.set(id, session);
+  }
 }

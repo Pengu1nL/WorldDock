@@ -30,6 +30,8 @@ const contextItemKinds = [
 const messageRoles = ["user", "assistant", "system", "tool"] as const;
 const messageStatuses = ["streaming", "complete", "failed"] as const;
 
+class CurrentWorldExplorationSwitchFailed extends Error {}
+
 @Injectable()
 export class PrismaAgentSessionsRepository implements AgentSessionsRepository, OnModuleDestroy {
   private readonly prisma: PrismaClient = createPrismaClient();
@@ -131,24 +133,29 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
   }
 
   async setCurrentWorldExploration(worldId: string, sessionId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const target = await tx.agentSession.findFirst({
-        where: { id: sessionId, worldId, kind: "world_exploration", status: "active" },
-      });
-      if (!target) return null;
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const target = await tx.agentSession.findFirst({
+          where: { id: sessionId, worldId, kind: "world_exploration", status: "active" },
+        });
+        if (!target) return null;
 
-      await tx.agentSession.updateMany({
-        where: { worldId, kind: "world_exploration", current: true },
-        data: { current: false },
+        await tx.agentSession.updateMany({
+          where: { worldId, kind: "world_exploration", current: true },
+          data: { current: false },
+        });
+        const updated = await tx.agentSession.updateMany({
+          where: { id: sessionId, worldId, kind: "world_exploration", status: "active" },
+          data: { current: true },
+        });
+        if (updated.count === 0) throw new CurrentWorldExplorationSwitchFailed();
+        const session = await tx.agentSession.findUnique({ where: { id: sessionId } });
+        return session ? mapSession(session) : null;
       });
-      const updated = await tx.agentSession.updateMany({
-        where: { id: sessionId, worldId, kind: "world_exploration", status: "active" },
-        data: { current: true },
-      });
-      if (updated.count === 0) return null;
-      const session = await tx.agentSession.findUnique({ where: { id: sessionId } });
-      return session ? mapSession(session) : null;
-    });
+    } catch (error) {
+      if (error instanceof CurrentWorldExplorationSwitchFailed) return null;
+      throw error;
+    }
   }
 
   async createSubject(input: Parameters<AgentSessionsRepository["createSubject"]>[0]) {
