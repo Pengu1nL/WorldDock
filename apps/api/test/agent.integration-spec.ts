@@ -72,7 +72,9 @@ describe("agent local endpoints", () => {
       status: "completed",
       tokenUsage: { inputTokens: 12, outputTokens: 24, totalTokens: 36 },
     });
-    expect(await agents.listSuggestions(runId)).toHaveLength(1);
+    const suggestions = await agents.listSuggestions(runId);
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0]?.suggestion.title).toBe("记忆交易许可");
     expect(provider.calls[0]).toMatchObject({
       runId,
       prompt: "继续推演记忆交易",

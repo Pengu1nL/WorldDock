@@ -482,14 +482,6 @@ export class AgentService {
             lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
           }
 
-          if (chunk.type === "suggestion") {
-            const suggestion = normalizeWorldSuggestion(suggestionSchema.parse(chunk.suggestion));
-            const created = await this.agents.createSuggestion({ runId: run.id, worldId: run.worldId, suggestion });
-            const event = await this.append(run.id, sequence++, "suggestion.created", { suggestionId: created.id, suggestion });
-            yield event;
-            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
-          }
-
           if (chunk.type === "failed") {
             throw new AgentProviderFailure(chunk.code, chunk.message);
           }

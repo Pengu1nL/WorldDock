@@ -78,9 +78,9 @@ describe("agent session run local endpoints", () => {
 
     expect(streamed.text).toContain("run.started");
     expect(streamed.text).toContain("message.delta");
-    expect(streamed.text).toContain("suggestion.created");
+    expect(streamed.text).not.toContain("suggestion.created");
     expect(streamed.text).toContain("run.completed");
-    expect(await agents.listSuggestions(created.body.run.id)).toHaveLength(1);
+    expect(await agents.listSuggestions(created.body.run.id)).toHaveLength(0);
 
     const detail = await request(app.getHttpServer())
       .get(`/v1/worlds/${world.id}/agent-sessions/${session.id}`)
@@ -88,6 +88,45 @@ describe("agent session run local endpoints", () => {
 
     expect(detail.body.messages.map((message: any) => message.role)).toEqual(["user", "assistant"]);
     expect(detail.body.messages[0].content).toBe("继续推演记忆交易");
+  });
+
+  it("does not create official suggestions for world exploration session runs", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "记忆交易推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    app = await createAgentSessionRunApp(worlds, agents, sessions);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "继续推演记忆交易" })
+      .expect(201);
+    const runId = created.body.run.id;
+
+    await request(app.getHttpServer())
+      .get(`/v1/agent-session-runs/${runId}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+
+    expect(await agents.listSuggestions(runId)).toHaveLength(0);
+
+    const events = await agents.listEvents(runId);
+    expect(events.map((event) => event.type)).not.toContain("suggestion.created");
   });
 
   it("appends session messages at the end without reusing sequences", async () => {
