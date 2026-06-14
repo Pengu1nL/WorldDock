@@ -1,5 +1,10 @@
-import { Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
+import {
+  AGENT_SESSIONS_REPOSITORY,
+  type AgentSessionContextItemKind,
+  type AgentSessionsRepository,
+} from "../agent-sessions/agent-sessions.repository";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -52,6 +57,7 @@ export class AgentService {
     @Inject(AGENT_REPOSITORY) private readonly agents: AgentRepository,
     @Inject(AGENT_PROVIDER) private readonly provider: AgentProvider,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    @Optional() @Inject(AGENT_SESSIONS_REPOSITORY) private readonly sessions?: AgentSessionsRepository,
   ) {}
 
   async createRun(worldId: string, input: { prompt: string }) {
@@ -65,6 +71,32 @@ export class AgentService {
     });
     await this.append(run.id, 1, "run.started", { runId: run.id });
     return { run, suggestions: [] };
+  }
+
+  async createSessionRun(worldId: string, sessionId: string, input: { prompt: string }) {
+    await this.requireWorld(worldId);
+    const sessions = this.requireSessionsRepository();
+    const session = await sessions.findSessionForWorld(worldId, sessionId);
+    if (!session) throw this.notFound("Agent session not found.");
+
+    const run = await this.agents.createRun({
+      worldId,
+      sessionId,
+      mode: LEGACY_AGENT_RUN_MODE,
+      prompt: input.prompt,
+      model: resolveRunModel(process.env),
+      provider: parseAgentProvider(process.env.AI_PROVIDER),
+    });
+    await sessions.appendMessage({
+      sessionId,
+      sequence: await this.nextSessionMessageSequence(sessionId),
+      role: "user",
+      content: input.prompt,
+      status: "complete",
+      metadata: { runId: run.id },
+    });
+    await this.append(run.id, 1, "run.started", { runId: run.id, sessionId });
+    return { run };
   }
 
   async generateWorldDraft(input: CreateWorldDraftInput): Promise<{ draft: WorldCreationDraft; tokenUsage: TokenUsage }> {
@@ -302,6 +334,205 @@ export class AgentService {
     }
   }
 
+  async *streamSessionRunEvents(runId: string): AsyncGenerator<AgentEventRecord> {
+    const run = await this.agents.findRunById(runId);
+    if (!run) throw this.notFound("Agent run not found.");
+    if (!run.sessionId) throw this.notFound("Agent session run not found.");
+    const sessions = this.requireSessionsRepository();
+    const session = await sessions.findSessionForWorld(run.worldId, run.sessionId);
+    if (!session) throw this.notFound("Agent session not found.");
+    const world = await this.requireWorld(run.worldId);
+
+    const existingEvents = await this.agents.listEvents(run.id);
+    for (const event of existingEvents) {
+      yield event;
+    }
+
+    if (run.status !== "running") return;
+
+    let sequence = existingEvents.reduce((max, event) => Math.max(max, event.sequence), 0) + 1;
+    let lastYieldedSequence = sequence - 1;
+    let assistantText = "";
+    let tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const controller = new AbortController();
+    this.runAbortControllers.set(run.id, controller);
+
+    try {
+      const context = selectInitialWorldContext({
+        prompt: run.prompt,
+        manifest: await buildDisclosureManifest(this.worlds, world),
+        cards: await buildDisclosureCards(this.worlds, world.id),
+        briefs: await buildDisclosureBriefs(this.worlds, world.id),
+        maxCards: 8,
+        maxBriefs: 3,
+      });
+
+      const latestBeforeProvider = await this.agents.findRunById(run.id);
+      if (controller.signal.aborted || latestBeforeProvider?.status !== "running") {
+        for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+          yield event;
+          lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+        }
+        return;
+      }
+
+      const providerInput = {
+        prompt: run.prompt,
+        runId: run.id,
+        model: run.model,
+        world: { id: world.id, name: world.name, summary: world.summary },
+        context,
+        tools: [...describeWorldTools()],
+        skills: loadWorldDockPiSkills(process.env),
+        signal: controller.signal,
+      };
+      const iterator = this.provider.stream(providerInput)[Symbol.asyncIterator]();
+
+      try {
+        while (true) {
+          const next = await nextProviderChunk(iterator, controller.signal);
+          if (next.status === "aborted") {
+            closeProviderIterator(iterator);
+            for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+              yield event;
+              lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+            }
+            return;
+          }
+          if (next.result.done) break;
+          const chunk = next.result.value;
+
+          if (chunk.type === "usage") {
+            tokenUsage = chunk.tokenUsage;
+            await this.agents.updateRun(run.id, { tokenUsage });
+          }
+
+          const latestRun = await this.agents.findRunById(run.id);
+          if (latestRun?.status === "cancelled") {
+            for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+              yield event;
+              lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+            }
+            return;
+          }
+
+          if (chunk.type === "context") {
+            const created = await this.agents.createContextRef({ runId: run.id, ...chunk.contextRef });
+            await this.appendSessionContextItem(run.sessionId, run.id, chunk.contextRef);
+            const event = await this.append(run.id, sequence++, "context.used", {
+              contextRef: {
+                id: created.id,
+                kind: created.kind,
+                title: created.title,
+                excerpt: created.excerpt,
+                targetId: created.targetId ?? undefined,
+                level: created.level ?? "card",
+                source: created.source ?? "initial",
+              },
+            });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "pi-session-started") {
+            await this.agents.updateRun(run.id, { piSessionId: chunk.piSessionId, provider: "pi" });
+            const event = await this.append(run.id, sequence++, "pi.session.started", { piSessionId: chunk.piSessionId });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "tool-requested") {
+            const event = await this.append(run.id, sequence++, "tool.requested", { toolCall: chunk.toolCall });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "tool-completed") {
+            const event = await this.append(run.id, sequence++, "tool.completed", { toolCallId: chunk.toolCallId, result: chunk.result });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "delta") {
+            assistantText += chunk.text;
+            const event = await this.append(run.id, sequence++, "message.delta", { text: chunk.text });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "failed") {
+            throw new AgentProviderFailure(chunk.code, chunk.message);
+          }
+        }
+
+        if (controller.signal.aborted) {
+          for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+          return;
+        }
+
+        const latestRun = await this.agents.findRunById(run.id);
+        if (latestRun?.status === "cancelled") {
+          for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+          return;
+        }
+        if (latestRun?.status !== "running") return;
+
+        const completed = await this.agents.updateRunIfStatus(run.id, "running", {
+          status: "completed",
+          tokenUsage,
+          completedAt: new Date(),
+        });
+        if (!completed) return;
+        await sessions.appendMessage({
+          sessionId: run.sessionId,
+          sequence: await this.nextSessionMessageSequence(run.sessionId),
+          role: "assistant",
+          content: assistantText,
+          status: "complete",
+          metadata: { runId: run.id, tokenUsage },
+        });
+        const event = await this.append(run.id, sequence++, "run.completed", { tokenUsage });
+        yield event;
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          for (const event of await this.listEventsAfter(run.id, lastYieldedSequence, "run.cancelled")) {
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+          return;
+        }
+        const failure = agentFailureFromError(error);
+        const failed = await this.agents.updateRunIfStatus(run.id, "running", {
+          status: "failed",
+          tokenUsage,
+          failedAt: new Date(),
+          errorCode: failure.code,
+          errorMessage: failure.message,
+        });
+        if (!failed) return;
+        await sessions.appendMessage({
+          sessionId: run.sessionId,
+          sequence: await this.nextSessionMessageSequence(run.sessionId),
+          role: "assistant",
+          content: assistantText,
+          status: "failed",
+          metadata: { runId: run.id, code: failure.code, message: failure.message },
+        });
+        yield await this.append(run.id, sequence++, "run.failed", { code: failure.code, message: failure.message });
+      }
+    } finally {
+      if (this.runAbortControllers.get(run.id) === controller) {
+        this.runAbortControllers.delete(run.id);
+      }
+    }
+  }
+
   async cancelRun(runId: string) {
     const run = await this.requireRun(runId);
     if (run.status !== "running") return run;
@@ -428,6 +659,50 @@ export class AgentService {
     const world = await this.worlds.findWorldById(worldId);
     if (!world) throw this.notFound("World not found.");
     return world;
+  }
+
+  private requireSessionsRepository() {
+    if (!this.sessions) {
+      throw new ServiceUnavailableException({
+        code: "AGENT_SESSIONS_UNAVAILABLE",
+        message: "Agent sessions repository is unavailable.",
+      });
+    }
+    return this.sessions;
+  }
+
+  private async nextSessionMessageSequence(sessionId: string) {
+    const sessions = this.requireSessionsRepository();
+    const messages = await sessions.listMessages(sessionId);
+    return messages.reduce((max, message) => Math.max(max, message.sequence), 0) + 1;
+  }
+
+  private async appendSessionContextItem(
+    sessionId: string,
+    runId: string,
+    contextRef: {
+      kind: "world" | "archive" | "seed" | "conflict";
+      title: string;
+      excerpt: string;
+      targetId?: string | null;
+      level?: string;
+      source?: string;
+    },
+  ) {
+    const sessions = this.requireSessionsRepository();
+    await sessions.createContextItem({
+      sessionId,
+      kind: sessionContextKindFromContextRef(contextRef.kind),
+      targetId: contextRef.targetId ?? runId,
+      title: contextRef.title,
+      summary: contextRef.excerpt,
+      metadata: {
+        runId,
+        contextKind: contextRef.kind,
+        level: contextRef.level ?? "card",
+        source: contextRef.source ?? "initial",
+      },
+    });
   }
 
   private async append(runId: string, sequence: number, type: AgentEvent["type"], payload: unknown) {
@@ -710,6 +985,11 @@ function delay(ms: number) {
 function parseAgentProvider(value: string | undefined): AgentRunRecord["provider"] {
   if (!value || value === "pi") return "pi";
   throw new Error(`Unsupported agent provider: ${value}`);
+}
+
+function sessionContextKindFromContextRef(kind: "world" | "archive" | "seed" | "conflict"): AgentSessionContextItemKind {
+  if (kind === "world") return "asset_index";
+  return "asset_document";
 }
 
 function resolveRunModel(env: Record<string, string | undefined>) {

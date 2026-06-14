@@ -131,6 +131,7 @@ model WorldAssetRelation {
 model AgentRun {
   id           String            @id @default(cuid())
   worldId      String
+  sessionId    String?
   status       String            @default("running")
   mode         String
   prompt       String
@@ -152,6 +153,7 @@ model AgentRun {
   potentialAssets PotentialAsset[]
 
   @@index([worldId])
+  @@index([sessionId])
   @@index([piSessionId])
   @@map("agent_runs")
 }

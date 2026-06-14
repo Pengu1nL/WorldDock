@@ -2193,6 +2193,7 @@ export type WorldAssetRelationScalarFieldEnum = (typeof WorldAssetRelationScalar
 export const AgentRunScalarFieldEnum = {
   id: 'id',
   worldId: 'worldId',
+  sessionId: 'sessionId',
   status: 'status',
   mode: 'mode',
   prompt: 'prompt',

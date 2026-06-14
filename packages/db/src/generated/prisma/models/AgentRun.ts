@@ -27,6 +27,7 @@ export type AggregateAgentRun = {
 export type AgentRunMinAggregateOutputType = {
   id: string | null
   worldId: string | null
+  sessionId: string | null
   status: string | null
   mode: string | null
   prompt: string | null
@@ -45,6 +46,7 @@ export type AgentRunMinAggregateOutputType = {
 export type AgentRunMaxAggregateOutputType = {
   id: string | null
   worldId: string | null
+  sessionId: string | null
   status: string | null
   mode: string | null
   prompt: string | null
@@ -63,6 +65,7 @@ export type AgentRunMaxAggregateOutputType = {
 export type AgentRunCountAggregateOutputType = {
   id: number
   worldId: number
+  sessionId: number
   status: number
   mode: number
   prompt: number
@@ -84,6 +87,7 @@ export type AgentRunCountAggregateOutputType = {
 export type AgentRunMinAggregateInputType = {
   id?: true
   worldId?: true
+  sessionId?: true
   status?: true
   mode?: true
   prompt?: true
@@ -102,6 +106,7 @@ export type AgentRunMinAggregateInputType = {
 export type AgentRunMaxAggregateInputType = {
   id?: true
   worldId?: true
+  sessionId?: true
   status?: true
   mode?: true
   prompt?: true
@@ -120,6 +125,7 @@ export type AgentRunMaxAggregateInputType = {
 export type AgentRunCountAggregateInputType = {
   id?: true
   worldId?: true
+  sessionId?: true
   status?: true
   mode?: true
   prompt?: true
@@ -212,6 +218,7 @@ export type AgentRunGroupByArgs<ExtArgs extends runtime.Types.Extensions.Interna
 export type AgentRunGroupByOutputType = {
   id: string
   worldId: string
+  sessionId: string | null
   status: string
   mode: string
   prompt: string
@@ -252,6 +259,7 @@ export type AgentRunWhereInput = {
   NOT?: Prisma.AgentRunWhereInput | Prisma.AgentRunWhereInput[]
   id?: Prisma.StringFilter<"AgentRun"> | string
   worldId?: Prisma.StringFilter<"AgentRun"> | string
+  sessionId?: Prisma.StringNullableFilter<"AgentRun"> | string | null
   status?: Prisma.StringFilter<"AgentRun"> | string
   mode?: Prisma.StringFilter<"AgentRun"> | string
   prompt?: Prisma.StringFilter<"AgentRun"> | string
@@ -276,6 +284,7 @@ export type AgentRunWhereInput = {
 export type AgentRunOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   mode?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
@@ -303,6 +312,7 @@ export type AgentRunWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.AgentRunWhereInput[]
   NOT?: Prisma.AgentRunWhereInput | Prisma.AgentRunWhereInput[]
   worldId?: Prisma.StringFilter<"AgentRun"> | string
+  sessionId?: Prisma.StringNullableFilter<"AgentRun"> | string | null
   status?: Prisma.StringFilter<"AgentRun"> | string
   mode?: Prisma.StringFilter<"AgentRun"> | string
   prompt?: Prisma.StringFilter<"AgentRun"> | string
@@ -327,6 +337,7 @@ export type AgentRunWhereUniqueInput = Prisma.AtLeast<{
 export type AgentRunOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   mode?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
@@ -352,6 +363,7 @@ export type AgentRunScalarWhereWithAggregatesInput = {
   NOT?: Prisma.AgentRunScalarWhereWithAggregatesInput | Prisma.AgentRunScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"AgentRun"> | string
   worldId?: Prisma.StringWithAggregatesFilter<"AgentRun"> | string
+  sessionId?: Prisma.StringNullableWithAggregatesFilter<"AgentRun"> | string | null
   status?: Prisma.StringWithAggregatesFilter<"AgentRun"> | string
   mode?: Prisma.StringWithAggregatesFilter<"AgentRun"> | string
   prompt?: Prisma.StringWithAggregatesFilter<"AgentRun"> | string
@@ -370,6 +382,7 @@ export type AgentRunScalarWhereWithAggregatesInput = {
 
 export type AgentRunCreateInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -394,6 +407,7 @@ export type AgentRunCreateInput = {
 export type AgentRunUncheckedCreateInput = {
   id?: string
   worldId: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -416,6 +430,7 @@ export type AgentRunUncheckedCreateInput = {
 
 export type AgentRunUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -440,6 +455,7 @@ export type AgentRunUpdateInput = {
 export type AgentRunUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -463,6 +479,7 @@ export type AgentRunUncheckedUpdateInput = {
 export type AgentRunCreateManyInput = {
   id?: string
   worldId: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -481,6 +498,7 @@ export type AgentRunCreateManyInput = {
 
 export type AgentRunUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -500,6 +518,7 @@ export type AgentRunUpdateManyMutationInput = {
 export type AgentRunUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -529,6 +548,7 @@ export type AgentRunOrderByRelationAggregateInput = {
 export type AgentRunCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  sessionId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   mode?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
@@ -548,6 +568,7 @@ export type AgentRunCountOrderByAggregateInput = {
 export type AgentRunMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  sessionId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   mode?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
@@ -566,6 +587,7 @@ export type AgentRunMaxOrderByAggregateInput = {
 export type AgentRunMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  sessionId?: Prisma.SortOrder
   status?: Prisma.SortOrder
   mode?: Prisma.SortOrder
   prompt?: Prisma.SortOrder
@@ -693,6 +715,7 @@ export type AgentRunUpdateOneWithoutPotentialAssetsNestedInput = {
 
 export type AgentRunCreateWithoutWorldInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -715,6 +738,7 @@ export type AgentRunCreateWithoutWorldInput = {
 
 export type AgentRunUncheckedCreateWithoutWorldInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -767,6 +791,7 @@ export type AgentRunScalarWhereInput = {
   NOT?: Prisma.AgentRunScalarWhereInput | Prisma.AgentRunScalarWhereInput[]
   id?: Prisma.StringFilter<"AgentRun"> | string
   worldId?: Prisma.StringFilter<"AgentRun"> | string
+  sessionId?: Prisma.StringNullableFilter<"AgentRun"> | string | null
   status?: Prisma.StringFilter<"AgentRun"> | string
   mode?: Prisma.StringFilter<"AgentRun"> | string
   prompt?: Prisma.StringFilter<"AgentRun"> | string
@@ -785,6 +810,7 @@ export type AgentRunScalarWhereInput = {
 
 export type AgentRunCreateWithoutEventsInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -808,6 +834,7 @@ export type AgentRunCreateWithoutEventsInput = {
 export type AgentRunUncheckedCreateWithoutEventsInput = {
   id?: string
   worldId: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -845,6 +872,7 @@ export type AgentRunUpdateToOneWithWhereWithoutEventsInput = {
 
 export type AgentRunUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -868,6 +896,7 @@ export type AgentRunUpdateWithoutEventsInput = {
 export type AgentRunUncheckedUpdateWithoutEventsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -889,6 +918,7 @@ export type AgentRunUncheckedUpdateWithoutEventsInput = {
 
 export type AgentRunCreateWithoutSuggestionsInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -912,6 +942,7 @@ export type AgentRunCreateWithoutSuggestionsInput = {
 export type AgentRunUncheckedCreateWithoutSuggestionsInput = {
   id?: string
   worldId: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -949,6 +980,7 @@ export type AgentRunUpdateToOneWithWhereWithoutSuggestionsInput = {
 
 export type AgentRunUpdateWithoutSuggestionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -972,6 +1004,7 @@ export type AgentRunUpdateWithoutSuggestionsInput = {
 export type AgentRunUncheckedUpdateWithoutSuggestionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -993,6 +1026,7 @@ export type AgentRunUncheckedUpdateWithoutSuggestionsInput = {
 
 export type AgentRunCreateWithoutContextRefsInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -1016,6 +1050,7 @@ export type AgentRunCreateWithoutContextRefsInput = {
 export type AgentRunUncheckedCreateWithoutContextRefsInput = {
   id?: string
   worldId: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -1053,6 +1088,7 @@ export type AgentRunUpdateToOneWithWhereWithoutContextRefsInput = {
 
 export type AgentRunUpdateWithoutContextRefsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1076,6 +1112,7 @@ export type AgentRunUpdateWithoutContextRefsInput = {
 export type AgentRunUncheckedUpdateWithoutContextRefsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1097,6 +1134,7 @@ export type AgentRunUncheckedUpdateWithoutContextRefsInput = {
 
 export type AgentRunCreateWithoutPotentialAssetsInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -1120,6 +1158,7 @@ export type AgentRunCreateWithoutPotentialAssetsInput = {
 export type AgentRunUncheckedCreateWithoutPotentialAssetsInput = {
   id?: string
   worldId: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -1157,6 +1196,7 @@ export type AgentRunUpdateToOneWithWhereWithoutPotentialAssetsInput = {
 
 export type AgentRunUpdateWithoutPotentialAssetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1180,6 +1220,7 @@ export type AgentRunUpdateWithoutPotentialAssetsInput = {
 export type AgentRunUncheckedUpdateWithoutPotentialAssetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1201,6 +1242,7 @@ export type AgentRunUncheckedUpdateWithoutPotentialAssetsInput = {
 
 export type AgentRunCreateManyWorldInput = {
   id?: string
+  sessionId?: string | null
   status?: string
   mode: string
   prompt: string
@@ -1219,6 +1261,7 @@ export type AgentRunCreateManyWorldInput = {
 
 export type AgentRunUpdateWithoutWorldInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1241,6 +1284,7 @@ export type AgentRunUpdateWithoutWorldInput = {
 
 export type AgentRunUncheckedUpdateWithoutWorldInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1263,6 +1307,7 @@ export type AgentRunUncheckedUpdateWithoutWorldInput = {
 
 export type AgentRunUncheckedUpdateManyWithoutWorldInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   mode?: Prisma.StringFieldUpdateOperationsInput | string
   prompt?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1340,6 +1385,7 @@ export type AgentRunCountOutputTypeCountPotentialAssetsArgs<ExtArgs extends runt
 export type AgentRunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   worldId?: boolean
+  sessionId?: boolean
   status?: boolean
   mode?: boolean
   prompt?: boolean
@@ -1365,6 +1411,7 @@ export type AgentRunSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
 export type AgentRunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   worldId?: boolean
+  sessionId?: boolean
   status?: boolean
   mode?: boolean
   prompt?: boolean
@@ -1385,6 +1432,7 @@ export type AgentRunSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exte
 export type AgentRunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   worldId?: boolean
+  sessionId?: boolean
   status?: boolean
   mode?: boolean
   prompt?: boolean
@@ -1405,6 +1453,7 @@ export type AgentRunSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exte
 export type AgentRunSelectScalar = {
   id?: boolean
   worldId?: boolean
+  sessionId?: boolean
   status?: boolean
   mode?: boolean
   prompt?: boolean
@@ -1421,7 +1470,7 @@ export type AgentRunSelectScalar = {
   cancelledAt?: boolean
 }
 
-export type AgentRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "worldId" | "status" | "mode" | "prompt" | "model" | "provider" | "piSessionId" | "tokenUsage" | "errorCode" | "errorMessage" | "createdAt" | "updatedAt" | "completedAt" | "failedAt" | "cancelledAt", ExtArgs["result"]["agentRun"]>
+export type AgentRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "worldId" | "sessionId" | "status" | "mode" | "prompt" | "model" | "provider" | "piSessionId" | "tokenUsage" | "errorCode" | "errorMessage" | "createdAt" | "updatedAt" | "completedAt" | "failedAt" | "cancelledAt", ExtArgs["result"]["agentRun"]>
 export type AgentRunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
   events?: boolean | Prisma.AgentRun$eventsArgs<ExtArgs>
@@ -1449,6 +1498,7 @@ export type $AgentRunPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     worldId: string
+    sessionId: string | null
     status: string
     mode: string
     prompt: string
@@ -1893,6 +1943,7 @@ export interface Prisma__AgentRunClient<T, Null = never, ExtArgs extends runtime
 export interface AgentRunFieldRefs {
   readonly id: Prisma.FieldRef<"AgentRun", 'String'>
   readonly worldId: Prisma.FieldRef<"AgentRun", 'String'>
+  readonly sessionId: Prisma.FieldRef<"AgentRun", 'String'>
   readonly status: Prisma.FieldRef<"AgentRun", 'String'>
   readonly mode: Prisma.FieldRef<"AgentRun", 'String'>
   readonly prompt: Prisma.FieldRef<"AgentRun", 'String'>

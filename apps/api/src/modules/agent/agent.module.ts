@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldsModule } from "../worlds/worlds.module";
 import { AgentController } from "./agent.controller";
@@ -13,7 +14,7 @@ import { createWorldToolRegistry } from "./pi/world-tools";
 import { PrismaAgentRepository } from "./prisma-agent.repository";
 
 @Module({
-  imports: [WorldsModule],
+  imports: [WorldsModule, AgentSessionsModule],
   controllers: [AgentController],
   providers: [
     AgentService,

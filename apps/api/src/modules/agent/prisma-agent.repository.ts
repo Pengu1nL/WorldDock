@@ -79,6 +79,7 @@ export class PrismaAgentRepository implements AgentRepository, OnModuleDestroy {
 function mapRun(record: {
   id: string;
   worldId: string;
+  sessionId: string | null;
   status: string;
   mode: string;
   prompt: string;
@@ -99,6 +100,7 @@ function mapRun(record: {
     status: parseRunStatus(record.status),
     mode: parseRunMode(record.mode),
     provider: parseRunProvider(record.provider),
+    sessionId: record.sessionId,
     piSessionId: record.piSessionId,
     tokenUsage: record.tokenUsage ? tokenUsageSchema.parse(record.tokenUsage) : null,
   };

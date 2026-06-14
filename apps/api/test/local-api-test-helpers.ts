@@ -458,6 +458,7 @@ export function createInMemoryAgents(): InMemoryAgents {
       const run: AgentRunRecord = {
         id: `run_${counters.run++}`,
         worldId: input.worldId,
+        sessionId: input.sessionId ?? null,
         status: "running",
         mode: input.mode,
         prompt: input.prompt,

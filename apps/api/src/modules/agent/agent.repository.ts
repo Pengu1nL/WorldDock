@@ -5,6 +5,7 @@ export const AGENT_REPOSITORY = Symbol("AGENT_REPOSITORY");
 export type AgentRunRecord = {
   id: string;
   worldId: string;
+  sessionId?: string | null;
   status: "running" | "completed" | "failed" | "cancelled";
   mode: "expand" | "challenge" | "fork" | "polish";
   prompt: string;
@@ -46,7 +47,7 @@ export type ContextRefRecord = {
 };
 
 export type AgentRepository = {
-  createRun(input: Pick<AgentRunRecord, "worldId" | "mode" | "prompt" | "model"> & Partial<Pick<AgentRunRecord, "provider" | "piSessionId">>): Promise<AgentRunRecord>;
+  createRun(input: Pick<AgentRunRecord, "worldId" | "mode" | "prompt" | "model"> & Partial<Pick<AgentRunRecord, "sessionId" | "provider" | "piSessionId">>): Promise<AgentRunRecord>;
   findRunById(id: string): Promise<AgentRunRecord | null>;
   updateRun(id: string, input: Partial<AgentRunRecord>): Promise<AgentRunRecord | null>;
   updateRunIfStatus(id: string, status: AgentRunRecord["status"], input: Partial<AgentRunRecord>): Promise<AgentRunRecord | null>;

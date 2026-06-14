@@ -34,12 +34,46 @@ export class AgentController {
     };
   }
 
+  @Post("worlds/:worldId/agent-sessions/:sessionId/runs")
+  async createSessionRun(
+    @Param("worldId") worldId: string,
+    @Param("sessionId") sessionId: string,
+    @Body() body: unknown,
+  ) {
+    const input = createRunSchema.parse(body);
+    const result = await this.agentService.createSessionRun(worldId, sessionId, input);
+    return { run: serializeAgentRun(result.run) };
+  }
+
   @Sse("agent-runs/:runId/events")
   events(@Param("runId") runId: string): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
       void (async () => {
         try {
           for await (const event of this.agentService.streamEvents(runId)) {
+            subscriber.next({
+              id: event.id,
+              type: event.type,
+              data: {
+                ...event,
+                createdAt: event.createdAt instanceof Date ? event.createdAt.toISOString() : event.createdAt,
+              },
+            });
+          }
+          subscriber.complete();
+        } catch (error) {
+          subscriber.error(error);
+        }
+      })();
+    });
+  }
+
+  @Sse("agent-session-runs/:runId/events")
+  sessionRunEvents(@Param("runId") runId: string): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((subscriber) => {
+      void (async () => {
+        try {
+          for await (const event of this.agentService.streamSessionRunEvents(runId)) {
             subscriber.next({
               id: event.id,
               type: event.type,
