@@ -184,6 +184,44 @@ describe("agent sessions local endpoints", () => {
     expect(new Set([...firstPage.body.sessions, ...secondPage.body.sessions].map((session) => session.id)).size).toBe(3);
   });
 
+  it("caps list limit at 50 instead of rejecting larger values", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await createWorld(worlds);
+    app = await createAgentSessionsApp(worlds, createInMemoryAgentSessions());
+    const server = app.getHttpServer();
+
+    for (let index = 1; index <= 51; index++) {
+      await request(server)
+        .post(`/v1/worlds/${world.id}/agent-sessions`)
+        .send({ kind: "world_exploration", title: `第 ${index} 轮` })
+        .expect(201);
+    }
+
+    const listed = await request(server)
+      .get(`/v1/worlds/${world.id}/agent-sessions`)
+      .query({ limit: 100 })
+      .expect(200);
+
+    expect(listed.body.sessions).toHaveLength(50);
+    expect(listed.body.nextCursor).toEqual(expect.any(String));
+  });
+
+  it("returns 400 for an invalid list cursor", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await createWorld(worlds);
+    app = await createAgentSessionsApp(worlds, createInMemoryAgentSessions());
+
+    const response = await request(app.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-sessions`)
+      .query({ cursor: "not-a-cursor" })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "Invalid agent session cursor.",
+    });
+  });
+
   it("archives a session and switches the current world exploration session", async () => {
     const worlds = createInMemoryWorlds();
     const world = await createWorld(worlds);

@@ -223,6 +223,7 @@ model AgentSession {
 
   @@index([worldId, kind, status])
   @@index([worldId, current])
+  @@index([worldId, updatedAt(sort: Desc), id])
   @@map("agent_sessions")
 }
 

@@ -50,7 +50,7 @@ const listSessionsQuerySchema = z.object({
   includeArchived: includeArchivedQuerySchema.optional(),
   q: z.string().trim().optional(),
   cursor: z.string().trim().min(1).optional(),
-  limit: z.coerce.number().int().min(1).max(50).default(20),
+  limit: z.coerce.number().int().min(1).default(20),
 });
 
 @Controller("worlds/:worldId/agent-sessions")
