@@ -121,7 +121,7 @@ model AgentRun {
   mode         String
   prompt       String
   model        String?
-  provider     String            @default("openai")
+  provider     String            @default("pi")
   piSessionId  String?
   tokenUsage   Json?
   errorCode    String?

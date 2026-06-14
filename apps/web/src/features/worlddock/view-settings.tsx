@@ -143,10 +143,10 @@ export function SettingsView({
         {tab === "model" && (
           <section className="card" style={{ padding: 18 }}>
             <h2 className="title-font" style={{ marginTop: 0 }}>模型配置</h2>
-            <Field label="AI_PROVIDER" value="openai" />
-            <Field label="OPENAI_BASE_URL" value="https://api.openai.com/v1" />
-            <Field label="OPENAI_API_KEY" value="服务端环境变量" />
-            <Field label="AI_MODEL" value="服务端环境变量" />
+            <Field label="AI_PROVIDER" value="pi" />
+            <Field label="PI_MODEL_PROVIDER" value="服务端环境变量" />
+            <Field label="PI_MODEL_ID" value="服务端环境变量" />
+            <Field label="PI_PROVIDER_API_KEY" value="服务端环境变量" />
             <button
               className="btn primary"
               onClick={() => {

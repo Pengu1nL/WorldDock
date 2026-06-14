@@ -9,7 +9,7 @@ export const runtimeEnvironmentSchema = z.enum([
 
 export const nodeEnvironmentSchema = z.enum(["development", "test", "production"]);
 
-export const agentProviderSchema = z.enum(["openai", "pi", "vercel-ai", "mock"]).default("openai");
+export const agentProviderSchema = z.literal("pi").default("pi");
 
 const optionalNonEmptyString = z.preprocess(
   (value) => {
@@ -51,8 +51,6 @@ export const worldDockEnvSchema = z.object({
   OTEL_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   AI_PROVIDER: agentProviderSchema,
   AI_MODEL: optionalNonEmptyString,
-  OPENAI_BASE_URL: optionalUrlString,
-  OPENAI_API_KEY: optionalNonEmptyString,
   PI_AGENT_CORE_VERSION: optionalNonEmptyString,
   PI_AI_VERSION: optionalNonEmptyString,
   PI_MODEL_PROVIDER: optionalNonEmptyString,
@@ -71,10 +69,6 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
     ? parsed.APP_ENV === "production"
     : parsed.NODE_ENV === "production";
 
-  if (parsed.AI_PROVIDER === "mock") {
-    throw new Error("AI_PROVIDER=mock is not allowed.");
-  }
-
   if (!isProduction) {
     return parsed;
   }
@@ -83,27 +77,10 @@ export function parseWorldDockEnv(env: Record<string, string | undefined>): Worl
     throw new Error("SENTRY_DSN is required in production.");
   }
 
-  if (parsed.AI_PROVIDER === "openai") {
-    if (!parsed.AI_MODEL) {
-      throw new Error("AI_MODEL is required when AI_PROVIDER=openai in production.");
-    }
-
-    if (!parsed.OPENAI_API_KEY) {
-      throw new Error("OPENAI_API_KEY is required when AI_PROVIDER=openai in production.");
-    }
-  }
-
-  if (
-    parsed.AI_PROVIDER === "pi" &&
-    (!parsed.PI_MODEL_PROVIDER || !parsed.PI_MODEL_ID || !parsed.PI_PROVIDER_API_KEY)
-  ) {
+  if (!parsed.PI_MODEL_PROVIDER || !parsed.PI_MODEL_ID || !parsed.PI_PROVIDER_API_KEY) {
     throw new Error(
       "PI_MODEL_PROVIDER, PI_MODEL_ID, and PI_PROVIDER_API_KEY are required when AI_PROVIDER=pi in production.",
     );
-  }
-
-  if (parsed.AI_PROVIDER === "vercel-ai" && !parsed.AI_MODEL) {
-    throw new Error("AI_MODEL is required when AI_PROVIDER=vercel-ai in production.");
   }
 
   return parsed;

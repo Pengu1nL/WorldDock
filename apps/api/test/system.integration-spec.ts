@@ -94,7 +94,7 @@ describe("system endpoints", () => {
     });
   });
 
-  it("rejects unsafe production runtime configuration before service startup", () => {
+  it("rejects non-pi provider configuration before service startup", () => {
     expect(() =>
       parseWorldDockEnv({
         NODE_ENV: "production",
@@ -105,7 +105,7 @@ describe("system endpoints", () => {
         AI_PROVIDER: "mock",
         SENTRY_DSN: "https://public@example.com/1",
       }),
-    ).toThrow("AI_PROVIDER=mock is not allowed.");
+    ).toThrow();
   });
 });
 

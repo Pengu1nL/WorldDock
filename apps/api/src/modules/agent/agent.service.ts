@@ -708,14 +708,12 @@ function delay(ms: number) {
 }
 
 function parseAgentProvider(value: string | undefined): AgentRunRecord["provider"] {
-  if (value === "pi" || value === "vercel-ai" || value === "mock" || value === "openai") return value;
-  return "openai";
+  if (!value || value === "pi") return "pi";
+  throw new Error(`Unsupported agent provider: ${value}`);
 }
 
 function resolveRunModel(env: Record<string, string | undefined>) {
-  if (env.AI_PROVIDER === "pi") return env.PI_MODEL_ID ?? env.AI_MODEL ?? null;
-  if (env.AI_PROVIDER === "mock") return "mock";
-  return env.AI_MODEL ?? null;
+  return env.PI_MODEL_ID ?? env.AI_MODEL ?? null;
 }
 
 function archiveEntryToWorldAsset(entry: ArchiveEntryRecord): WorldAsset {

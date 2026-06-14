@@ -9,7 +9,7 @@ export type AgentRunRecord = {
   mode: "expand" | "challenge" | "fork" | "polish";
   prompt: string;
   model?: string | null;
-  provider: "openai" | "mock" | "vercel-ai" | "pi";
+  provider: "pi";
   piSessionId?: string | null;
   tokenUsage?: TokenUsage | null;
   createdAt: Date;

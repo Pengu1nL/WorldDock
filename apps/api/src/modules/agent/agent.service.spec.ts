@@ -19,7 +19,7 @@ describe("AgentService cancellation", () => {
       mode: "expand",
       prompt: "继续推演",
       model: "test-model",
-      provider: "mock",
+      provider: "pi",
       createdAt: now,
       updatedAt: now,
     };
@@ -61,7 +61,7 @@ describe("AgentService cancellation", () => {
       mode: "expand",
       prompt: "继续推演",
       model: "test-model",
-      provider: "mock",
+      provider: "pi",
       createdAt: now,
       updatedAt: now,
     };
@@ -101,7 +101,7 @@ describe("AgentService cancellation", () => {
       mode: "expand",
       prompt: "继续推演",
       model: "test-model",
-      provider: "mock",
+      provider: "pi",
       createdAt: now,
       updatedAt: now,
     };

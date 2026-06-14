@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldsModule } from "../worlds/worlds.module";
 import { AgentController } from "./agent.controller";
-import { AGENT_PROVIDER, createAgentProviderFromEnv, PiAgentProvider } from "./agent.provider";
+import { AGENT_PROVIDER, PiAgentProvider } from "./agent.provider";
 import { AGENT_REPOSITORY } from "./agent.repository";
 import { AgentService } from "./agent.service";
 import { createPiAgentCoreAdapter } from "./pi/pi-agent-core.adapter";
@@ -25,22 +25,18 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
     {
       provide: AGENT_PROVIDER,
       useFactory: (worlds: WorldRepository) => {
-        if (process.env.AI_PROVIDER === "pi") {
-          const adapter = createPiAgentCoreAdapter({
-            modelProvider: process.env.PI_MODEL_PROVIDER,
-            modelId: process.env.PI_MODEL_ID,
-            providerApiKey: process.env.PI_PROVIDER_API_KEY,
-          });
-          return new PiAgentProvider(
-            new PiSessionRunner(
-              new PiAgentCoreRuntimeClient(adapter),
-              createWorldToolRegistry(worlds),
-              new SafetyGate(),
-            ),
-          );
-        }
-
-        return createAgentProviderFromEnv(process.env);
+        const adapter = createPiAgentCoreAdapter({
+          modelProvider: process.env.PI_MODEL_PROVIDER,
+          modelId: process.env.PI_MODEL_ID,
+          providerApiKey: process.env.PI_PROVIDER_API_KEY,
+        });
+        return new PiAgentProvider(
+          new PiSessionRunner(
+            new PiAgentCoreRuntimeClient(adapter),
+            createWorldToolRegistry(worlds),
+            new SafetyGate(),
+          ),
+        );
       },
       inject: [WORLD_REPOSITORY],
     },

@@ -179,9 +179,7 @@ function parseRunMode(value: string): AgentRunRecord["mode"] {
 }
 
 function parseRunProvider(value: string): AgentRunRecord["provider"] {
-  if (value === "openai" || value === "mock" || value === "vercel-ai" || value === "pi") {
-    return value;
-  }
+  if (value === "pi") return value;
   throw new Error(`Unknown agent run provider: ${value}`);
 }
 

@@ -450,7 +450,7 @@ export function createInMemoryAgents(): InMemoryAgents {
         mode: input.mode,
         prompt: input.prompt,
         model: input.model ?? null,
-        provider: input.provider ?? "mock",
+        provider: input.provider ?? "pi",
         piSessionId: input.piSessionId ?? null,
         tokenUsage: null,
         createdAt: timestamp,
