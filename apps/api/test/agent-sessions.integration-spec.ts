@@ -69,6 +69,12 @@ describe("agent sessions local endpoints", () => {
       .expect(400);
     expect(missingSubject.body).toMatchObject({ code: "VALIDATION_FAILED" });
 
+    const blankSubject = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions`)
+      .send({ kind: "asset_edit", title: "资产改写", subjectAssetId: "   " })
+      .expect(400);
+    expect(blankSubject.body).toMatchObject({ code: "VALIDATION_FAILED" });
+
     const created = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-sessions`)
       .send({ kind: "asset_edit", title: "资产改写", subjectAssetId: "asset_memory_law", current: true })
@@ -93,6 +99,12 @@ describe("agent sessions local endpoints", () => {
       .send({ kind: "consistency_repair", title: "一致性修复" })
       .expect(400);
     expect(missingIssue.body).toMatchObject({ code: "VALIDATION_FAILED" });
+
+    const blankIssue = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions`)
+      .send({ kind: "consistency_repair", title: "一致性修复", issueId: "   " })
+      .expect(400);
+    expect(blankIssue.body).toMatchObject({ code: "VALIDATION_FAILED" });
 
     const created = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-sessions`)
@@ -154,7 +166,15 @@ describe("agent sessions local endpoints", () => {
     const archived = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/agent-sessions/${second.body.session.id}/archive`)
       .expect(200);
-    expect(archived.body.session).toMatchObject({ id: second.body.session.id, status: "archived" });
+    expect(archived.body.session).toMatchObject({ id: second.body.session.id, status: "archived", current: false });
+
+    const archivedCurrent = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${second.body.session.id}/current`)
+      .expect(400);
+    expect(archivedCurrent.body).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "Only active world exploration sessions can be current.",
+    });
   });
 
   it("returns 404 when the world does not exist", async () => {

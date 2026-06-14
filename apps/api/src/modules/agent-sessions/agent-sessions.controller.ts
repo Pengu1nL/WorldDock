@@ -22,11 +22,11 @@ const createSessionSchema = z.discriminatedUnion("kind", [
   baseCreateSessionSchema.extend({ kind: z.literal("world_exploration") }),
   baseCreateSessionSchema.extend({
     kind: z.literal("asset_edit"),
-    subjectAssetId: z.string().min(1),
+    subjectAssetId: z.string().trim().min(1),
   }),
   baseCreateSessionSchema.extend({
     kind: z.literal("consistency_repair"),
-    issueId: z.string().min(1),
+    issueId: z.string().trim().min(1),
   }),
 ]);
 

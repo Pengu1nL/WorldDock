@@ -71,11 +71,20 @@ export type ListAgentSessionsQuery = {
   limit?: number;
 };
 
+export type CreateSessionWithSubjectInput = {
+  session: Pick<AgentSessionRecord, "worldId" | "kind" | "title"> &
+    Partial<Pick<AgentSessionRecord, "status" | "current" | "metadata">>;
+  subject: Pick<AgentSessionSubjectRecord, "kind" | "targetId"> &
+    Partial<Pick<AgentSessionSubjectRecord, "role" | "title" | "metadata">>;
+  clearCurrentWorldExploration?: boolean;
+};
+
 export type AgentSessionsRepository = {
   createSession(
     input: Pick<AgentSessionRecord, "worldId" | "kind" | "title"> &
       Partial<Pick<AgentSessionRecord, "status" | "current" | "metadata">>,
   ): Promise<AgentSessionRecord>;
+  createSessionWithSubject(input: CreateSessionWithSubjectInput): Promise<AgentSessionRecord>;
   findSessionById(id: string): Promise<AgentSessionRecord | null>;
   findSessionForWorld(worldId: string, sessionId: string): Promise<AgentSessionRecord | null>;
   listSessions(worldId: string, query?: ListAgentSessionsQuery): Promise<AgentSessionRecord[]>;
@@ -84,6 +93,7 @@ export type AgentSessionsRepository = {
     input: Partial<Pick<AgentSessionRecord, "title" | "status" | "current" | "metadata">>,
   ): Promise<AgentSessionRecord | null>;
   clearCurrentWorldExploration(worldId: string): Promise<void>;
+  setCurrentWorldExploration(worldId: string, sessionId: string): Promise<AgentSessionRecord | null>;
   createSubject(
     input: Pick<AgentSessionSubjectRecord, "sessionId" | "kind" | "targetId"> &
       Partial<Pick<AgentSessionSubjectRecord, "role" | "title" | "metadata">>,

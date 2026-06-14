@@ -48,6 +48,39 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
     return mapSession(created);
   }
 
+  async createSessionWithSubject(input: Parameters<AgentSessionsRepository["createSessionWithSubject"]>[0]) {
+    return this.prisma.$transaction(async (tx) => {
+      if (input.clearCurrentWorldExploration) {
+        await tx.agentSession.updateMany({
+          where: { worldId: input.session.worldId, kind: "world_exploration", current: true },
+          data: { current: false },
+        });
+      }
+
+      const created = await tx.agentSession.create({
+        data: {
+          worldId: input.session.worldId,
+          kind: input.session.kind,
+          title: input.session.title,
+          status: input.session.status ?? "active",
+          current: input.session.current ?? false,
+          metadata: (input.session.metadata ?? {}) as never,
+        },
+      });
+      await tx.agentSessionSubject.create({
+        data: {
+          sessionId: created.id,
+          kind: input.subject.kind,
+          targetId: input.subject.targetId,
+          role: input.subject.role ?? "primary",
+          title: input.subject.title ?? null,
+          metadata: (input.subject.metadata ?? {}) as never,
+        },
+      });
+      return mapSession(created);
+    });
+  }
+
   async findSessionById(id: string) {
     const session = await this.prisma.agentSession.findUnique({ where: { id } });
     return session ? mapSession(session) : null;
@@ -94,6 +127,22 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
     await this.prisma.agentSession.updateMany({
       where: { worldId, kind: "world_exploration", current: true },
       data: { current: false },
+    });
+  }
+
+  async setCurrentWorldExploration(worldId: string, sessionId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.agentSession.updateMany({
+        where: { worldId, kind: "world_exploration", current: true },
+        data: { current: false },
+      });
+      const updated = await tx.agentSession.updateMany({
+        where: { id: sessionId, worldId, kind: "world_exploration", status: "active" },
+        data: { current: true },
+      });
+      if (updated.count === 0) return null;
+      const session = await tx.agentSession.findUnique({ where: { id: sessionId } });
+      return session ? mapSession(session) : null;
     });
   }
 

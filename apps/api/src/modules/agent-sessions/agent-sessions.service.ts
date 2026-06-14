@@ -35,20 +35,19 @@ export class AgentSessionsService {
 
   async createSession(worldId: string, input: CreateAgentSessionInput) {
     const current = input.kind === "world_exploration" && input.current === true;
-    if (current) await this.sessions.clearCurrentWorldExploration(worldId);
 
-    const session = await this.sessions.createSession({
-      worldId,
-      kind: input.kind,
-      title: input.title ?? defaultTitleForKind(input.kind),
-      status: "active",
-      current,
-      metadata: input.metadata ?? {},
+    return this.sessions.createSessionWithSubject({
+      session: {
+        worldId,
+        kind: input.kind,
+        title: input.title ?? defaultTitleForKind(input.kind),
+        status: "active",
+        current,
+        metadata: input.metadata ?? {},
+      },
+      subject: primarySubjectFor(worldId, input),
+      clearCurrentWorldExploration: current,
     });
-
-    await this.sessions.createSubject(primarySubjectFor(worldId, session.id, input));
-
-    return session;
   }
 
   async listSessions(worldId: string, query?: ListAgentSessionsInput) {
@@ -83,9 +82,14 @@ export class AgentSessionsService {
         message: "Only world exploration sessions can be current.",
       });
     }
+    if (existing.status !== "active") {
+      throw new BadRequestException({
+        code: "BAD_REQUEST",
+        message: "Only active world exploration sessions can be current.",
+      });
+    }
 
-    await this.sessions.clearCurrentWorldExploration(worldId);
-    const session = await this.sessions.updateSession(sessionId, { current: true });
+    const session = await this.sessions.setCurrentWorldExploration(worldId, sessionId);
     if (!session) throw this.notFound();
     return session;
   }
@@ -104,10 +108,9 @@ export class AgentSessionsService {
   }
 }
 
-function primarySubjectFor(worldId: string, sessionId: string, input: CreateAgentSessionInput) {
+function primarySubjectFor(worldId: string, input: CreateAgentSessionInput) {
   if (input.kind === "asset_edit") {
     return {
-      sessionId,
       kind: "asset" as const,
       targetId: input.subjectAssetId,
       role: "primary" as const,
@@ -116,7 +119,6 @@ function primarySubjectFor(worldId: string, sessionId: string, input: CreateAgen
 
   if (input.kind === "consistency_repair") {
     return {
-      sessionId,
       kind: "consistency_issue" as const,
       targetId: input.issueId,
       role: "primary" as const,
@@ -124,7 +126,6 @@ function primarySubjectFor(worldId: string, sessionId: string, input: CreateAgen
   }
 
   return {
-    sessionId,
     kind: "world" as const,
     targetId: worldId,
     role: "primary" as const,

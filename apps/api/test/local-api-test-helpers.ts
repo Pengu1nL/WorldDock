@@ -572,6 +572,43 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
       stores.sessions.set(session.id, session);
       return session;
     },
+    async createSessionWithSubject(input) {
+      if (input.clearCurrentWorldExploration) {
+        for (const [id, session] of stores.sessions) {
+          if (session.worldId !== input.session.worldId || session.kind !== "world_exploration" || !session.current) {
+            continue;
+          }
+          stores.sessions.set(id, { ...session, current: false, updatedAt: now() });
+        }
+      }
+
+      const timestamp = now();
+      const session: AgentSessionRecord = {
+        id: `agent_session_${counters.session++}`,
+        worldId: input.session.worldId,
+        kind: input.session.kind,
+        title: input.session.title,
+        status: input.session.status ?? "active",
+        current: input.session.current ?? false,
+        metadata: input.session.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const subject: AgentSessionSubjectRecord = {
+        id: `agent_session_subject_${counters.subject++}`,
+        sessionId: session.id,
+        kind: input.subject.kind,
+        targetId: input.subject.targetId,
+        role: input.subject.role ?? "primary",
+        title: input.subject.title ?? null,
+        metadata: input.subject.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      stores.sessions.set(session.id, session);
+      stores.subjects.push(subject);
+      return session;
+    },
     async findSessionById(id) {
       return stores.sessions.get(id) ?? null;
     },
@@ -603,6 +640,18 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
         if (session.worldId !== worldId || session.kind !== "world_exploration" || !session.current) continue;
         stores.sessions.set(id, { ...session, current: false, updatedAt: now() });
       }
+    },
+    async setCurrentWorldExploration(worldId, sessionId) {
+      const target = stores.sessions.get(sessionId);
+      if (target?.worldId !== worldId || target.kind !== "world_exploration" || target.status !== "active") return null;
+      const timestamp = now();
+      for (const [id, session] of stores.sessions) {
+        if (session.worldId !== worldId || session.kind !== "world_exploration" || !session.current) continue;
+        stores.sessions.set(id, { ...session, current: false, updatedAt: timestamp });
+      }
+      const updated: AgentSessionRecord = { ...target, current: true, updatedAt: timestamp };
+      stores.sessions.set(sessionId, updated);
+      return updated;
     },
     async createSubject(input) {
       const timestamp = now();
