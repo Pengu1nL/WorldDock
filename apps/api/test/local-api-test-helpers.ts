@@ -12,6 +12,13 @@ import type {
   ContextRefRecord,
 } from "../src/modules/agent/agent.repository";
 import type {
+  AgentSessionContextItemRecord,
+  AgentSessionMessageRecord,
+  AgentSessionRecord,
+  AgentSessionsRepository,
+  AgentSessionSubjectRecord,
+} from "../src/modules/agent-sessions/agent-sessions.repository";
+import type {
   ArchiveEntryRecord,
   ConflictRecord,
   StorySeedRecord,
@@ -529,6 +536,145 @@ export function createInMemoryAgents(): InMemoryAgents {
   };
 }
 
+export type InMemoryAgentSessions = AgentSessionsRepository & {
+  stores: {
+    sessions: Map<string, AgentSessionRecord>;
+    subjects: AgentSessionSubjectRecord[];
+    contextItems: AgentSessionContextItemRecord[];
+    messages: AgentSessionMessageRecord[];
+  };
+};
+
+export function createInMemoryAgentSessions(): InMemoryAgentSessions {
+  const stores: InMemoryAgentSessions["stores"] = {
+    sessions: new Map(),
+    subjects: [],
+    contextItems: [],
+    messages: [],
+  };
+  const counters = { session: 1, subject: 1, contextItem: 1, message: 1 };
+
+  return {
+    stores,
+    async createSession(input) {
+      const timestamp = now();
+      const session: AgentSessionRecord = {
+        id: `agent_session_${counters.session++}`,
+        worldId: input.worldId,
+        kind: input.kind,
+        title: input.title,
+        status: input.status ?? "active",
+        current: input.current ?? false,
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      stores.sessions.set(session.id, session);
+      return session;
+    },
+    async findSessionById(id) {
+      return stores.sessions.get(id) ?? null;
+    },
+    async findSessionForWorld(worldId, sessionId) {
+      const session = stores.sessions.get(sessionId);
+      return session?.worldId === worldId ? session : null;
+    },
+    async listSessions(worldId, query = {}) {
+      const q = query.q?.trim().toLocaleLowerCase();
+      return [...stores.sessions.values()]
+        .filter((session) => session.worldId === worldId)
+        .filter((session) => query.includeArchived || session.status !== "archived")
+        .filter((session) => !query.kind || session.kind === query.kind)
+        .filter((session) => !query.status || session.status === query.status)
+        .filter((session) => query.current === undefined || session.current === query.current)
+        .filter((session) => !q || session.title.toLocaleLowerCase().includes(q))
+        .sort(compareUpdatedDesc)
+        .slice(0, query.limit);
+    },
+    async updateSession(id, input) {
+      const session = stores.sessions.get(id);
+      if (!session) return null;
+      const updated: AgentSessionRecord = { ...session, ...input, updatedAt: now() };
+      stores.sessions.set(id, updated);
+      return updated;
+    },
+    async clearCurrentWorldExploration(worldId) {
+      for (const [id, session] of stores.sessions) {
+        if (session.worldId !== worldId || session.kind !== "world_exploration" || !session.current) continue;
+        stores.sessions.set(id, { ...session, current: false, updatedAt: now() });
+      }
+    },
+    async createSubject(input) {
+      const timestamp = now();
+      const subject: AgentSessionSubjectRecord = {
+        id: `agent_session_subject_${counters.subject++}`,
+        sessionId: input.sessionId,
+        kind: input.kind,
+        targetId: input.targetId,
+        role: input.role ?? "primary",
+        title: input.title ?? null,
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      stores.subjects.push(subject);
+      return subject;
+    },
+    async listSubjects(sessionId) {
+      return stores.subjects
+        .filter((subject) => subject.sessionId === sessionId)
+        .sort(compareCreatedAsc);
+    },
+    async createContextItem(input) {
+      const timestamp = now();
+      const contextItem: AgentSessionContextItemRecord = {
+        id: `agent_session_context_${counters.contextItem++}`,
+        sessionId: input.sessionId,
+        kind: input.kind,
+        targetId: input.targetId,
+        title: input.title ?? null,
+        summary: input.summary ?? null,
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      stores.contextItems.push(contextItem);
+      return contextItem;
+    },
+    async listContextItems(sessionId) {
+      return stores.contextItems
+        .filter((contextItem) => contextItem.sessionId === sessionId)
+        .sort(compareCreatedAsc);
+    },
+    async appendMessage(input) {
+      const duplicate = stores.messages.some((message) =>
+        message.sessionId === input.sessionId &&
+        message.sequence === input.sequence,
+      );
+      if (duplicate) throw new Error(`Agent session message sequence already exists: ${input.sessionId}#${input.sequence}`);
+      const timestamp = now();
+      const message: AgentSessionMessageRecord = {
+        id: `agent_session_message_${counters.message++}`,
+        sessionId: input.sessionId,
+        sequence: input.sequence,
+        role: input.role,
+        content: input.content,
+        status: input.status ?? "complete",
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      stores.messages.push(message);
+      return message;
+    },
+    async listMessages(sessionId) {
+      return stores.messages
+        .filter((message) => message.sessionId === sessionId)
+        .sort((left, right) => left.sequence - right.sequence);
+    },
+  };
+}
+
 export function createMockStreamingAgentProvider(chunks: AgentProviderChunk[] = defaultAgentChunks()) {
   const calls: AgentProviderInput[] = [];
   const provider: AgentProvider & { calls: AgentProviderInput[] } = {
@@ -711,6 +857,14 @@ function remapIds(values: string[], idMap: Map<string, string>) {
 
 function comparePosition<T extends { position?: number; updatedAt: Date }>(left: T, right: T) {
   return (left.position ?? 0) - (right.position ?? 0) || right.updatedAt.getTime() - left.updatedAt.getTime();
+}
+
+function compareCreatedAsc<T extends { createdAt: Date }>(left: T, right: T) {
+  return left.createdAt.getTime() - right.createdAt.getTime();
+}
+
+function compareUpdatedDesc<T extends { updatedAt: Date; createdAt: Date }>(left: T, right: T) {
+  return right.updatedAt.getTime() - left.updatedAt.getTime() || right.createdAt.getTime() - left.createdAt.getTime();
 }
 
 function archiveEntriesFor(worlds: InMemoryWorlds, worldId: string) {
