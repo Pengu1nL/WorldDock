@@ -11,9 +11,12 @@ import { LocalStorageService } from "../src/modules/local-storage/local-storage.
 import { OfficialAssetsController } from "../src/modules/official-assets/official-assets.controller";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
+  type ApplyOfficialAssetPatchRecordInput,
   type CreateOfficialAssetRecordInput,
   type ListOfficialAssetsQuery,
   type OfficialAssetDetailRecord,
+  type OfficialAssetPatchesRepository,
+  type OfficialAssetPatchRecord,
   type OfficialAssetRecord,
   type OfficialAssetRevisionRecord,
   type OfficialAssetsRepository,
@@ -21,6 +24,7 @@ import {
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
+import { WorldAssetPatchesService } from "../src/modules/official-assets/world-asset-patches.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
 import {
   createHttpTestApp,
@@ -98,6 +102,36 @@ describe("asset edit local endpoints", () => {
         }),
       }),
     ]);
+  });
+
+  it("applies a markdown patch and creates revision", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await createAssetEditSession(asset.id);
+
+    const applied = await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。",
+        reason: "补充续期规则",
+      })
+      .expect(201);
+
+    expect(applied.body.patch).toMatchObject({
+      assetId: asset.id,
+      sessionId: session.id,
+      status: "applied",
+      assetVersionFrom: 1,
+      assetVersionTo: 2,
+    });
+    expect(applied.body.patch.diff).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "add", text: expect.stringContaining("续期") }),
+    ]));
+
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(2);
+    expect(detail.markdown).toContain("每年续期");
+    expect(detail.revisions).toHaveLength(2);
   });
 
   it("creates default titled asset edit sessions when the body is omitted or empty", async () => {
@@ -190,6 +224,23 @@ describe("asset edit local endpoints", () => {
 
     return created.body.asset as OfficialAssetRecord;
   }
+
+  async function createAssetEditSession(assetId: string) {
+    const created = await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${assetId}/edit-sessions`)
+      .send({})
+      .expect(201);
+
+    return created.body.session as { id: string };
+  }
+
+  async function getOfficialAsset(assetId: string) {
+    const detail = await request(app?.getHttpServer())
+      .get(`/v1/worlds/${world.id}/official-assets/${assetId}`)
+      .expect(200);
+
+    return detail.body as { asset: OfficialAssetRecord; markdown: string; revisions: unknown[] };
+  }
 });
 
 async function createAssetEditApp(worlds: InMemoryWorlds, sessions: InMemoryAgentSessions = createInMemoryAgentSessions()) {
@@ -198,6 +249,7 @@ async function createAssetEditApp(worlds: InMemoryWorlds, sessions: InMemoryAgen
     providers: [
       AgentSessionsService,
       OfficialAssetsService,
+      WorldAssetPatchesService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: AGENT_SESSIONS_REPOSITORY, useValue: sessions },
@@ -206,13 +258,15 @@ async function createAssetEditApp(worlds: InMemoryWorlds, sessions: InMemoryAgen
   });
 }
 
-function createInMemoryOfficialAssets(): OfficialAssetsRepository {
+function createInMemoryOfficialAssets(): OfficialAssetsRepository & OfficialAssetPatchesRepository {
   const assets = new Map<string, OfficialAssetRecord>();
   const revisions = new Map<string, OfficialAssetRevisionRecord[]>();
   const indexes = new Map<string, OfficialAssetSectionIndexRecord[]>();
+  const patches = new Map<string, OfficialAssetPatchRecord[]>();
   let assetCount = 1;
   let revisionCount = 1;
   let indexCount = 1;
+  let patchCount = 1;
 
   return {
     async createAsset(input: CreateOfficialAssetRecordInput) {
@@ -257,6 +311,7 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
       assets.set(asset.id, asset);
       revisions.set(asset.id, [revision]);
       indexes.set(asset.id, sectionIndexes);
+      patches.set(asset.id, []);
       return { asset, revisions: [revision], indexes: sectionIndexes };
     },
     async updateAsset(
@@ -289,6 +344,77 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
         revisions: revisions.get(asset.id) ?? [],
         indexes: indexes.get(asset.id) ?? [],
       };
+    },
+    async applyPatch(input: ApplyOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null> {
+      const asset = assets.get(input.assetId);
+      if (!asset || asset.worldId !== input.worldId) return null;
+      const timestamp = new Date();
+      const existingRevisions = revisions.get(asset.id) ?? [];
+      const versionFrom = asset.version;
+      const versionTo = versionFrom + 1;
+      const updated: OfficialAssetRecord = {
+        ...asset,
+        summary: input.summary,
+        version: versionTo,
+        updatedAt: timestamp,
+      };
+      const revision: OfficialAssetRevisionRecord = {
+        id: `official_asset_revision_${revisionCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        version: versionTo,
+        markdown: input.afterMarkdown,
+        summary: input.summary,
+        metadata: { sessionId: input.sessionId, source: "patch" },
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const sectionIndexes = input.indexes.map((section) => ({
+        id: `official_asset_index_${indexCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        title: section.title,
+        summary: section.summary ?? null,
+        metadata: section.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }));
+      const patch: OfficialAssetPatchRecord = {
+        id: `world_asset_patch_${patchCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        sessionId: input.sessionId,
+        batchId: null,
+        beforeRevisionId: existingRevisions[0]?.id ?? null,
+        afterRevisionId: revision.id,
+        beforeMarkdown: input.beforeMarkdown,
+        afterMarkdown: input.afterMarkdown,
+        diff: input.diff,
+        assetVersionFrom: versionFrom,
+        assetVersionTo: versionTo,
+        status: "applied",
+        metadata: { ...(input.metadata ?? {}), sessionId: input.sessionId },
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        appliedAt: timestamp,
+        revertedAt: null,
+      };
+
+      assets.set(asset.id, updated);
+      revisions.set(asset.id, [revision, ...existingRevisions]);
+      indexes.set(asset.id, sectionIndexes);
+      patches.set(asset.id, [patch, ...(patches.get(asset.id) ?? [])]);
+      return patch;
+    },
+    async listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]> {
+      const asset = assets.get(assetId);
+      if (!asset || asset.worldId !== worldId) return [];
+      return patches.get(assetId) ?? [];
+    },
+    async getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null> {
+      const asset = assets.get(assetId);
+      if (!asset || asset.worldId !== worldId) return null;
+      return (patches.get(assetId) ?? []).find((patch) => patch.id === patchId) ?? null;
     },
   };
 }

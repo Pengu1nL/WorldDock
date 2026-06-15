@@ -15,6 +15,7 @@ import type {
   OfficialAssetSectionIndexRecord,
 } from "./official-assets.repository";
 import { OfficialAssetsService } from "./official-assets.service";
+import { type OfficialAssetPatchView, WorldAssetPatchesService } from "./world-asset-patches.service";
 
 const createOfficialAssetSchema = z.object({
   type: officialWorldAssetTypeSchema,
@@ -46,10 +47,17 @@ const createOfficialAssetEditSessionSchema = z.object({
   title: z.string().trim().min(1).optional(),
 }).strict();
 
+const applyOfficialAssetPatchSchema = z.object({
+  sessionId: z.string().trim().min(1),
+  afterMarkdown: z.string().trim().min(1),
+  reason: z.string().trim().min(1).optional(),
+}).strict();
+
 @Controller("worlds/:worldId/official-assets")
 export class OfficialAssetsController {
   constructor(
     @Inject(OfficialAssetsService) private readonly officialAssets: OfficialAssetsService,
+    @Inject(WorldAssetPatchesService) private readonly assetPatches: WorldAssetPatchesService,
     @Inject(AgentSessionsService) private readonly agentSessions: AgentSessionsService,
   ) {}
 
@@ -105,6 +113,41 @@ export class OfficialAssetsController {
     return serializeAgentSessionDetail(await this.agentSessions.getSessionDetail(worldId, session.id));
   }
 
+  @Post(":assetId/patches")
+  async applyPatch(
+    @Param("worldId") worldId: string,
+    @Param("assetId") assetId: string,
+    @Body() body: unknown,
+  ) {
+    const input = applyOfficialAssetPatchSchema.parse(body);
+    return {
+      patch: serializeOfficialAssetPatch(await this.assetPatches.applyPatch({
+        worldId,
+        assetId,
+        ...input,
+      })),
+    };
+  }
+
+  @Get(":assetId/patches")
+  async listPatches(@Param("worldId") worldId: string, @Param("assetId") assetId: string) {
+    const patches = await this.assetPatches.listPatches(worldId, assetId);
+    return {
+      patches: patches.map(serializeOfficialAssetPatch),
+    };
+  }
+
+  @Get(":assetId/patches/:patchId")
+  async patchDetail(
+    @Param("worldId") worldId: string,
+    @Param("assetId") assetId: string,
+    @Param("patchId") patchId: string,
+  ) {
+    return {
+      patch: serializeOfficialAssetPatch(await this.assetPatches.getPatch(worldId, assetId, patchId)),
+    };
+  }
+
   @Patch(":assetId")
   async update(
     @Param("worldId") worldId: string,
@@ -150,6 +193,16 @@ function serializeOfficialAssetIndex(index: OfficialAssetSectionIndexRecord) {
     ...index,
     createdAt: index.createdAt.toISOString(),
     updatedAt: index.updatedAt.toISOString(),
+  };
+}
+
+function serializeOfficialAssetPatch(patch: OfficialAssetPatchView) {
+  return {
+    ...patch,
+    createdAt: patch.createdAt.toISOString(),
+    updatedAt: patch.updatedAt.toISOString(),
+    appliedAt: patch.appliedAt?.toISOString() ?? null,
+    revertedAt: patch.revertedAt?.toISOString() ?? null,
   };
 }
 

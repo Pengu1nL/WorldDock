@@ -1,5 +1,6 @@
 import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
 import type { OfficialAssetsService } from "../../official-assets/official-assets.service";
+import type { WorldAssetPatchesService } from "../../official-assets/world-asset-patches.service";
 import type { ArchiveEntryRecord, ConflictRecord, StorySeedRecord, WorldRecord, WorldRepository } from "../../worlds/world.repository";
 import { normalizeWorldSuggestion } from "../suggestion-normalizer";
 import { WorldToolRegistry } from "./world-tool-registry";
@@ -16,7 +17,11 @@ export type DisclosureAsset = {
   updatedAt: Date;
 };
 
-export function createWorldToolRegistry(worlds: WorldRepository, officialAssets?: OfficialAssetsService) {
+export function createWorldToolRegistry(
+  worlds: WorldRepository,
+  officialAssets?: OfficialAssetsService,
+  assetPatches?: WorldAssetPatchesService,
+) {
   const registry = new WorldToolRegistry();
 
   registry.register("get_world_manifest", async (input) => {
@@ -79,7 +84,21 @@ export function createWorldToolRegistry(worlds: WorldRepository, officialAssets?
     };
   });
 
-  registry.register("apply_world_asset_patch", async () => unimplementedFormalAssetTool("apply_world_asset_patch"));
+  registry.register("apply_world_asset_patch", async (input) => {
+    if (!assetPatches) {
+      throw new Error("World asset patch tool is unavailable: WorldAssetPatchesService is not configured.");
+    }
+    const patch = isRecord(input.patch) ? input.patch : {};
+    return {
+      patch: await assetPatches.applyPatch({
+        worldId: readToolText(input.worldId),
+        assetId: readToolText(input.assetId),
+        sessionId: readToolText(input.sessionId, patch.sessionId),
+        afterMarkdown: readToolText(input.afterMarkdown, patch.afterMarkdown, patch.markdown),
+        reason: readToolText(input.reason, patch.reason) || undefined,
+      }),
+    };
+  });
 
   registry.register("resolve_consistency_issue", async () => unimplementedFormalAssetTool("resolve_consistency_issue"));
 

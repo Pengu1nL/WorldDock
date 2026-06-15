@@ -1,6 +1,7 @@
 import type {
   OfficialWorldAssetStatus,
   OfficialWorldAssetType,
+  WorldAssetPatchStatus,
 } from "@worlddock/contract/assets";
 
 export const OFFICIAL_ASSETS_REPOSITORY = Symbol("OFFICIAL_ASSETS_REPOSITORY");
@@ -50,6 +51,27 @@ export type OfficialAssetDetailRecord = {
   indexes: OfficialAssetSectionIndexRecord[];
 };
 
+export type OfficialAssetPatchRecord = {
+  id: string;
+  worldId: string;
+  assetId: string;
+  sessionId: string | null;
+  batchId: string | null;
+  beforeRevisionId: string | null;
+  afterRevisionId: string | null;
+  beforeMarkdown: string;
+  afterMarkdown: string;
+  diff: string | null;
+  assetVersionFrom: number;
+  assetVersionTo: number;
+  status: WorldAssetPatchStatus;
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+  appliedAt: Date | null;
+  revertedAt: Date | null;
+};
+
 export type CreateOfficialAssetRecordInput = {
   id: string;
   worldId: string;
@@ -79,6 +101,22 @@ export type UpdateOfficialAssetRecordInput = {
   status?: OfficialWorldAssetStatus;
 };
 
+export type ApplyOfficialAssetPatchRecordInput = {
+  worldId: string;
+  assetId: string;
+  sessionId: string;
+  beforeMarkdown: string;
+  afterMarkdown: string;
+  diff: string;
+  summary: string;
+  metadata?: Record<string, unknown>;
+  indexes: Array<{
+    title: string;
+    summary: string | null;
+    metadata?: Record<string, unknown>;
+  }>;
+};
+
 export type ListOfficialAssetsQuery = {
   type?: OfficialWorldAssetType;
   q?: string;
@@ -98,6 +136,12 @@ export type OfficialAssetsRepository = {
     query?: ListOfficialAssetsQuery,
   ): Promise<{ assets: OfficialAssetRecord[]; nextCursor: string | null }>;
   getAsset(worldId: string, assetId: string): Promise<OfficialAssetDetailRecord | null>;
+};
+
+export type OfficialAssetPatchesRepository = {
+  applyPatch(input: ApplyOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null>;
+  listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]>;
+  getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null>;
 };
 
 export const DEFAULT_OFFICIAL_ASSET_LIST_LIMIT = 20;

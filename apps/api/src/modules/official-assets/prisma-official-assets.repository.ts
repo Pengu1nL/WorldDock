@@ -1,10 +1,12 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
-import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema, worldAssetPatchStatusSchema } from "@worlddock/contract/assets";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
 import {
   decodeOfficialAssetListCursor,
   encodeOfficialAssetListCursor,
   normalizeOfficialAssetListLimit,
+  type OfficialAssetPatchRecord,
+  type OfficialAssetPatchesRepository,
   type OfficialAssetDetailRecord,
   type OfficialAssetRecord,
   type OfficialAssetRevisionRecord,
@@ -13,7 +15,7 @@ import {
 } from "./official-assets.repository";
 
 @Injectable()
-export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository, OnModuleDestroy {
+export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository, OfficialAssetPatchesRepository, OnModuleDestroy {
   private readonly prisma: PrismaClient = createPrismaClient();
 
   async createAsset(input: Parameters<OfficialAssetsRepository["createAsset"]>[0]) {
@@ -152,6 +154,95 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
     };
   }
 
+  async applyPatch(input: Parameters<OfficialAssetPatchesRepository["applyPatch"]>[0]): Promise<OfficialAssetPatchRecord | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.officialWorldAsset.findFirst({
+        where: { worldId: input.worldId, id: input.assetId },
+        include: {
+          revisions: { orderBy: [{ version: "desc" }, { createdAt: "desc" }], take: 1 },
+        },
+      });
+      if (!current) return null;
+
+      const versionFrom = current.version;
+      const versionTo = versionFrom + 1;
+      await tx.officialWorldAsset.update({
+        where: { id: current.id },
+        data: {
+          summary: input.summary,
+          version: versionTo,
+        },
+      });
+
+      const revision = await tx.officialWorldAssetRevision.create({
+        data: {
+          worldId: input.worldId,
+          assetId: input.assetId,
+          version: versionTo,
+          markdown: input.afterMarkdown,
+          summary: input.summary,
+          metadata: {
+            sessionId: input.sessionId,
+            source: "patch",
+          },
+        },
+      });
+
+      await tx.officialWorldAssetIndex.deleteMany({
+        where: { worldId: input.worldId, assetId: input.assetId },
+      });
+      for (const section of input.indexes) {
+        await tx.officialWorldAssetIndex.create({
+          data: {
+            worldId: input.worldId,
+            assetId: input.assetId,
+            title: section.title,
+            summary: section.summary,
+            metadata: (section.metadata ?? {}) as never,
+          },
+        });
+      }
+
+      const appliedAt = new Date();
+      const patch = await tx.worldAssetPatch.create({
+        data: {
+          worldId: input.worldId,
+          assetId: input.assetId,
+          beforeRevisionId: current.revisions[0]?.id ?? null,
+          afterRevisionId: revision.id,
+          beforeMarkdown: input.beforeMarkdown,
+          afterMarkdown: input.afterMarkdown,
+          diff: input.diff,
+          assetVersionFrom: versionFrom,
+          assetVersionTo: versionTo,
+          status: "applied",
+          metadata: {
+            ...(input.metadata ?? {}),
+            sessionId: input.sessionId,
+          } as never,
+          appliedAt,
+        },
+      });
+
+      return mapOfficialAssetPatch(patch);
+    });
+  }
+
+  async listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]> {
+    const patches = await this.prisma.worldAssetPatch.findMany({
+      where: { worldId, assetId },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+    return patches.map(mapOfficialAssetPatch);
+  }
+
+  async getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null> {
+    const patch = await this.prisma.worldAssetPatch.findFirst({
+      where: { worldId, assetId, id: patchId },
+    });
+    return patch ? mapOfficialAssetPatch(patch) : null;
+  }
+
   async onModuleDestroy() {
     await this.prisma.$disconnect();
   }
@@ -243,6 +334,48 @@ function mapOfficialAssetIndex(index: {
     metadata: isRecord(index.metadata) ? index.metadata : {},
     createdAt: index.createdAt,
     updatedAt: index.updatedAt,
+  };
+}
+
+function mapOfficialAssetPatch(patch: {
+  id: string;
+  worldId: string;
+  assetId: string;
+  batchId: string | null;
+  beforeRevisionId: string | null;
+  afterRevisionId: string | null;
+  beforeMarkdown: string;
+  afterMarkdown: string;
+  diff: string | null;
+  assetVersionFrom: number;
+  assetVersionTo: number;
+  status: string;
+  metadata: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  appliedAt: Date | null;
+  revertedAt: Date | null;
+}): OfficialAssetPatchRecord {
+  const metadata = isRecord(patch.metadata) ? patch.metadata : {};
+  return {
+    id: patch.id,
+    worldId: patch.worldId,
+    assetId: patch.assetId,
+    sessionId: typeof metadata.sessionId === "string" ? metadata.sessionId : null,
+    batchId: patch.batchId,
+    beforeRevisionId: patch.beforeRevisionId,
+    afterRevisionId: patch.afterRevisionId,
+    beforeMarkdown: patch.beforeMarkdown,
+    afterMarkdown: patch.afterMarkdown,
+    diff: patch.diff,
+    assetVersionFrom: patch.assetVersionFrom,
+    assetVersionTo: patch.assetVersionTo,
+    status: worldAssetPatchStatusSchema.parse(patch.status),
+    metadata,
+    createdAt: patch.createdAt,
+    updatedAt: patch.updatedAt,
+    appliedAt: patch.appliedAt,
+    revertedAt: patch.revertedAt,
   };
 }
 

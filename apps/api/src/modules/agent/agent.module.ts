@@ -2,6 +2,7 @@ import { forwardRef, Module } from "@nestjs/common";
 import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
 import { OfficialAssetsModule } from "../official-assets/official-assets.module";
 import { OfficialAssetsService } from "../official-assets/official-assets.service";
+import { WorldAssetPatchesService } from "../official-assets/world-asset-patches.service";
 import { PotentialAssetsModule } from "../potential-assets/potential-assets.module";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldsModule } from "../worlds/worlds.module";
@@ -28,7 +29,11 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
     },
     {
       provide: AGENT_PROVIDER,
-      useFactory: (worlds: WorldRepository, officialAssets: OfficialAssetsService) => {
+      useFactory: (
+        worlds: WorldRepository,
+        officialAssets: OfficialAssetsService,
+        assetPatches: WorldAssetPatchesService,
+      ) => {
         const adapter = createPiAgentCoreAdapter({
           modelProvider: process.env.PI_MODEL_PROVIDER,
           modelId: process.env.PI_MODEL_ID,
@@ -37,12 +42,12 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
         return new PiAgentProvider(
           new PiSessionRunner(
             new PiAgentCoreRuntimeClient(adapter),
-            createWorldToolRegistry(worlds, officialAssets),
+            createWorldToolRegistry(worlds, officialAssets, assetPatches),
             new SafetyGate(),
           ),
         );
       },
-      inject: [WORLD_REPOSITORY, OfficialAssetsService],
+      inject: [WORLD_REPOSITORY, OfficialAssetsService, WorldAssetPatchesService],
     },
   ],
   exports: [AgentService, AGENT_REPOSITORY, AGENT_PROVIDER],

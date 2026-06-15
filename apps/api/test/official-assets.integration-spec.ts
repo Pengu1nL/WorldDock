@@ -18,6 +18,7 @@ import {
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
+import { WorldAssetPatchesService } from "../src/modules/official-assets/world-asset-patches.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -278,6 +279,7 @@ async function createOfficialAssetsApp(worlds: InMemoryWorlds) {
     providers: [
       AgentSessionsService,
       OfficialAssetsService,
+      WorldAssetPatchesService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: AGENT_SESSIONS_REPOSITORY, useValue: createInMemoryAgentSessions() },
