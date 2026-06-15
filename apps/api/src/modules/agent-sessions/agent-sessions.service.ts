@@ -2,6 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import {
   AGENT_SESSIONS_REPOSITORY,
   InvalidAgentSessionListCursorError,
+  type CreateAgentSessionContextItemInput,
   type AgentSessionRecord,
   type AgentSessionsRepository,
   decodeAgentSessionListCursor,
@@ -30,6 +31,7 @@ type CreateAgentSessionInput =
   };
 
 type ListAgentSessionsInput = Parameters<AgentSessionsRepository["listSessions"]>[1];
+type CreateSessionContextItemInput = Omit<CreateAgentSessionContextItemInput, "sessionId">;
 
 @Injectable()
 export class AgentSessionsService {
@@ -80,6 +82,10 @@ export class AgentSessionsService {
     ]);
 
     return { session, subjects, contextItems, messages };
+  }
+
+  async createContextItem(sessionId: string, input: CreateSessionContextItemInput) {
+    return this.sessions.createContextItem({ sessionId, ...input });
   }
 
   async archiveSession(worldId: string, sessionId: string) {

@@ -1,4 +1,5 @@
 import { forwardRef, Module } from "@nestjs/common";
+import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
 import { LocalStorageModule } from "../local-storage/local-storage.module";
 import { WorldsModule } from "../worlds/worlds.module";
 import { OFFICIAL_ASSETS_REPOSITORY } from "./official-assets.repository";
@@ -7,7 +8,7 @@ import { OfficialAssetsService } from "./official-assets.service";
 import { PrismaOfficialAssetsRepository } from "./prisma-official-assets.repository";
 
 @Module({
-  imports: [LocalStorageModule, forwardRef(() => WorldsModule)],
+  imports: [LocalStorageModule, forwardRef(() => WorldsModule), forwardRef(() => AgentSessionsModule)],
   controllers: [OfficialAssetsController],
   providers: [
     OfficialAssetsService,

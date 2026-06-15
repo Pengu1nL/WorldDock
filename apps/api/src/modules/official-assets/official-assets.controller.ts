@@ -2,6 +2,13 @@ import { Body, Controller, Get, Inject, Param, Patch, Post, Query } from "@nestj
 import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
 import { z } from "zod";
 import type {
+  AgentSessionContextItemRecord,
+  AgentSessionMessageRecord,
+  AgentSessionRecord,
+  AgentSessionSubjectRecord,
+} from "../agent-sessions/agent-sessions.repository";
+import { AgentSessionsService } from "../agent-sessions/agent-sessions.service";
+import type {
   OfficialAssetDetailRecord,
   OfficialAssetRecord,
   OfficialAssetRevisionRecord,
@@ -35,9 +42,16 @@ const updateOfficialAssetSchema = z.object({
   message: "At least one official asset update field is required.",
 });
 
+const createOfficialAssetEditSessionSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+}).strict();
+
 @Controller("worlds/:worldId/official-assets")
 export class OfficialAssetsController {
-  constructor(@Inject(OfficialAssetsService) private readonly officialAssets: OfficialAssetsService) {}
+  constructor(
+    @Inject(OfficialAssetsService) private readonly officialAssets: OfficialAssetsService,
+    @Inject(AgentSessionsService) private readonly agentSessions: AgentSessionsService,
+  ) {}
 
   @Post()
   async create(@Param("worldId") worldId: string, @Body() body: unknown) {
@@ -59,6 +73,35 @@ export class OfficialAssetsController {
   @Get(":assetId")
   async detail(@Param("worldId") worldId: string, @Param("assetId") assetId: string) {
     return serializeOfficialAssetDetail(await this.officialAssets.getAsset(worldId, assetId));
+  }
+
+  @Post(":assetId/edit-sessions")
+  async createEditSession(
+    @Param("worldId") worldId: string,
+    @Param("assetId") assetId: string,
+    @Body() body: unknown,
+  ) {
+    const assetDetail = await this.officialAssets.getAsset(worldId, assetId);
+    const input = createOfficialAssetEditSessionSchema.parse(body);
+    const session = await this.agentSessions.createSession(worldId, {
+      kind: "asset_edit",
+      subjectAssetId: assetId,
+      title: input.title,
+    });
+
+    await this.agentSessions.createContextItem(session.id, {
+      kind: "asset_document",
+      targetId: assetDetail.asset.id,
+      title: assetDetail.asset.name,
+      summary: assetDetail.asset.summary,
+      metadata: {
+        documentKey: assetDetail.asset.documentKey,
+        version: assetDetail.asset.version,
+        source: "initial",
+      },
+    });
+
+    return serializeAgentSessionDetail(await this.agentSessions.getSessionDetail(worldId, session.id));
   }
 
   @Patch(":assetId")
@@ -106,5 +149,59 @@ function serializeOfficialAssetIndex(index: OfficialAssetSectionIndexRecord) {
     ...index,
     createdAt: index.createdAt.toISOString(),
     updatedAt: index.updatedAt.toISOString(),
+  };
+}
+
+function serializeAgentSession(record: AgentSessionRecord) {
+  return {
+    ...record,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+function serializeAgentSessionDetail(detail: {
+  session: AgentSessionRecord;
+  subjects: AgentSessionSubjectRecord[];
+  contextItems: AgentSessionContextItemRecord[];
+  messages: AgentSessionMessageRecord[];
+}) {
+  return {
+    session: serializeAgentSession(detail.session),
+    subjects: detail.subjects.map(serializeAgentSessionSubject),
+    contextItems: detail.contextItems.map(serializeAgentSessionContextItem),
+    messages: detail.messages.map(serializeAgentSessionMessage),
+  };
+}
+
+function serializeAgentSessionSubject(record: AgentSessionSubjectRecord) {
+  return {
+    id: record.id,
+    sessionId: record.sessionId,
+    subjectKind: record.kind,
+    subjectId: record.targetId,
+    role: record.role,
+    title: record.title,
+    metadata: record.metadata,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+function serializeAgentSessionContextItem(record: AgentSessionContextItemRecord) {
+  const source = typeof record.metadata.source === "string" ? record.metadata.source : undefined;
+  return {
+    ...record,
+    ...(source ? { source } : {}),
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}
+
+function serializeAgentSessionMessage(record: AgentSessionMessageRecord) {
+  return {
+    ...record,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
   };
 }

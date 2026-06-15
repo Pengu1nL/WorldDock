@@ -2,6 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type INestApplication } from "@nestjs/common";
+import { AGENT_SESSIONS_REPOSITORY } from "../src/modules/agent-sessions/agent-sessions.repository";
+import { AgentSessionsService } from "../src/modules/agent-sessions/agent-sessions.service";
 import { LocalStorageService } from "../src/modules/local-storage/local-storage.service";
 import { OfficialAssetsController } from "../src/modules/official-assets/official-assets.controller";
 import {
@@ -19,7 +21,12 @@ import { OfficialAssetsService } from "../src/modules/official-assets/official-a
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createHttpTestApp, createInMemoryWorlds, type InMemoryWorlds } from "./local-api-test-helpers";
+import {
+  createHttpTestApp,
+  createInMemoryAgentSessions,
+  createInMemoryWorlds,
+  type InMemoryWorlds,
+} from "./local-api-test-helpers";
 
 describe("official assets local endpoints", () => {
   let app: INestApplication | undefined;
@@ -269,9 +276,11 @@ async function createOfficialAssetsApp(worlds: InMemoryWorlds) {
   return createHttpTestApp({
     controllers: [OfficialAssetsController],
     providers: [
+      AgentSessionsService,
       OfficialAssetsService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
+      { provide: AGENT_SESSIONS_REPOSITORY, useValue: createInMemoryAgentSessions() },
       { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
     ],
   });
