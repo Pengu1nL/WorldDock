@@ -44,4 +44,22 @@ describe("describeWorldTools session policies", () => {
       "resolve_consistency_issue",
     ]));
   });
+
+  it("limits asset deposition tools to read tools and create_world_asset", () => {
+    const names = describeWorldTools({ kind: "world_exploration", intent: "asset_deposition" }).map((tool) => tool.name);
+
+    expect(names).toEqual(expect.arrayContaining([
+      "get_world_manifest",
+      "search_world_assets",
+      "get_asset_brief",
+      "get_asset_detail",
+      "get_asset_source_fragments",
+      "list_local_releases",
+      "create_world_asset",
+    ]));
+    expect(names).not.toContain("propose_setting");
+    expect(names.filter((name) => name.startsWith("propose_"))).toEqual([]);
+    expect(names).not.toContain("apply_world_asset_patch");
+    expect(names).not.toContain("resolve_consistency_issue");
+  });
 });

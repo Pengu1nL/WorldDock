@@ -47,7 +47,9 @@ export function isToolAllowedForPolicy(
   policy: PiSessionPolicy = DEFAULT_PI_SESSION_POLICY,
 ) {
   if (READ_TOOLS.has(toolName)) return true;
-  if (PENDING_SUGGESTION_TOOLS.has(toolName)) return policy.kind === "world_exploration";
+  if (PENDING_SUGGESTION_TOOLS.has(toolName)) {
+    return policy.kind === "world_exploration" && policy.intent === undefined;
+  }
   if (toolName === "create_world_asset") return policy.kind === "world_exploration" && policy.intent === "asset_deposition";
   if (toolName === "apply_world_asset_patch") return policy.kind === "asset_edit" || policy.kind === "consistency_repair";
   if (toolName === "resolve_consistency_issue") return policy.kind === "consistency_repair";

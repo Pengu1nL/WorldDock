@@ -209,6 +209,77 @@ describe("agent session run local endpoints", () => {
     expect(events.map((event) => event.type)).not.toContain("suggestion.created");
   });
 
+  it.each([
+    {
+      kind: "asset_edit" as const,
+      skillName: "asset-edit",
+      allowedWriteTools: ["apply_world_asset_patch"],
+      deniedTools: ["propose_setting", "propose_story_seed", "propose_conflict", "propose_release_notes", "create_world_asset", "resolve_consistency_issue"],
+    },
+    {
+      kind: "consistency_repair" as const,
+      skillName: "consistency-repair",
+      allowedWriteTools: ["apply_world_asset_patch", "resolve_consistency_issue"],
+      deniedTools: ["propose_setting", "propose_story_seed", "propose_conflict", "propose_release_notes", "create_world_asset"],
+    },
+  ])("passes $kind policy, tools, and skills to the provider", async ({ kind, skillName, allowedWriteTools, deniedTools }) => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const provider = createMockStreamingAgentProvider([
+      { type: "delta", text: "已按会话类型处理。" },
+      {
+        type: "usage",
+        tokenUsage: { inputTokens: 2, outputTokens: 3, totalTokens: 5 },
+      },
+    ]);
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind,
+      title: `${kind} session`,
+      status: "active",
+      current: false,
+      metadata: {},
+    });
+    app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "按当前会话处理" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/v1/agent-session-runs/${created.body.run.id}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+
+    expect(provider.calls).toHaveLength(1);
+    const providerInput = provider.calls[0];
+    expect(providerInput.policy).toEqual({ kind });
+    expect(providerInput.skills?.map((skill) => skill.name)).toEqual([skillName]);
+    const toolNames = providerInput.tools?.map((tool) => tool.name) ?? [];
+    expect(toolNames).toEqual(expect.arrayContaining([
+      "get_world_manifest",
+      "search_world_assets",
+      "get_asset_brief",
+      "get_asset_detail",
+      "get_asset_source_fragments",
+      "list_local_releases",
+      ...allowedWriteTools,
+    ]));
+    for (const deniedTool of deniedTools) {
+      expect(toolNames).not.toContain(deniedTool);
+    }
+  });
+
   it("appends session messages at the end without reusing sequences", async () => {
     const sessions = createInMemoryAgentSessions();
     const session = await sessions.createSession({

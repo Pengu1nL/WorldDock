@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException, Optional, ServiceUnavailableExce
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
 import {
   AGENT_SESSIONS_REPOSITORY,
+  type AgentSessionRecord,
   type CreateAgentSessionContextItemInput,
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
@@ -17,10 +18,11 @@ import {
 } from "../worlds/world.repository";
 import { selectInitialWorldContext } from "./context-builder";
 import { describeWorldTools } from "./pi/world-tool-registry";
-import { loadWorldDockPiSkills } from "./pi/skill-loader";
+import { loadSessionPiSkills } from "./pi/session-skill-loader";
+import { DEFAULT_PI_SESSION_POLICY, type PiSessionPolicy } from "./pi/safety-gate";
 import { buildDisclosureBriefs, buildDisclosureCards, buildDisclosureManifest } from "./pi/world-tools";
 import { normalizeWorldSuggestion } from "./suggestion-normalizer";
-import { AGENT_PROVIDER, type AgentProvider, type AgentProviderChunk } from "./agent.provider";
+import { AGENT_PROVIDER, type AgentProvider, type AgentProviderChunk, type AgentProviderInput } from "./agent.provider";
 import { AGENT_REPOSITORY, type AgentEventRecord, type AgentRepository, type AgentRunRecord, type AgentSuggestionRecord } from "./agent.repository";
 
 const LEGACY_AGENT_RUN_MODE: AgentRunRecord["mode"] = "expand";
@@ -30,6 +32,34 @@ type SessionContextItemFromProvider = Omit<CreateAgentSessionContextItemInput, "
   targetId?: string | null;
   source: NonNullable<AgentProviderChunkContext["source"]>;
 };
+type AgentProviderSessionConfig = Pick<AgentProviderInput, "policy" | "tools" | "skills">;
+
+function buildAgentProviderSessionConfig(
+  policy: PiSessionPolicy,
+  env: { PI_SKILLS_DIR?: string },
+): AgentProviderSessionConfig {
+  return {
+    policy,
+    tools: [...describeWorldTools(policy)],
+    skills: loadPiSkillsForPolicy(policy, env.PI_SKILLS_DIR),
+  };
+}
+
+function policyForSession(session: Pick<AgentSessionRecord, "kind">): PiSessionPolicy {
+  if (session.kind === "asset_edit") return { kind: "asset_edit" };
+  if (session.kind === "consistency_repair") return { kind: "consistency_repair" };
+  return DEFAULT_PI_SESSION_POLICY;
+}
+
+function loadPiSkillsForPolicy(policy: PiSessionPolicy, skillsDir?: string) {
+  if (policy.kind === "asset_edit") {
+    return loadSessionPiSkills({ kind: "asset_edit", skillsDir });
+  }
+  if (policy.kind === "consistency_repair") {
+    return loadSessionPiSkills({ kind: "consistency_repair", skillsDir });
+  }
+  return loadSessionPiSkills({ kind: "world_exploration", intent: policy.intent, skillsDir });
+}
 
 type CreateWorldDraftInput = {
   inspiration: string;
@@ -203,8 +233,7 @@ export class AgentService {
         model: run.model,
         world: { id: world.id, name: world.name, summary: world.summary },
         context,
-        tools: [...describeWorldTools()],
-        skills: loadWorldDockPiSkills(process.env),
+        ...buildAgentProviderSessionConfig(DEFAULT_PI_SESSION_POLICY, process.env),
         signal: controller.signal,
       };
       const iterator = this.provider.stream(providerInput)[Symbol.asyncIterator]();
@@ -413,8 +442,7 @@ export class AgentService {
         model: run.model,
         world: { id: world.id, name: world.name, summary: world.summary },
         context,
-        tools: [...describeWorldTools()],
-        skills: loadWorldDockPiSkills(process.env),
+        ...buildAgentProviderSessionConfig(policyForSession(session), process.env),
         signal: controller.signal,
       };
       const iterator = this.provider.stream(providerInput)[Symbol.asyncIterator]();

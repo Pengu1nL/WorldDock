@@ -61,11 +61,11 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
     releases: [],
   }));
 
-  registry.register("create_world_asset", async (input) => unimplementedFormalAssetTool("create_world_asset", input));
+  registry.register("create_world_asset", async () => unimplementedFormalAssetTool("create_world_asset"));
 
-  registry.register("apply_world_asset_patch", async (input) => unimplementedFormalAssetTool("apply_world_asset_patch", input));
+  registry.register("apply_world_asset_patch", async () => unimplementedFormalAssetTool("apply_world_asset_patch"));
 
-  registry.register("resolve_consistency_issue", async (input) => unimplementedFormalAssetTool("resolve_consistency_issue", input));
+  registry.register("resolve_consistency_issue", async () => unimplementedFormalAssetTool("resolve_consistency_issue"));
 
   registry.register("propose_setting", async (input) => {
     const body = readToolText(input.body, input.summary, "待整理设定建议。");
@@ -117,14 +117,8 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
   return registry;
 }
 
-function unimplementedFormalAssetTool(toolName: string, input: Record<string, unknown>) {
-  return {
-    ok: false,
-    code: "WORLD_ASSET_WRITE_NOT_IMPLEMENTED",
-    toolName,
-    worldId: readToolText(input.worldId),
-    message: `${toolName} is reserved for Task 6.3 and is not implemented yet.`,
-  };
+function unimplementedFormalAssetTool(toolName: string): never {
+  throw new Error(`World asset write tool is not implemented yet: ${toolName}`);
 }
 
 function readToolText(...values: unknown[]) {
