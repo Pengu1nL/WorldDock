@@ -42,7 +42,7 @@ export class PiSessionRunner {
     const disclosedAssetIds = new Set(input.context.map((ref) => ref.targetId).filter((id): id is string => Boolean(id)));
 
     const executeTool = async (toolCall: { id: string; name: PiToolName; arguments: Record<string, unknown> }) => {
-      this.safetyGate.assertToolAllowed(toolCall, disclosedAssetIds);
+      this.safetyGate.assertToolAllowed(toolCall, disclosedAssetIds, input.policy);
       const result = await this.tools.execute(toolCall.name, toolCall.arguments);
       const contextEvents = contextEventsFromToolResult(toolCall.name, result);
       for (const assetId of disclosedAssetIdsFromToolResult(toolCall.name, result)) {

@@ -1,12 +1,22 @@
 import type { PiToolCall, PiToolName } from "@worlddock/domain/agent/pi";
 
-const ALLOWED_TOOLS = new Set<PiToolName>([
+export type PiSessionPolicy =
+  | { kind: "world_exploration"; intent?: "asset_deposition" }
+  | { kind: "asset_edit" }
+  | { kind: "consistency_repair" };
+
+export const DEFAULT_PI_SESSION_POLICY: PiSessionPolicy = { kind: "world_exploration" };
+
+const READ_TOOLS = new Set<PiToolName>([
   "get_world_manifest",
   "search_world_assets",
   "get_asset_brief",
   "get_asset_detail",
   "get_asset_source_fragments",
   "list_local_releases",
+]);
+
+const PENDING_SUGGESTION_TOOLS = new Set<PiToolName>([
   "propose_setting",
   "propose_story_seed",
   "propose_conflict",
@@ -14,8 +24,12 @@ const ALLOWED_TOOLS = new Set<PiToolName>([
 ]);
 
 export class SafetyGate {
-  assertToolAllowed(toolCall: PiToolCall, disclosedAssetIds = new Set<string>()) {
-    if (!ALLOWED_TOOLS.has(toolCall.name)) {
+  assertToolAllowed(
+    toolCall: PiToolCall,
+    disclosedAssetIds = new Set<string>(),
+    policy: PiSessionPolicy = DEFAULT_PI_SESSION_POLICY,
+  ) {
+    if (!isToolAllowedForPolicy(toolCall.name, policy)) {
       throw new Error(`Blocked unsafe pi tool: ${toolCall.name}`);
     }
 
@@ -26,4 +40,16 @@ export class SafetyGate {
       }
     }
   }
+}
+
+export function isToolAllowedForPolicy(
+  toolName: PiToolName,
+  policy: PiSessionPolicy = DEFAULT_PI_SESSION_POLICY,
+) {
+  if (READ_TOOLS.has(toolName)) return true;
+  if (PENDING_SUGGESTION_TOOLS.has(toolName)) return policy.kind === "world_exploration";
+  if (toolName === "create_world_asset") return policy.kind === "world_exploration" && policy.intent === "asset_deposition";
+  if (toolName === "apply_world_asset_patch") return policy.kind === "asset_edit" || policy.kind === "consistency_repair";
+  if (toolName === "resolve_consistency_issue") return policy.kind === "consistency_repair";
+  return false;
 }

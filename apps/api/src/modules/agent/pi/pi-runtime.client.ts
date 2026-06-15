@@ -1,5 +1,6 @@
 import { piRuntimeEventSchema, type PiRuntimeEvent, type PiToolCall, type PiToolName } from "@worlddock/domain/agent/pi";
 import type { WorldContextRef } from "@worlddock/domain/agent/context";
+import type { PiSessionPolicy } from "./safety-gate";
 
 export type PiSessionInput = {
   runId: string;
@@ -7,6 +8,7 @@ export type PiSessionInput = {
   prompt: string;
   model?: string | null;
   context: WorldContextRef[];
+  policy?: PiSessionPolicy;
   tools: Array<{ name: PiToolName; description: string; inputSchema: Record<string, unknown> }>;
   skills: Array<{ name: string; path: string; description: string; instructions?: string }>;
 };

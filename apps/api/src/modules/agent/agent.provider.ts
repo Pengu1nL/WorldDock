@@ -4,12 +4,10 @@ import type { WorldContextRef } from "@worlddock/domain/agent/context";
 import { MockPiRuntimeClient } from "./pi/pi-runtime.client";
 import { piEventToAgentChunk } from "./pi/pi-event-adapter";
 import { PiSessionRunner } from "./pi/pi-session-runner";
-import { SafetyGate } from "./pi/safety-gate";
-import { describeWorldTools, WorldToolRegistry } from "./pi/world-tool-registry";
+import { SafetyGate, type PiSessionPolicy } from "./pi/safety-gate";
+import { describeWorldTools, WorldToolRegistry, type WorldToolDefinition } from "./pi/world-tool-registry";
 
 export const AGENT_PROVIDER = Symbol("AGENT_PROVIDER");
-
-type WorldToolDefinition = ReturnType<typeof describeWorldTools>[number];
 
 export type AgentProviderInput = {
   runId?: string;
@@ -20,6 +18,7 @@ export type AgentProviderInput = {
     summary: string;
   };
   context?: WorldContextRef[];
+  policy?: PiSessionPolicy;
   tools?: readonly WorldToolDefinition[];
   skills?: Array<{ name: string; path: string; description: string }>;
   model?: string | null;
@@ -74,7 +73,8 @@ export class PiAgentProvider implements AgentProvider {
       prompt: input.prompt,
       model: input.model ?? process.env.PI_MODEL_ID ?? process.env.AI_MODEL ?? "pi-mock",
       context,
-      tools: input.tools ? [...input.tools] : [...describeWorldTools()],
+      policy: input.policy,
+      tools: input.tools ? [...input.tools] : [...describeWorldTools(input.policy)],
       skills: input.skills ?? [],
     })) {
       if (input.signal?.aborted) return;
@@ -94,7 +94,13 @@ export function createAgentProviderFromEnv(env: AgentProviderEnv = process.env):
 
 function createDefaultPiSessionRunner() {
   const registry = new WorldToolRegistry();
-  for (const tool of describeWorldTools()) {
+  const policies: PiSessionPolicy[] = [
+    { kind: "world_exploration" },
+    { kind: "world_exploration", intent: "asset_deposition" },
+    { kind: "asset_edit" },
+    { kind: "consistency_repair" },
+  ];
+  for (const tool of policies.flatMap((policy) => describeWorldTools(policy))) {
     registry.register(tool.name, async () => ({}));
   }
   return new PiSessionRunner(new MockPiRuntimeClient(), registry, new SafetyGate());
