@@ -85,7 +85,7 @@ export class WorldAssetPatchesService {
       if (!patch) throw this.notFound();
     } catch (error) {
       if (error instanceof OfficialAssetPatchConflictError) {
-        await this.restoreLatestRevisionMarkdown(input.worldId, input.assetId, detail.asset.documentKey);
+        await this.restoreLatestRevisionMarkdown(input.worldId, input.assetId, detail.asset.documentKey, afterMarkdown);
         throw new ConflictException({
           code: "PATCH_CONFLICT",
           message: "Official asset changed while applying patch.",
@@ -141,8 +141,10 @@ export class WorldAssetPatchesService {
     return new TextDecoder().decode(stored.body);
   }
 
-  private async restoreLatestRevisionMarkdown(worldId: string, assetId: string, documentKey: string) {
+  private async restoreLatestRevisionMarkdown(worldId: string, assetId: string, documentKey: string, afterMarkdown: string) {
     try {
+      const currentMarkdown = await this.readMarkdown(documentKey);
+      if (currentMarkdown !== afterMarkdown) return;
       const latest = await this.officialAssets.getAsset(worldId, assetId);
       const latestMarkdown = latest?.revisions[0]?.markdown;
       if (latestMarkdown === undefined) return;

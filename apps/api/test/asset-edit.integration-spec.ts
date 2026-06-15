@@ -265,6 +265,34 @@ describe("asset edit local endpoints", () => {
     expect(detail.markdown).toBe(latestMarkdown);
   });
 
+  it("does not overwrite a newer storage write during conflict compensation", async () => {
+    const latestMarkdown = "# 记忆交易许可\n\n## 概括\n\nDB 中较早的成功补丁。";
+    const failedAfterMarkdown = "# 记忆交易许可\n\n## 概括\n\n这次失败的补丁不应留在文件里。";
+    const racingMarkdown = "# 记忆交易许可\n\n## 概括\n\n补偿前另一个补丁已经写入文件。";
+    await app?.close();
+    officialAssets = createInMemoryOfficialAssets({ conflictOnApply: { markdown: latestMarkdown } });
+    app = await createAssetEditApp(worlds, agentSessions, officialAssets, createRacingLocalStorageService({
+      failedAfterMarkdown,
+      latestMarkdown,
+      racingMarkdown,
+    }));
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await createAssetEditSession(asset.id);
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: failedAfterMarkdown,
+      })
+      .expect(409);
+
+    const storedMarkdown = await readStoredMarkdown(asset.documentKey);
+    expect(storedMarkdown).toBe(racingMarkdown);
+    expect(storedMarkdown).not.toBe(latestMarkdown);
+    expect(storedMarkdown).not.toBe(failedAfterMarkdown);
+  });
+
   it("creates default titled asset edit sessions when the body is omitted or empty", async () => {
     const asset = await createOfficialAsset("rule", "记忆交易许可");
 
@@ -388,6 +416,7 @@ async function createAssetEditApp(
   worlds: InMemoryWorlds,
   sessions: InMemoryAgentSessions = createInMemoryAgentSessions(),
   officialAssets: InMemoryOfficialAssets = createInMemoryOfficialAssets(),
+  localStorage: LocalStorageService = new LocalStorageService(),
 ) {
   return createHttpTestApp({
     controllers: [OfficialAssetsController],
@@ -395,12 +424,44 @@ async function createAssetEditApp(
       AgentSessionsService,
       OfficialAssetsService,
       WorldAssetPatchesService,
-      LocalStorageService,
+      { provide: LocalStorageService, useValue: localStorage },
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: AGENT_SESSIONS_REPOSITORY, useValue: sessions },
       { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: officialAssets },
     ],
   });
+}
+
+function createRacingLocalStorageService(input: {
+  failedAfterMarkdown: string;
+  latestMarkdown: string;
+  racingMarkdown: string;
+}) {
+  const delegate = new LocalStorageService();
+  let pendingRace = false;
+
+  return {
+    async saveObject(saveInput: Parameters<LocalStorageService["saveObject"]>[0]) {
+      const markdown = new TextDecoder().decode(saveInput.body);
+      if (markdown === input.failedAfterMarkdown) pendingRace = true;
+      if (markdown === input.latestMarkdown && pendingRace) pendingRace = false;
+      return delegate.saveObject(saveInput);
+    },
+    async readObject(key: string) {
+      if (pendingRace) {
+        pendingRace = false;
+        await delegate.saveObject({
+          key,
+          contentType: "text/markdown; charset=utf-8",
+          body: new TextEncoder().encode(input.racingMarkdown),
+        });
+      }
+      return delegate.readObject(key);
+    },
+    async deleteObject(key: string) {
+      await delegate.deleteObject(key);
+    },
+  } as LocalStorageService;
 }
 
 type InMemoryOfficialAssets = OfficialAssetsRepository & OfficialAssetPatchesRepository;
