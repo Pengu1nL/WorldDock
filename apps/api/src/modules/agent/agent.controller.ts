@@ -58,11 +58,15 @@ export class AgentController {
     @Param("potentialAssetId") potentialAssetId: string,
     @Body() body: unknown,
   ) {
-    return this.agentService.promotePotentialAsset(
+    const result = await this.agentService.promotePotentialAsset(
       worldId,
       potentialAssetId,
       promotePotentialAssetSchema.parse(body),
     );
+    return {
+      ...result,
+      depositionRun: serializeAgentRun(result.depositionRun),
+    };
   }
 
   @Sse("agent-runs/:runId/events")

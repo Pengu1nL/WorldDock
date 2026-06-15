@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
 import {
   AGENT_SESSIONS_REPOSITORY,
@@ -6,7 +6,7 @@ import {
   type CreateAgentSessionContextItemInput,
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
-import { OfficialAssetsService } from "../official-assets/official-assets.service";
+import { OfficialAssetsService, type CreateOfficialAssetInput } from "../official-assets/official-assets.service";
 import { PotentialAssetsService } from "../potential-assets/potential-assets.service";
 import type { PotentialAssetRecord } from "../potential-assets/potential-assets.repository";
 import {
@@ -152,12 +152,14 @@ export class AgentService {
     const potentialAssets = this.requirePotentialAssetsService();
     const officialAssets = this.requireOfficialAssetsService();
     const potentialAsset = await potentialAssets.getForWorld(worldId, potentialAssetId);
+    if (potentialAsset.status !== "active") throw this.potentialAssetNotActive();
+
     const sourceMetadata = {
       sourcePotentialAssetId: potentialAsset.id,
       sourceSessionId: potentialAsset.sessionId,
       sourceRunId: potentialAsset.runId,
     };
-    const created = await officialAssets.createAsset(worldId, {
+    const createAssetInput: CreateOfficialAssetInput = {
       type: potentialAsset.type,
       name: cleanOptional(input.name) ?? potentialAsset.title,
       summary: potentialAsset.summary,
@@ -167,8 +169,14 @@ export class AgentService {
         ...(input.metadata ?? {}),
         ...sourceMetadata,
       },
-    });
-    const depositionRun = await this.createCompletedAssetDepositionRun(worldId, potentialAsset, created.asset.id);
+    };
+    const created = await officialAssets.createAsset(worldId, createAssetInput);
+    const depositionRun = await this.createCompletedAssetDepositionRun(
+      worldId,
+      potentialAsset,
+      created.asset.id,
+      createAssetInput,
+    );
     const promotedPotentialAsset = await potentialAssets.markPromoted(worldId, potentialAsset.id, created.asset.id, {
       ...sourceMetadata,
       officialAssetId: created.asset.id,
@@ -821,6 +829,7 @@ export class AgentService {
     worldId: string,
     potentialAsset: PotentialAssetRecord,
     officialAssetId: string,
+    createAssetInput: CreateOfficialAssetInput,
   ) {
     const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
     const run = await this.agents.createRun({
@@ -834,12 +843,7 @@ export class AgentService {
     const toolCall = {
       id: "call_create_world_asset",
       name: "create_world_asset" as const,
-      arguments: {
-        worldId,
-        potentialAssetId: potentialAsset.id,
-        type: potentialAsset.type,
-        name: potentialAsset.title,
-      },
+      arguments: buildAssetDepositionToolArguments(worldId, potentialAsset, createAssetInput),
     };
 
     await this.append(run.id, 1, "run.started", { runId: run.id });
@@ -928,6 +932,13 @@ export class AgentService {
 
   private notFound(message: string) {
     return new NotFoundException({ code: "NOT_FOUND", message });
+  }
+
+  private potentialAssetNotActive() {
+    return new ConflictException({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: "Potential asset is not active and cannot be promoted.",
+    });
   }
 }
 
@@ -1209,6 +1220,35 @@ function serializePotentialAssetForEvent(asset: PotentialAssetRecord) {
     createdAt: asset.createdAt.toISOString(),
     updatedAt: asset.updatedAt.toISOString(),
   };
+}
+
+function buildAssetDepositionToolArguments(
+  worldId: string,
+  potentialAsset: PotentialAssetRecord,
+  createAssetInput: CreateOfficialAssetInput,
+) {
+  const metadata = createAssetInput.metadata ?? {};
+
+  return {
+    worldId,
+    potentialAssetId: potentialAsset.id,
+    type: createAssetInput.type,
+    name: createAssetInput.name,
+    summary: createAssetInput.summary,
+    tags: createAssetInput.tags ?? [],
+    metadataKeys: Object.keys(metadata).sort(),
+    metadataSourceIds: {
+      sourcePotentialAssetId: stringOrNull(metadata.sourcePotentialAssetId),
+      sourceSessionId: stringOrNull(metadata.sourceSessionId),
+      sourceRunId: stringOrNull(metadata.sourceRunId),
+    },
+    markdownProvided: createAssetInput.markdown !== undefined,
+    markdownLength: createAssetInput.markdown?.length ?? 0,
+  };
+}
+
+function stringOrNull(value: unknown) {
+  return typeof value === "string" ? value : null;
 }
 
 function archiveEntryToWorldAsset(entry: ArchiveEntryRecord): WorldAsset {

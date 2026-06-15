@@ -633,7 +633,7 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
     },
     async markPromoted(worldId, id, promotedAssetId, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
-      if (!asset || asset.worldId !== worldId) return null;
+      if (!asset || asset.worldId !== worldId || asset.status !== "active") return null;
       const updated: PotentialAssetRecord = {
         ...asset,
         status: "promoted",

@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import {
   AGENT_SESSIONS_REPOSITORY,
   type AgentSessionsRepository,
@@ -128,7 +128,7 @@ export class PotentialAssetsService {
   ) {
     await this.requireWorld(worldId);
     const asset = await this.potentialAssets.markPromoted(worldId, id, promotedAssetId, metadata);
-    if (!asset) throw this.notFound();
+    if (!asset) throw this.promotionConflict();
     return asset;
   }
 
@@ -143,6 +143,13 @@ export class PotentialAssetsService {
     return new BadRequestException({
       code: "BAD_REQUEST",
       message: "Invalid potential asset cursor.",
+    });
+  }
+
+  private promotionConflict() {
+    return new ConflictException({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: "Potential asset is not active and cannot be promoted.",
     });
   }
 

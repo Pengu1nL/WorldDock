@@ -39,6 +39,14 @@ import {
   type InMemoryWorlds,
 } from "./local-api-test-helpers";
 
+type InMemoryOfficialAssets = OfficialAssetsRepository & {
+  stores: {
+    assets: Map<string, OfficialAssetRecord>;
+    revisions: Map<string, OfficialAssetRevisionRecord[]>;
+    indexes: Map<string, OfficialAssetSectionIndexRecord[]>;
+  };
+};
+
 describe("asset deposition local endpoints", () => {
   let app: INestApplication | undefined;
   let dataDir: string;
@@ -62,51 +70,34 @@ describe("asset deposition local endpoints", () => {
   });
 
   it("promotes a potential asset into an official asset through controlled deposition", async () => {
-    const worlds = createInMemoryWorlds();
-    const agents = createInMemoryAgents();
-    const sessions = createInMemoryAgentSessions();
-    const potentialAssets = createInMemoryPotentialAssets();
-    const world = await createWorld(worlds);
-    const explorationSession = await sessions.createSession({
-      worldId: world.id,
-      kind: "world_exploration",
-      title: "记忆交易推演",
-      status: "active",
-      current: true,
-      metadata: {},
-    });
-    const explorationRun = await agents.createRun({
-      worldId: world.id,
-      sessionId: explorationSession.id,
-      mode: "expand",
-      prompt: "探索记忆交易制度",
-      model: null,
-      provider: "pi",
-    });
-    await agents.updateRun(explorationRun.id, { status: "completed", completedAt: new Date() });
-    const [potentialAsset] = await potentialAssets.createMany([{
-      worldId: world.id,
-      sessionId: explorationSession.id,
-      runId: explorationRun.id,
-      type: "rule",
-      title: "记忆交易许可",
-      summary: "所有记忆交易都需要登记。",
-      evidence: [{ quote: "所有记忆交易都需要登记。", confidence: 0.95 }],
-      metadata: { detector: "test" },
-    }]);
+    const {
+      worlds,
+      agents,
+      sessions,
+      potentialAssets,
+      world,
+      explorationSession,
+      explorationRun,
+      potentialAsset,
+    } = await createPromotionFixture();
     app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets);
+    const overrideMarkdown = "# 记忆交易登记令\n\n## 概括\n\n登记后的记忆交易规则摘要。\n\n## 正文\n\n这段正文只应存入正式资产 markdown。";
 
     const promoted = await request(app.getHttpServer())
       .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
       .send({
-        name: "记忆交易许可",
+        name: "记忆交易登记令",
+        markdown: overrideMarkdown,
+        tags: ["法律", "登记"],
         metadata: { reviewer: "codex" },
       })
       .expect(201);
 
     expect(promoted.body.asset).toMatchObject({
       type: "rule",
-      name: "记忆交易许可",
+      name: "记忆交易登记令",
+      summary: "登记后的记忆交易规则摘要。",
+      tags: ["法律", "登记"],
       version: 1,
       metadata: expect.objectContaining({
         reviewer: "codex",
@@ -115,7 +106,8 @@ describe("asset deposition local endpoints", () => {
         sourceRunId: explorationRun.id,
       }),
     });
-    expect(promoted.body.markdown).toContain("所有记忆交易都需要登记");
+    expect(promoted.body.markdown).toBe(overrideMarkdown);
+    expect(promoted.body.depositionRun).not.toHaveProperty("mode");
 
     const refreshed = await request(app.getHttpServer())
       .get(`/v1/worlds/${world.id}/potential-assets`)
@@ -149,6 +141,33 @@ describe("asset deposition local endpoints", () => {
       "tool.completed",
       "run.completed",
     ]);
+    const requestedEvent = depositionEvents.find((event) => event.type === "tool.requested");
+    if (!requestedEvent || requestedEvent.type !== "tool.requested") throw new Error("Expected tool.requested event.");
+    const requestedArguments = (requestedEvent.payload as {
+      toolCall: { arguments: Record<string, unknown> };
+    }).toolCall.arguments;
+    expect(requestedArguments).toEqual(expect.objectContaining({
+      worldId: world.id,
+      potentialAssetId: potentialAsset.id,
+      type: "rule",
+      name: "记忆交易登记令",
+      summary: "所有记忆交易都需要登记。",
+      tags: ["法律", "登记"],
+      metadataKeys: [
+        "reviewer",
+        "sourcePotentialAssetId",
+        "sourceRunId",
+        "sourceSessionId",
+      ],
+      metadataSourceIds: {
+        sourcePotentialAssetId: potentialAsset.id,
+        sourceSessionId: explorationSession.id,
+        sourceRunId: explorationRun.id,
+      },
+      markdownProvided: true,
+      markdownLength: overrideMarkdown.length,
+    }));
+    expect(requestedArguments).not.toHaveProperty("markdown");
     expect(depositionEvents[2].payload).toEqual(expect.objectContaining({
       toolCallId: "call_create_world_asset",
       result: expect.objectContaining({
@@ -157,6 +176,63 @@ describe("asset deposition local endpoints", () => {
       }),
     }));
   });
+
+  it("returns 409 on duplicate promotion without creating another official asset or deposition run", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(201);
+
+    const duplicate = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(409);
+
+    expect(duplicate.body).toMatchObject({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: "Potential asset is not active and cannot be promoted.",
+    });
+    expect(officialAssets.stores.assets.size).toBe(1);
+    expect(countDepositionRuns(agents)).toBe(1);
+  });
+
+  it("returns 409 when promoting a dismissed potential asset", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    await potentialAssets.updateStatus(world.id, potentialAsset.id, "dismissed");
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    const dismissed = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(409);
+
+    expect(dismissed.body).toMatchObject({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: "Potential asset is not active and cannot be promoted.",
+    });
+    expect(officialAssets.stores.assets.size).toBe(0);
+    expect(countDepositionRuns(agents)).toBe(0);
+  });
+
+  it("returns 404 when promoting a potential asset through another world", async () => {
+    const { worlds, agents, sessions, potentialAssets, potentialAsset } = await createPromotionFixture();
+    const otherWorld = await createWorld(worlds);
+    const officialAssets = createInMemoryOfficialAssets();
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${otherWorld.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(404);
+
+    expect(officialAssets.stores.assets.size).toBe(0);
+    expect(countDepositionRuns(agents)).toBe(0);
+  });
 });
 
 async function createAssetDepositionApp(
@@ -164,6 +240,7 @@ async function createAssetDepositionApp(
   agents: InMemoryAgents,
   sessions: InMemoryAgentSessions,
   potentialAssets: InMemoryPotentialAssets,
+  officialAssets: InMemoryOfficialAssets = createInMemoryOfficialAssets(),
 ) {
   const provider: AgentProvider = {
     async *stream() {
@@ -183,10 +260,58 @@ async function createAssetDepositionApp(
       { provide: AGENT_REPOSITORY, useValue: agents },
       { provide: AGENT_SESSIONS_REPOSITORY, useValue: sessions },
       { provide: POTENTIAL_ASSETS_REPOSITORY, useValue: potentialAssets },
-      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
+      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: officialAssets },
       { provide: AGENT_PROVIDER, useValue: provider },
     ],
   });
+}
+
+async function createPromotionFixture() {
+  const worlds = createInMemoryWorlds();
+  const agents = createInMemoryAgents();
+  const sessions = createInMemoryAgentSessions();
+  const potentialAssets = createInMemoryPotentialAssets();
+  const world = await createWorld(worlds);
+  const explorationSession = await sessions.createSession({
+    worldId: world.id,
+    kind: "world_exploration",
+    title: "记忆交易推演",
+    status: "active",
+    current: true,
+    metadata: {},
+  });
+  const explorationRun = await agents.createRun({
+    worldId: world.id,
+    sessionId: explorationSession.id,
+    mode: "expand",
+    prompt: "探索记忆交易制度",
+    model: null,
+    provider: "pi",
+  });
+  await agents.updateRun(explorationRun.id, { status: "completed", completedAt: new Date() });
+  const createdPotentialAssets = await potentialAssets.createMany([{
+    worldId: world.id,
+    sessionId: explorationSession.id,
+    runId: explorationRun.id,
+    type: "rule",
+    title: "记忆交易许可",
+    summary: "所有记忆交易都需要登记。",
+    evidence: [{ quote: "所有记忆交易都需要登记。", confidence: 0.95 }],
+    metadata: { detector: "test" },
+  }]);
+  const potentialAsset = createdPotentialAssets[0];
+  if (!potentialAsset) throw new Error("Expected promotion fixture to create a potential asset.");
+
+  return {
+    worlds,
+    agents,
+    sessions,
+    potentialAssets,
+    world,
+    explorationSession,
+    explorationRun,
+    potentialAsset,
+  };
 }
 
 async function createWorld(worlds: InMemoryWorlds) {
@@ -200,7 +325,13 @@ async function createWorld(worlds: InMemoryWorlds) {
   });
 }
 
-function createInMemoryOfficialAssets(): OfficialAssetsRepository {
+function countDepositionRuns(agents: InMemoryAgents) {
+  return [...agents.stores.runs.values()]
+    .filter((run) => run.prompt.startsWith("Promote potential asset "))
+    .length;
+}
+
+function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
   const assets = new Map<string, OfficialAssetRecord>();
   const revisions = new Map<string, OfficialAssetRevisionRecord[]>();
   const indexes = new Map<string, OfficialAssetSectionIndexRecord[]>();
@@ -208,6 +339,7 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
   let indexCount = 1;
 
   return {
+    stores: { assets, revisions, indexes },
     async createAsset(input: CreateOfficialAssetRecordInput) {
       const timestamp = new Date();
       const asset: OfficialAssetRecord = {

@@ -104,18 +104,20 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     promotedAssetId: string,
     metadata: Record<string, unknown> = {},
   ) {
-    const current = await this.prisma.potentialAsset.findFirst({ where: { worldId, id } });
+    const current = await this.prisma.potentialAsset.findFirst({ where: { worldId, id, status: "active" } });
     if (!current) return null;
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
-    const updated = await this.prisma.potentialAsset.update({
-      where: { id: current.id },
+    const updated = await this.prisma.potentialAsset.updateMany({
+      where: { worldId, id, status: "active" },
       data: {
         status: "promoted",
         promotedAssetId,
         metadata: { ...currentMetadata, ...metadata } as never,
       },
     });
-    return mapPotentialAsset(updated);
+    if (updated.count === 0) return null;
+    const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
+    return asset ? mapPotentialAsset(asset) : null;
   }
 
   async onModuleDestroy() {
