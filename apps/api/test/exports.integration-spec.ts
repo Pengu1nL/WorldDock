@@ -207,9 +207,93 @@ describe("exports local endpoints", () => {
     });
     expect(detail.markdown).toContain("所有记忆交易都需要登记");
   });
+
+  it("cleans up the created world when v2 official asset import fails", async () => {
+    const worlds = createInMemoryWorlds();
+    app = await createExportsApp(worlds, { officialAssets: createFailingOfficialAssets() });
+
+    await request(app.getHttpServer())
+      .post("/v1/worlds/import")
+      .send({
+        package: {
+          format: "worlddock.world-package.v2",
+          exportedAt: "2026-06-12T00:00:00.000Z",
+          world: {
+            name: "回忆所",
+            type: "近未来",
+            summary: "记忆可以被买卖。",
+            tags: ["记忆", "城市"],
+            maturity: 27,
+          },
+          assets: [
+            {
+              type: "rule",
+              name: "记忆交易许可",
+              summary: "所有记忆交易都需要登记。",
+              markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+              tags: ["法律"],
+              metadata: { authority: "记忆署" },
+            },
+          ],
+          releases: [],
+        },
+      })
+      .expect(500);
+
+    await expect(worlds.listWorlds()).resolves.toEqual([]);
+    expect(worlds.stores.worlds.get("world_1")?.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("preserves archived official asset status through export and import", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆", "城市"],
+      mode: "local",
+      maturity: 27,
+    });
+    app = await createExportsApp(worlds);
+    const officialAssets = app.get(OfficialAssetsService);
+    const created = await officialAssets.createAsset(world.id, {
+      type: "rule",
+      name: "记忆交易许可",
+      summary: "所有记忆交易都需要登记。",
+      markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+      tags: ["法律"],
+      metadata: { authority: "记忆署" },
+    });
+    await officialAssets.updateAsset(world.id, created.asset.id, { status: "archived" });
+
+    const exported = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/export`)
+      .expect(201);
+    const fetched = await request(app.getHttpServer())
+      .get(`/v1/exports/${exported.body.export.id}`)
+      .expect(200);
+    expect(fetched.body.package.assets[0]).toMatchObject({ status: "archived" });
+
+    const imported = await request(app.getHttpServer())
+      .post("/v1/worlds/import")
+      .send({ package: fetched.body.package })
+      .expect(201);
+
+    const listed = await officialAssets.listAssets(imported.body.world.id);
+    expect(listed.assets).toHaveLength(1);
+    const detail = await officialAssets.getAsset(imported.body.world.id, listed.assets[0].id);
+    expect(detail.asset).toMatchObject({
+      name: "记忆交易许可",
+      status: "archived",
+      archivedAt: expect.any(Date),
+    });
+  });
 });
 
-async function createExportsApp(worlds: InMemoryWorlds) {
+async function createExportsApp(
+  worlds: InMemoryWorlds,
+  options: { officialAssets?: OfficialAssetsRepository } = {},
+) {
   return createHttpTestApp({
     controllers: [ExportsController],
     providers: [
@@ -217,7 +301,7 @@ async function createExportsApp(worlds: InMemoryWorlds) {
       OfficialAssetsService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
-      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
+      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: options.officialAssets ?? createInMemoryOfficialAssets() },
     ],
   });
 }
@@ -320,6 +404,23 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
         revisions: revisions.get(asset.id) ?? [],
         indexes: indexes.get(asset.id) ?? [],
       };
+    },
+  };
+}
+
+function createFailingOfficialAssets(): OfficialAssetsRepository {
+  return {
+    async createAsset() {
+      throw new Error("simulated official asset write failure");
+    },
+    async updateAsset() {
+      throw new Error("Not implemented in failing test repository.");
+    },
+    async listAssets() {
+      return { assets: [], nextCursor: null };
+    },
+    async getAsset() {
+      return null;
     },
   };
 }

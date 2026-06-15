@@ -73,11 +73,26 @@ export class ExportsService {
       mode: "local",
       maturity: worldPackage.world.maturity,
     });
-    if (worldPackage.format === "worlddock.world-package.v2") {
-      await Promise.all(worldPackage.assets.map((asset) => this.createImportedOfficialAsset(world.id, asset)));
-    } else {
-      await Promise.all(worldPackage.assets.map((asset, index) => this.createImportedAsset(world.id, asset, { position: index })));
+
+    try {
+      if (worldPackage.format === "worlddock.world-package.v2") {
+        for (const asset of worldPackage.assets) {
+          await this.createImportedOfficialAsset(world.id, asset);
+        }
+      } else {
+        for (const [index, asset] of worldPackage.assets.entries()) {
+          await this.createImportedAsset(world.id, asset, { position: index });
+        }
+      }
+    } catch (error) {
+      try {
+        await this.worlds.deleteWorld(world.id);
+      } catch {
+        // Preserve the original import failure for callers.
+      }
+      throw error;
     }
+
     return { world: await this.toWorldResponse(world) };
   }
 
@@ -296,7 +311,8 @@ export class ExportsService {
   }
 
   private async createImportedOfficialAsset(worldId: string, asset: OfficialWorldPackageAsset) {
-    return this.requireOfficialAssets().createAsset(worldId, {
+    const officialAssets = this.requireOfficialAssets();
+    const created = await officialAssets.createAsset(worldId, {
       type: asset.type,
       name: asset.name,
       summary: asset.summary,
@@ -304,6 +320,10 @@ export class ExportsService {
       tags: asset.tags,
       metadata: asset.metadata,
     });
+    if (asset.status === "archived") {
+      return officialAssets.updateAsset(worldId, created.asset.id, { status: "archived" });
+    }
+    return created;
   }
 
   private async buildOfficialPackageAssets(worldId: string): Promise<OfficialPackageAssetBuild[]> {
