@@ -27,6 +27,7 @@ describe("agent session and asset contracts", () => {
           targetId: "asset_1",
           title: "记忆交易许可",
           summary: null,
+          source: "initial",
         },
       ],
       metadata: { source: "user" },
@@ -37,6 +38,7 @@ describe("agent session and asset contracts", () => {
     expect(parsed.metadata).toEqual({ source: "user" });
     expect(parsed.subjects[0]?.targetId).toBe("asset_1");
     expect(parsed.contextItems[0]?.summary).toBeNull();
+    expect(parsed.contextItems[0]?.source).toBe("initial");
   });
 
   it("parses message, potential asset, official asset, issue, and patch batch", () => {

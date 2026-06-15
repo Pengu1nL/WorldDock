@@ -175,6 +175,9 @@ describe("worlddock local API client", () => {
         ok: true,
         status: 200,
         text: async () => [
+          "event: context.used",
+          "data: {\"type\":\"context.used\",\"payload\":{\"contextItemId\":\"ctx_item_1\",\"contextRef\":{\"id\":\"ctx_1\",\"kind\":\"world\",\"title\":\"回忆所 · 世界摘要\",\"excerpt\":\"记忆可以被买卖。\",\"level\":\"manifest\",\"source\":\"initial\"}}}",
+          "",
           "event: message.delta",
           "data: {\"type\":\"message.delta\",\"payload\":{\"text\":\"好。\"}}",
           "",
@@ -189,7 +192,10 @@ describe("worlddock local API client", () => {
     const events = await fetchAgentEvents("run_1", { fetcher });
     await saveAgentSuggestion("ags_1", { fetcher });
 
-    expect(events.map((event) => event.type)).toEqual(["message.delta", "suggestion.created"]);
+    expect(events.map((event) => event.type)).toEqual(["context.used", "message.delta", "suggestion.created"]);
+    const contextEvent = events.find((event) => event.type === "context.used");
+    if (contextEvent?.type !== "context.used") throw new Error("Expected context.used event.");
+    expect(contextEvent.payload.contextItemId).toBe("ctx_item_1");
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-runs", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/agent-runs/run_1/events", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/agent-suggestions/ags_1/save", expect.objectContaining({ method: "POST" }));

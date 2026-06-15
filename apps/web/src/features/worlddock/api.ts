@@ -132,7 +132,7 @@ export type AgentEventBase = {
 export type AgentEvent =
   | (AgentEventBase & { type: "run.started"; payload: { runId: string } })
   | (AgentEventBase & { type: "pi.session.started"; payload: { piSessionId: string } })
-  | (AgentEventBase & { type: "context.used"; payload: { contextRef: AgentContextRef } })
+  | (AgentEventBase & { type: "context.used"; payload: { contextRef: AgentContextRef; contextItemId?: string } })
   | (AgentEventBase & { type: "message.delta"; payload: { text: string } })
   | (AgentEventBase & { type: "tool.requested"; payload: { toolCall: { id: string; name: string; arguments: Record<string, unknown> } } })
   | (AgentEventBase & { type: "tool.completed"; payload: { toolCallId: string; result: Record<string, unknown> } })

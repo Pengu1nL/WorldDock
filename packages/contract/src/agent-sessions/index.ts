@@ -67,6 +67,7 @@ export const agentSessionContextItemSchema = z.object({
   targetId: z.string().min(1),
   title: z.string().min(1).nullable().optional(),
   summary: z.string().min(1).nullable().optional(),
+  source: z.string().min(1).optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime().optional(),
   updatedAt: z.string().datetime().optional(),
