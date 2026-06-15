@@ -144,5 +144,43 @@ describe("agent session and asset contracts", () => {
         revertedAt: null,
       }).diff,
     ).toBeNull();
+
+    expect(
+      worldAssetPatchSchema.parse({
+        id: "patch_legacy",
+        assetId: "asset_1",
+        batchId: null,
+        status: "applied",
+        beforeRevisionId: "rev_1",
+        afterRevisionId: "rev_2",
+        diff: "[{\"type\":\"add\",\"text\":\"B2\",\"lineTo\":2}]",
+        createdAt: "2026-06-14T00:00:00.000Z",
+        appliedAt: "2026-06-14T00:00:00.000Z",
+        revertedAt: null,
+      }).diff,
+    ).toBe("[{\"type\":\"add\",\"text\":\"B2\",\"lineTo\":2}]");
+
+    expect(
+      worldAssetPatchSchema.parse({
+        id: "patch_2",
+        assetId: "asset_1",
+        batchId: null,
+        status: "applied",
+        beforeRevisionId: "rev_1",
+        afterRevisionId: "rev_2",
+        diff: [
+          { type: "context", text: "A", lineFrom: 1, lineTo: 1 },
+          { type: "remove", text: "B", lineFrom: 2 },
+          { type: "add", text: "B2", lineTo: 2 },
+        ],
+        createdAt: "2026-06-14T00:00:00.000Z",
+        appliedAt: "2026-06-14T00:00:00.000Z",
+        revertedAt: null,
+      }).diff,
+    ).toEqual([
+      { type: "context", text: "A", lineFrom: 1, lineTo: 1 },
+      { type: "remove", text: "B", lineFrom: 2 },
+      { type: "add", text: "B2", lineTo: 2 },
+    ]);
   });
 });

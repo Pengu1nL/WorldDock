@@ -143,12 +143,10 @@ export class WorldAssetPatchesService {
 
   private async restoreLatestRevisionMarkdown(worldId: string, assetId: string, documentKey: string, afterMarkdown: string) {
     try {
-      const currentMarkdown = await this.readMarkdown(documentKey);
-      if (currentMarkdown !== afterMarkdown) return;
       const latest = await this.officialAssets.getAsset(worldId, assetId);
       const latestMarkdown = latest?.revisions[0]?.markdown;
       if (latestMarkdown === undefined) return;
-      await this.saveMarkdown(documentKey, latestMarkdown);
+      await this.saveMarkdownIfCurrentMarkdownEquals(documentKey, afterMarkdown, latestMarkdown);
     } catch {
       // Keep the original conflict as the surfaced error.
     }
@@ -156,12 +154,19 @@ export class WorldAssetPatchesService {
 
   private async restoreBeforeMarkdownIfUnchanged(documentKey: string, beforeMarkdown: string, afterMarkdown: string) {
     try {
-      const currentMarkdown = await this.readMarkdown(documentKey);
-      if (currentMarkdown !== afterMarkdown) return;
-      await this.saveMarkdown(documentKey, beforeMarkdown);
+      await this.saveMarkdownIfCurrentMarkdownEquals(documentKey, afterMarkdown, beforeMarkdown);
     } catch {
       // Keep the original repository/storage error as the surfaced error.
     }
+  }
+
+  private async saveMarkdownIfCurrentMarkdownEquals(documentKey: string, expectedMarkdown: string, markdown: string) {
+    await this.localStorage.saveObjectIfCurrentBodyEquals({
+      key: documentKey,
+      expectedBody: new TextEncoder().encode(expectedMarkdown),
+      contentType: "text/markdown; charset=utf-8",
+      body: new TextEncoder().encode(markdown),
+    });
   }
 
   private async saveMarkdown(documentKey: string, markdown: string) {

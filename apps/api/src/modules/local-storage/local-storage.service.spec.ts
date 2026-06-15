@@ -75,6 +75,54 @@ describe("LocalStorageService", () => {
     });
   });
 
+  it("saves objects only when the current body matches the expected body", async () => {
+    const service = new LocalStorageService();
+    const original = new TextEncoder().encode("original");
+    const replacement = new TextEncoder().encode("replacement");
+
+    await service.saveObject({
+      key: "tmp/cas.txt",
+      contentType: "text/plain",
+      body: original,
+    });
+
+    await expect(service.saveObjectIfCurrentBodyEquals({
+      key: "tmp/cas.txt",
+      expectedBody: original,
+      contentType: "text/markdown",
+      body: replacement,
+    })).resolves.toBe(true);
+
+    await expect(service.readObject("tmp/cas.txt")).resolves.toEqual({
+      contentType: "text/markdown",
+      body: replacement,
+    });
+  });
+
+  it("does not save objects when the current body differs from the expected body", async () => {
+    const service = new LocalStorageService();
+    const original = new TextEncoder().encode("original");
+    const replacement = new TextEncoder().encode("replacement");
+
+    await service.saveObject({
+      key: "tmp/cas-miss.txt",
+      contentType: "text/plain",
+      body: original,
+    });
+
+    await expect(service.saveObjectIfCurrentBodyEquals({
+      key: "tmp/cas-miss.txt",
+      expectedBody: new TextEncoder().encode("stale"),
+      contentType: "text/markdown",
+      body: replacement,
+    })).resolves.toBe(false);
+
+    await expect(service.readObject("tmp/cas-miss.txt")).resolves.toEqual({
+      contentType: "text/plain",
+      body: original,
+    });
+  });
+
   it("deletes objects and ignores missing keys", async () => {
     const service = new LocalStorageService();
     await service.saveObject({ key: "tmp/file.txt", body: new TextEncoder().encode("temporary") });

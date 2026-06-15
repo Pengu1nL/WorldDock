@@ -10,7 +10,52 @@ type LocalStorageMetadata = {
 
 @Injectable()
 export class LocalStorageService {
+  private readonly keyLocks = new Map<string, Promise<void>>();
+
   async saveObject(input: {
+    key: string;
+    contentType?: string;
+    body: Uint8Array;
+  }): Promise<{ key: string; filePath: string; sizeBytes: number }> {
+    return this.withKeyLock(input.key, () => this.saveObjectUnlocked(input));
+  }
+
+  async readObject(key: string): Promise<{ contentType?: string; body: Uint8Array }> {
+    return this.withKeyLock(key, () => this.readObjectUnlocked(key));
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    await this.withKeyLock(key, async () => {
+      const filePath = this.resolveObjectPath(key);
+      await Promise.all([
+        rm(filePath, { force: true }),
+        rm(this.metadataPathForKey(key), { force: true }),
+      ]);
+    });
+  }
+
+  async saveObjectIfCurrentBodyEquals(input: {
+    key: string;
+    expectedBody: Uint8Array;
+    contentType?: string;
+    body: Uint8Array;
+  }): Promise<boolean> {
+    return this.withKeyLock(input.key, async () => {
+      const filePath = this.resolveObjectPath(input.key);
+      let currentBody: Uint8Array;
+      try {
+        currentBody = new Uint8Array(await readFile(filePath));
+      } catch (error) {
+        if (isMissingFileError(error)) return false;
+        throw error;
+      }
+      if (!bytesEqual(currentBody, input.expectedBody)) return false;
+      await this.saveObjectUnlocked(input);
+      return true;
+    });
+  }
+
+  private async saveObjectUnlocked(input: {
     key: string;
     contentType?: string;
     body: Uint8Array;
@@ -36,7 +81,7 @@ export class LocalStorageService {
     };
   }
 
-  async readObject(key: string): Promise<{ contentType?: string; body: Uint8Array }> {
+  private async readObjectUnlocked(key: string): Promise<{ contentType?: string; body: Uint8Array }> {
     const filePath = this.resolveObjectPath(key);
     const [body, metadata] = await Promise.all([
       readFile(filePath),
@@ -49,12 +94,24 @@ export class LocalStorageService {
     };
   }
 
-  async deleteObject(key: string): Promise<void> {
-    const filePath = this.resolveObjectPath(key);
-    await Promise.all([
-      rm(filePath, { force: true }),
-      rm(this.metadataPathForKey(key), { force: true }),
-    ]);
+  private async withKeyLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.keyLocks.get(key) ?? Promise.resolve();
+    let releaseCurrentLock: () => void = () => undefined;
+    const current = new Promise<void>((resolve) => {
+      releaseCurrentLock = resolve;
+    });
+    const queued = previous.catch(() => undefined).then(() => current);
+    this.keyLocks.set(key, queued);
+
+    await previous.catch(() => undefined);
+    try {
+      return await work();
+    } finally {
+      releaseCurrentLock();
+      if (this.keyLocks.get(key) === queued) {
+        this.keyLocks.delete(key);
+      }
+    }
   }
 
   private async readMetadata(key: string) {
@@ -107,4 +164,12 @@ function isMissingFileError(error: unknown) {
     error !== null &&
     "code" in error &&
     (error as { code?: unknown }).code === "ENOENT";
+}
+
+function bytesEqual(left: Uint8Array, right: Uint8Array) {
+  if (left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
 }

@@ -448,15 +448,18 @@ function createRacingLocalStorageService(input: {
       return delegate.saveObject(saveInput);
     },
     async readObject(key: string) {
+      return delegate.readObject(key);
+    },
+    async saveObjectIfCurrentBodyEquals(saveInput: Parameters<LocalStorageService["saveObjectIfCurrentBodyEquals"]>[0]) {
       if (pendingRace) {
         pendingRace = false;
         await delegate.saveObject({
-          key,
+          key: saveInput.key,
           contentType: "text/markdown; charset=utf-8",
           body: new TextEncoder().encode(input.racingMarkdown),
         });
       }
-      return delegate.readObject(key);
+      return delegate.saveObjectIfCurrentBodyEquals(saveInput);
     },
     async deleteObject(key: string) {
       await delegate.deleteObject(key);

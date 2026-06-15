@@ -75,6 +75,25 @@ export const worldAssetRevisionSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
+export const lineDiffOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("context"),
+    text: z.string(),
+    lineFrom: z.number().int().min(1),
+    lineTo: z.number().int().min(1),
+  }),
+  z.object({
+    type: z.literal("remove"),
+    text: z.string(),
+    lineFrom: z.number().int().min(1),
+  }),
+  z.object({
+    type: z.literal("add"),
+    text: z.string(),
+    lineTo: z.number().int().min(1),
+  }),
+]);
+
 export const worldAssetPatchSchema = z.object({
   id: z.string().min(1),
   assetId: z.string().min(1),
@@ -82,7 +101,7 @@ export const worldAssetPatchSchema = z.object({
   status: worldAssetPatchStatusSchema,
   beforeRevisionId: z.string().min(1).nullable().optional(),
   afterRevisionId: z.string().min(1).nullable().optional(),
-  diff: z.string().nullable().optional(),
+  diff: z.union([z.string(), z.array(lineDiffOperationSchema)]).nullable().optional(),
   metadata: z.record(z.string(), z.unknown()).default({}),
   createdAt: z.string().datetime(),
   appliedAt: z.string().datetime().nullable().optional(),
@@ -126,6 +145,7 @@ export type OfficialWorldAssetStatus = z.infer<
 export type WorldAssetIndex = z.infer<typeof worldAssetIndexSchema>;
 export type WorldAssetDetail = z.infer<typeof worldAssetDetailSchema>;
 export type WorldAssetRevision = z.infer<typeof worldAssetRevisionSchema>;
+export type LineDiffOperation = z.infer<typeof lineDiffOperationSchema>;
 export type WorldAssetPatchStatus = z.infer<typeof worldAssetPatchStatusSchema>;
 export type WorldAssetPatch = z.infer<typeof worldAssetPatchSchema>;
 export type WorldAssetPatchBatch = z.infer<typeof worldAssetPatchBatchSchema>;
