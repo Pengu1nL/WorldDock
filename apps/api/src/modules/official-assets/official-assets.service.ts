@@ -55,22 +55,28 @@ export class OfficialAssetsService {
       body: new TextEncoder().encode(markdown),
     });
 
-    const created = await this.officialAssets.createAsset({
-      id: assetId,
-      worldId,
-      type: input.type,
-      name: input.name,
-      summary: input.summary,
-      documentKey,
-      tags: input.tags ?? [],
-      metadata: input.metadata ?? {},
-      initialRevision: {
-        markdown,
+    let created: OfficialAssetDetailRecord;
+    try {
+      created = await this.officialAssets.createAsset({
+        id: assetId,
+        worldId,
+        type: input.type,
+        name: input.name,
         summary,
-        metadata: {},
-      },
-      indexes,
-    });
+        documentKey,
+        tags: input.tags ?? [],
+        metadata: input.metadata ?? {},
+        initialRevision: {
+          markdown,
+          summary,
+          metadata: {},
+        },
+        indexes,
+      });
+    } catch (error) {
+      await this.localStorage.deleteObject(documentKey);
+      throw error;
+    }
 
     return { ...created, markdown };
   }

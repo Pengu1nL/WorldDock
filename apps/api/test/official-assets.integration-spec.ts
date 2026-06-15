@@ -81,6 +81,39 @@ describe("official assets local endpoints", () => {
     expect(detail.body.markdown).toContain("所有记忆交易都需要登记");
     expect(detail.body.revisions).toHaveLength(1);
   });
+
+  it("uses markdown summary for the asset and initial revision when custom markdown differs", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 12,
+    });
+    app = await createOfficialAssetsApp(worlds);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets`)
+      .send({
+        type: "rule",
+        name: "记忆交易许可",
+        summary: "请求里的旧摘要。",
+        markdown: "# 记忆交易许可\n\n## 概括\n\nMarkdown 里的真实摘要。",
+        tags: ["法律"],
+      })
+      .expect(201);
+
+    expect(created.body.asset.summary).toBe("Markdown 里的真实摘要。");
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .expect(200);
+
+    expect(detail.body.asset.summary).toBe("Markdown 里的真实摘要。");
+    expect(detail.body.revisions[0].summary).toBe("Markdown 里的真实摘要。");
+  });
 });
 
 async function createOfficialAssetsApp(worlds: InMemoryWorlds) {
