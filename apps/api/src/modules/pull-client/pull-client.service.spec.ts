@@ -134,6 +134,16 @@ describe("PullClientService", () => {
     await expect(worlds.listWorlds()).resolves.toEqual([]);
   });
 
+  it("rejects v1 snapshots with official snapshot assets before creating a local world", async () => {
+    const worlds = createInMemoryWorlds();
+    const service = createPullClientService(worlds, async () => jsonResponse(pulledV1WithOfficialSnapshotAssetResponse()));
+
+    await expect(service.pullWorld({ owner: "studio", slug: "memory-market" })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "HUB_PULL_INVALID_RESPONSE" }),
+    });
+    await expect(worlds.listWorlds()).resolves.toEqual([]);
+  });
+
   it("cleans up the created world when asset import fails", async () => {
     const worlds = createInMemoryWorlds();
     const createConflict = worlds.createConflict.bind(worlds);
@@ -379,6 +389,41 @@ function pulledOfficialRepositoryResponse() {
         releases: [],
       },
       assets: [officialAsset],
+      createdAt: "2026-06-12T00:00:00.000Z",
+    },
+  };
+}
+
+function pulledV1WithOfficialSnapshotAssetResponse() {
+  return {
+    repository: { owner: "studio", slug: "memory-market", name: "回忆所", summary: "公开仓库" },
+    snapshot: {
+      contractVersion: "1.0.0",
+      repository: { owner: "studio", slug: "memory-market", name: "回忆所" },
+      package: {
+        format: "worlddock.world-package.v1",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "回忆所",
+          type: "近未来",
+          summary: "记忆可以被买卖。",
+          tags: ["记忆", "城市"],
+          maturity: 27,
+        },
+        assets: [],
+        releases: [],
+      },
+      assets: [
+        {
+          id: "official_asset_upstream_1",
+          type: "rule",
+          name: "记忆交易许可",
+          summary: "所有记忆交易都需要登记。",
+          markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+          tags: ["法律"],
+          metadata: { authority: "记忆署" },
+        },
+      ],
       createdAt: "2026-06-12T00:00:00.000Z",
     },
   };

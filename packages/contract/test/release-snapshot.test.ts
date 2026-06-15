@@ -93,6 +93,122 @@ describe("release snapshot contract", () => {
     });
   });
 
+  it("rejects a v1 snapshot with official snapshot assets", () => {
+    expect(() => releaseSnapshotSchema.parse({
+      contractVersion: "1.0.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-market",
+        name: "Memory Market",
+      },
+      package: {
+        format: "worlddock.world-package.v1",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "Memory Market",
+          type: "city",
+          summary: "A city built around traded memories.",
+          tags: ["urban"],
+          maturity: 32,
+        },
+        assets: [],
+        releases: [],
+      },
+      createdAt: "2026-06-12T00:00:00.000Z",
+      assets: [
+        {
+          id: "official_asset_1",
+          type: "rule",
+          name: "Memory Trading Permit",
+          summary: "All memory trades require registration.",
+          markdown: "# Memory Trading Permit\n\nAll memory trades require registration.",
+          tags: ["law"],
+          metadata: { source: "test" },
+        },
+      ],
+    })).toThrow();
+  });
+
+  it("rejects a v2 snapshot when top-level official assets are missing", () => {
+    expect(() => releaseSnapshotSchema.parse({
+      contractVersion: "1.0.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-market",
+        name: "Memory Market",
+      },
+      package: {
+        format: "worlddock.world-package.v2",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "Memory Market",
+          type: "city",
+          summary: "A city built around traded memories.",
+          tags: ["urban"],
+          maturity: 32,
+        },
+        assets: [
+          {
+            type: "rule",
+            name: "Memory Trading Permit",
+            summary: "All memory trades require registration.",
+            markdown: "# Memory Trading Permit\n\nAll memory trades require registration.",
+            tags: ["law"],
+            metadata: { source: "test" },
+          },
+        ],
+        releases: [],
+      },
+      createdAt: "2026-06-12T00:00:00.000Z",
+      assets: [],
+    })).toThrow();
+  });
+
+  it("rejects a v2 snapshot when package and top-level official assets differ", () => {
+    expect(() => releaseSnapshotSchema.parse({
+      contractVersion: "1.0.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-market",
+        name: "Memory Market",
+      },
+      package: {
+        format: "worlddock.world-package.v2",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "Memory Market",
+          type: "city",
+          summary: "A city built around traded memories.",
+          tags: ["urban"],
+          maturity: 32,
+        },
+        assets: [
+          {
+            type: "rule",
+            name: "Memory Trading Permit",
+            summary: "All memory trades require registration.",
+            markdown: "# Memory Trading Permit\n\nAll memory trades require registration.",
+            tags: ["law"],
+            metadata: { source: "test" },
+          },
+        ],
+        releases: [],
+      },
+      createdAt: "2026-06-12T00:00:00.000Z",
+      assets: [
+        {
+          id: "official_asset_1",
+          type: "rule",
+          name: "Different Permit",
+          summary: "All memory trades require registration.",
+          markdown: "# Memory Trading Permit\n\nAll memory trades require registration.",
+          tags: ["law"],
+          metadata: { source: "test" },
+        },
+      ],
+    })).toThrow();
+  });
+
   it("does not expose hub contracts from the root entry", () => {
     expect("hubPersonalAccessTokenScopeSchema" in contract).toBe(false);
   });
