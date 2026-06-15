@@ -31,7 +31,9 @@ const updateOfficialAssetSchema = z.object({
   tags: z.array(z.string().trim().min(1)).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   status: officialWorldAssetStatusSchema.optional(),
-}).strict();
+}).strict().refine((input) => Object.keys(input).length > 0, {
+  message: "At least one official asset update field is required.",
+});
 
 @Controller("worlds/:worldId/official-assets")
 export class OfficialAssetsController {

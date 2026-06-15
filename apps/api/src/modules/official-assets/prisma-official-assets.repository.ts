@@ -68,27 +68,32 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
     input: Parameters<OfficialAssetsRepository["updateAsset"]>[2],
   ): Promise<OfficialAssetDetailRecord | null> {
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.officialWorldAsset.updateMany({
+      const current = await tx.officialWorldAsset.findFirst({
         where: { worldId, id: assetId },
+      });
+      if (!current) return null;
+
+      const archivedAt = nextArchivedAt({
+        currentStatus: current.status,
+        currentArchivedAt: current.archivedAt,
+        nextStatus: input.status,
+      });
+
+      const asset = await tx.officialWorldAsset.update({
+        where: { id: current.id },
         data: {
           name: input.name,
           summary: input.summary,
           tags: input.tags,
           metadata: input.metadata === undefined ? undefined : input.metadata as never,
           status: input.status,
-          archivedAt: input.status === undefined ? undefined : input.status === "archived" ? new Date() : null,
+          archivedAt,
         },
-      });
-      if (updated.count === 0) return null;
-
-      const asset = await tx.officialWorldAsset.findFirst({
-        where: { worldId, id: assetId },
         include: {
           revisions: { orderBy: [{ version: "desc" }, { createdAt: "desc" }] },
           indexes: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
         },
       });
-      if (!asset) return null;
       return {
         asset: mapOfficialAsset(asset),
         revisions: asset.revisions.map(mapOfficialAssetRevision),
@@ -182,6 +187,17 @@ function mapOfficialAsset(asset: {
     updatedAt: asset.updatedAt,
     archivedAt: asset.archivedAt,
   };
+}
+
+function nextArchivedAt(input: {
+  currentStatus: string;
+  currentArchivedAt: Date | null;
+  nextStatus: string | undefined;
+}) {
+  if (input.nextStatus === undefined) return undefined;
+  if (input.nextStatus === "active") return null;
+  if (input.currentStatus !== "archived" || input.currentArchivedAt === null) return new Date();
+  return undefined;
 }
 
 function mapOfficialAssetRevision(revision: {

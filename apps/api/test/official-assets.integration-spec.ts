@@ -185,6 +185,84 @@ describe("official assets local endpoints", () => {
       .send({ markdown: "# 新正文" })
       .expect(400);
   });
+
+  it("rejects empty metadata updates", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 12,
+    });
+    app = await createOfficialAssetsApp(worlds);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets`)
+      .send({
+        type: "rule",
+        name: "记忆交易许可",
+        summary: "所有记忆交易都需要登记。",
+        markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+        tags: ["法律"],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .send({})
+      .expect(400);
+  });
+
+  it("does not refresh archivedAt on repeated archive updates and clears it when reactivated", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 12,
+    });
+    app = await createOfficialAssetsApp(worlds);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets`)
+      .send({
+        type: "rule",
+        name: "记忆交易许可",
+        summary: "所有记忆交易都需要登记。",
+        markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+        tags: ["法律"],
+      })
+      .expect(201);
+
+    const archived = await request(app.getHttpServer())
+      .patch(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .send({ status: "archived" })
+      .expect(200);
+    expect(archived.body.asset.archivedAt).toEqual(expect.any(String));
+
+    await wait(20);
+
+    const archivedAgain = await request(app.getHttpServer())
+      .patch(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .send({ status: "archived" })
+      .expect(200);
+
+    expect(archivedAgain.body.asset.archivedAt).toBe(archived.body.asset.archivedAt);
+
+    const reactivated = await request(app.getHttpServer())
+      .patch(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .send({ status: "active" })
+      .expect(200);
+
+    expect(reactivated.body.asset).toMatchObject({
+      status: "active",
+      archivedAt: null,
+    });
+  });
 });
 
 async function createOfficialAssetsApp(worlds: InMemoryWorlds) {
@@ -259,6 +337,12 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
       const asset = assets.get(assetId);
       if (!asset || asset.worldId !== worldId) return null;
       const timestamp = new Date();
+      const archivedAt = nextArchivedAt({
+        currentStatus: asset.status,
+        currentArchivedAt: asset.archivedAt,
+        nextStatus: input.status,
+        now: timestamp,
+      });
       const updated: OfficialAssetRecord = {
         ...asset,
         name: input.name ?? asset.name,
@@ -266,11 +350,7 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
         tags: input.tags ?? asset.tags,
         metadata: input.metadata ?? asset.metadata,
         status: input.status ?? asset.status,
-        archivedAt: input.status === undefined
-          ? asset.archivedAt
-          : input.status === "archived"
-            ? timestamp
-            : null,
+        archivedAt: archivedAt === undefined ? asset.archivedAt : archivedAt,
         updatedAt: timestamp,
       };
       assets.set(asset.id, updated);
@@ -301,4 +381,20 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
 
 function searchableText(asset: OfficialAssetRecord) {
   return `${asset.name}\n${asset.summary}`.toLocaleLowerCase();
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function nextArchivedAt(input: {
+  currentStatus: OfficialAssetRecord["status"];
+  currentArchivedAt: Date | null;
+  nextStatus: UpdateOfficialAssetRecordInput["status"];
+  now: Date;
+}) {
+  if (input.nextStatus === undefined) return undefined;
+  if (input.nextStatus === "active") return null;
+  if (input.currentStatus !== "archived" || input.currentArchivedAt === null) return input.now;
+  return undefined;
 }
