@@ -1,3 +1,5 @@
+import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import type { OfficialAssetsService } from "../../official-assets/official-assets.service";
 import type { ArchiveEntryRecord, ConflictRecord, StorySeedRecord, WorldRecord, WorldRepository } from "../../worlds/world.repository";
 import { normalizeWorldSuggestion } from "../suggestion-normalizer";
 import { WorldToolRegistry } from "./world-tool-registry";
@@ -14,7 +16,7 @@ export type DisclosureAsset = {
   updatedAt: Date;
 };
 
-export function createWorldToolRegistry(worlds: WorldRepository) {
+export function createWorldToolRegistry(worlds: WorldRepository, officialAssets?: OfficialAssetsService) {
   const registry = new WorldToolRegistry();
 
   registry.register("get_world_manifest", async (input) => {
@@ -61,7 +63,21 @@ export function createWorldToolRegistry(worlds: WorldRepository) {
     releases: [],
   }));
 
-  registry.register("create_world_asset", async () => unimplementedFormalAssetTool("create_world_asset"));
+  registry.register("create_world_asset", async (input) => {
+    if (!officialAssets) {
+      throw new Error("World asset write tool is unavailable: OfficialAssetsService is not configured.");
+    }
+    return {
+      asset: await officialAssets.createAsset(String(input.worldId), {
+        type: officialWorldAssetTypeSchema.parse(input.type),
+        name: String(input.name ?? input.title ?? ""),
+        summary: String(input.summary ?? ""),
+        markdown: String(input.markdown ?? ""),
+        tags: Array.isArray(input.tags) ? input.tags.map(String) : [],
+        metadata: isRecord(input.metadata) ? input.metadata : {},
+      }),
+    };
+  });
 
   registry.register("apply_world_asset_patch", async () => unimplementedFormalAssetTool("apply_world_asset_patch"));
 
@@ -128,6 +144,10 @@ function readToolText(...values: unknown[]) {
     if (text) return text;
   }
   return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export async function listDisclosureAssets(worlds: WorldRepository, worldId: string) {

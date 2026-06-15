@@ -107,8 +107,27 @@ export class PotentialAssetsService {
     return this.potentialAssets.listForWorld(worldId, normalizedQuery);
   }
 
+  async getForWorld(worldId: string, id: string) {
+    await this.requireWorld(worldId);
+    const asset = await this.potentialAssets.findById(worldId, id);
+    if (!asset) throw this.notFound();
+    return asset;
+  }
+
   async updateStatus(worldId: string, id: string, status: PotentialAssetRecord["status"]) {
     const asset = await this.potentialAssets.updateStatus(worldId, id, status);
+    if (!asset) throw this.notFound();
+    return asset;
+  }
+
+  async markPromoted(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    await this.requireWorld(worldId);
+    const asset = await this.potentialAssets.markPromoted(worldId, id, promotedAssetId, metadata);
     if (!asset) throw this.notFound();
     return asset;
   }

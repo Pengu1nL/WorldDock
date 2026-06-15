@@ -6,6 +6,7 @@ import {
   type CreateAgentSessionContextItemInput,
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
+import { OfficialAssetsService } from "../official-assets/official-assets.service";
 import { PotentialAssetsService } from "../potential-assets/potential-assets.service";
 import type { PotentialAssetRecord } from "../potential-assets/potential-assets.repository";
 import {
@@ -69,6 +70,13 @@ type CreateWorldDraftInput = {
   avoid?: string;
 };
 
+type PromotePotentialAssetInput = {
+  name?: string;
+  markdown?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+};
+
 type WorldDraftTool = {
   id: string;
   label: string;
@@ -98,6 +106,7 @@ export class AgentService {
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     @Optional() @Inject(AGENT_SESSIONS_REPOSITORY) private readonly sessions?: AgentSessionsRepository,
     @Optional() @Inject(PotentialAssetsService) private readonly potentialAssets?: PotentialAssetsService,
+    @Optional() @Inject(OfficialAssetsService) private readonly officialAssets?: OfficialAssetsService,
   ) {}
 
   async createRun(worldId: string, input: { prompt: string }) {
@@ -136,6 +145,42 @@ export class AgentService {
     });
     await this.append(run.id, 1, "run.started", { runId: run.id, sessionId });
     return { run };
+  }
+
+  async promotePotentialAsset(worldId: string, potentialAssetId: string, input: PromotePotentialAssetInput) {
+    await this.requireWorld(worldId);
+    const potentialAssets = this.requirePotentialAssetsService();
+    const officialAssets = this.requireOfficialAssetsService();
+    const potentialAsset = await potentialAssets.getForWorld(worldId, potentialAssetId);
+    const sourceMetadata = {
+      sourcePotentialAssetId: potentialAsset.id,
+      sourceSessionId: potentialAsset.sessionId,
+      sourceRunId: potentialAsset.runId,
+    };
+    const created = await officialAssets.createAsset(worldId, {
+      type: potentialAsset.type,
+      name: cleanOptional(input.name) ?? potentialAsset.title,
+      summary: potentialAsset.summary,
+      markdown: input.markdown,
+      tags: input.tags ?? [],
+      metadata: {
+        ...(input.metadata ?? {}),
+        ...sourceMetadata,
+      },
+    });
+    const depositionRun = await this.createCompletedAssetDepositionRun(worldId, potentialAsset, created.asset.id);
+    const promotedPotentialAsset = await potentialAssets.markPromoted(worldId, potentialAsset.id, created.asset.id, {
+      ...sourceMetadata,
+      officialAssetId: created.asset.id,
+      depositionRunId: depositionRun.id,
+      promotedAt: new Date().toISOString(),
+    });
+
+    return {
+      ...created,
+      potentialAsset: promotedPotentialAsset,
+      depositionRun,
+    };
   }
 
   async generateWorldDraft(input: CreateWorldDraftInput): Promise<{ draft: WorldCreationDraft; tokenUsage: TokenUsage }> {
@@ -750,6 +795,69 @@ export class AgentService {
       });
     }
     return this.sessions;
+  }
+
+  private requirePotentialAssetsService() {
+    if (!this.potentialAssets) {
+      throw new ServiceUnavailableException({
+        code: "POTENTIAL_ASSETS_UNAVAILABLE",
+        message: "Potential assets service is unavailable.",
+      });
+    }
+    return this.potentialAssets;
+  }
+
+  private requireOfficialAssetsService() {
+    if (!this.officialAssets) {
+      throw new ServiceUnavailableException({
+        code: "OFFICIAL_ASSETS_UNAVAILABLE",
+        message: "Official assets service is unavailable.",
+      });
+    }
+    return this.officialAssets;
+  }
+
+  private async createCompletedAssetDepositionRun(
+    worldId: string,
+    potentialAsset: PotentialAssetRecord,
+    officialAssetId: string,
+  ) {
+    const tokenUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+    const run = await this.agents.createRun({
+      worldId,
+      sessionId: potentialAsset.sessionId,
+      mode: LEGACY_AGENT_RUN_MODE,
+      prompt: `Promote potential asset ${potentialAsset.id} into official asset ${officialAssetId}.`,
+      model: resolveRunModel(process.env),
+      provider: parseAgentProvider(process.env.AI_PROVIDER),
+    });
+    const toolCall = {
+      id: "call_create_world_asset",
+      name: "create_world_asset" as const,
+      arguments: {
+        worldId,
+        potentialAssetId: potentialAsset.id,
+        type: potentialAsset.type,
+        name: potentialAsset.title,
+      },
+    };
+
+    await this.append(run.id, 1, "run.started", { runId: run.id });
+    await this.append(run.id, 2, "tool.requested", { toolCall });
+    await this.append(run.id, 3, "tool.completed", {
+      toolCallId: toolCall.id,
+      result: {
+        assetId: officialAssetId,
+        sourcePotentialAssetId: potentialAsset.id,
+      },
+    });
+    const completed = await this.agents.updateRunIfStatus(run.id, "running", {
+      status: "completed",
+      tokenUsage,
+      completedAt: new Date(),
+    });
+    await this.append(run.id, 4, "run.completed", { tokenUsage });
+    return completed ?? await this.agents.findRunById(run.id) ?? run;
   }
 
   private async *streamEventsFromActiveSessionRun(

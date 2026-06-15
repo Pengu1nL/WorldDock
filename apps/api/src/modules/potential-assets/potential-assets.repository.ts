@@ -34,6 +34,7 @@ export type ListPotentialAssetsForWorldQuery = {
 
 export type PotentialAssetsRepository = {
   createMany(input: CreatePotentialAssetRecordInput[]): Promise<PotentialAssetRecord[]>;
+  findById(worldId: string, id: string): Promise<PotentialAssetRecord | null>;
   listForSession(worldId: string, sessionId: string): Promise<PotentialAssetRecord[]>;
   listForRun(worldId: string, runId: string): Promise<PotentialAssetRecord[]>;
   listForWorld(
@@ -44,6 +45,12 @@ export type PotentialAssetsRepository = {
     worldId: string,
     id: string,
     status: PotentialAssetStatus,
+  ): Promise<PotentialAssetRecord | null>;
+  markPromoted(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata?: Record<string, unknown>,
   ): Promise<PotentialAssetRecord | null>;
 };
 

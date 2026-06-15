@@ -42,6 +42,11 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     return created.map(mapPotentialAsset);
   }
 
+  async findById(worldId: string, id: string) {
+    const asset = await this.prisma.potentialAsset.findFirst({ where: { worldId, id } });
+    return asset ? mapPotentialAsset(asset) : null;
+  }
+
   async listForSession(worldId: string, sessionId: string) {
     const assets = await this.prisma.potentialAsset.findMany({
       where: { worldId, sessionId },
@@ -91,6 +96,26 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     if (updated.count === 0) return null;
     const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
     return asset ? mapPotentialAsset(asset) : null;
+  }
+
+  async markPromoted(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    const current = await this.prisma.potentialAsset.findFirst({ where: { worldId, id } });
+    if (!current) return null;
+    const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
+    const updated = await this.prisma.potentialAsset.update({
+      where: { id: current.id },
+      data: {
+        status: "promoted",
+        promotedAssetId,
+        metadata: { ...currentMetadata, ...metadata } as never,
+      },
+    });
+    return mapPotentialAsset(updated);
   }
 
   async onModuleDestroy() {

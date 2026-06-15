@@ -15,6 +15,13 @@ const createWorldDraftSchema = z.object({
   avoid: z.string().trim().optional(),
 });
 
+const promotePotentialAssetSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  markdown: z.string().optional(),
+  tags: z.array(z.string().trim().min(1)).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
 @Controller()
 export class AgentController {
   constructor(@Inject(AgentService) private readonly agentService: AgentService) {}
@@ -43,6 +50,19 @@ export class AgentController {
     const input = createRunSchema.parse(body);
     const result = await this.agentService.createSessionRun(worldId, sessionId, input);
     return { run: serializeAgentRun(result.run) };
+  }
+
+  @Post("worlds/:worldId/potential-assets/:potentialAssetId/promote")
+  async promotePotentialAsset(
+    @Param("worldId") worldId: string,
+    @Param("potentialAssetId") potentialAssetId: string,
+    @Body() body: unknown,
+  ) {
+    return this.agentService.promotePotentialAsset(
+      worldId,
+      potentialAssetId,
+      promotePotentialAssetSchema.parse(body),
+    );
   }
 
   @Sse("agent-runs/:runId/events")

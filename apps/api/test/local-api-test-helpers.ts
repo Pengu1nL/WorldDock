@@ -594,6 +594,10 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
         return potentialAsset;
       });
     },
+    async findById(worldId, id) {
+      const asset = stores.potentialAssets.get(id);
+      return asset?.worldId === worldId ? asset : null;
+    },
     async listForSession(worldId, sessionId) {
       return [...stores.potentialAssets.values()]
         .filter((asset) => asset.worldId === worldId && asset.sessionId === sessionId)
@@ -624,6 +628,19 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       const asset = stores.potentialAssets.get(id);
       if (!asset || asset.worldId !== worldId) return null;
       const updated: PotentialAssetRecord = { ...asset, status, updatedAt: now() };
+      stores.potentialAssets.set(id, updated);
+      return updated;
+    },
+    async markPromoted(worldId, id, promotedAssetId, metadata = {}) {
+      const asset = stores.potentialAssets.get(id);
+      if (!asset || asset.worldId !== worldId) return null;
+      const updated: PotentialAssetRecord = {
+        ...asset,
+        status: "promoted",
+        promotedAssetId,
+        metadata: { ...asset.metadata, ...metadata },
+        updatedAt: now(),
+      };
       stores.potentialAssets.set(id, updated);
       return updated;
     },

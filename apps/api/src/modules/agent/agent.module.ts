@@ -1,5 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
+import { OfficialAssetsModule } from "../official-assets/official-assets.module";
+import { OfficialAssetsService } from "../official-assets/official-assets.service";
 import { PotentialAssetsModule } from "../potential-assets/potential-assets.module";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldsModule } from "../worlds/worlds.module";
@@ -15,7 +17,7 @@ import { createWorldToolRegistry } from "./pi/world-tools";
 import { PrismaAgentRepository } from "./prisma-agent.repository";
 
 @Module({
-  imports: [WorldsModule, AgentSessionsModule, forwardRef(() => PotentialAssetsModule)],
+  imports: [WorldsModule, AgentSessionsModule, OfficialAssetsModule, forwardRef(() => PotentialAssetsModule)],
   controllers: [AgentController],
   providers: [
     AgentService,
@@ -26,7 +28,7 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
     },
     {
       provide: AGENT_PROVIDER,
-      useFactory: (worlds: WorldRepository) => {
+      useFactory: (worlds: WorldRepository, officialAssets: OfficialAssetsService) => {
         const adapter = createPiAgentCoreAdapter({
           modelProvider: process.env.PI_MODEL_PROVIDER,
           modelId: process.env.PI_MODEL_ID,
@@ -35,12 +37,12 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
         return new PiAgentProvider(
           new PiSessionRunner(
             new PiAgentCoreRuntimeClient(adapter),
-            createWorldToolRegistry(worlds),
+            createWorldToolRegistry(worlds, officialAssets),
             new SafetyGate(),
           ),
         );
       },
-      inject: [WORLD_REPOSITORY],
+      inject: [WORLD_REPOSITORY, OfficialAssetsService],
     },
   ],
   exports: [AgentService, AGENT_REPOSITORY, AGENT_PROVIDER],
