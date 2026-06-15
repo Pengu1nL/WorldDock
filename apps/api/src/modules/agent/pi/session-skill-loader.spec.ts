@@ -1,9 +1,12 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadSessionPiSkills } from "./session-skill-loader";
 
 describe("loadSessionPiSkills", () => {
   it("loads the world exploration skill for world exploration sessions", () => {
-    expect(loadSessionPiSkills({ kind: "world_exploration" }).name).toBe("world-exploration");
+    expect(loadSessionPiSkills({ kind: "world_exploration" }).map((skill) => skill.name)).toEqual(["world-exploration"]);
   });
 
   it("loads the asset deposition skill for world exploration deposition intent", () => {
@@ -11,15 +14,34 @@ describe("loadSessionPiSkills", () => {
       loadSessionPiSkills({
         kind: "world_exploration",
         intent: "asset_deposition",
-      }).name,
-    ).toBe("asset-deposition");
+      }).map((skill) => skill.name),
+    ).toEqual(["asset-deposition"]);
   });
 
   it("loads the asset edit skill for asset edit sessions", () => {
-    expect(loadSessionPiSkills({ kind: "asset_edit" }).name).toBe("asset-edit");
+    expect(loadSessionPiSkills({ kind: "asset_edit" }).map((skill) => skill.name)).toEqual(["asset-edit"]);
   });
 
   it("loads the consistency repair skill for consistency repair sessions", () => {
-    expect(loadSessionPiSkills({ kind: "consistency_repair" }).name).toBe("consistency-repair");
+    expect(loadSessionPiSkills({ kind: "consistency_repair" }).map((skill) => skill.name)).toEqual(["consistency-repair"]);
+  });
+
+  it("reads skill instructions from a configured skillsDir", () => {
+    const skillsDir = mkdtempSync(join(tmpdir(), "worlddock-pi-skills-"));
+    const skillDir = join(skillsDir, "world-exploration");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(skillDir, "SKILL.md"), "自定义技能正文：禁止调用写入工具。");
+
+    try {
+      const [skill] = loadSessionPiSkills({
+        kind: "world_exploration",
+        skillsDir,
+      });
+
+      expect(skill.path).toBe(`${skillsDir}/world-exploration`);
+      expect(skill.instructions).toContain("禁止调用写入工具");
+    } finally {
+      rmSync(skillsDir, { recursive: true, force: true });
+    }
   });
 });

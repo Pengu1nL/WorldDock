@@ -8,7 +8,7 @@ export type PiSessionInput = {
   model?: string | null;
   context: WorldContextRef[];
   tools: Array<{ name: PiToolName; description: string; inputSchema: Record<string, unknown> }>;
-  skills: Array<{ name: string; path: string; description: string }>;
+  skills: Array<{ name: string; path: string; description: string; instructions?: string }>;
 };
 
 export type PiToolExecutionResult = {

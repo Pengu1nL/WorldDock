@@ -107,9 +107,23 @@ export function buildSystemPrompt(input: PiSessionInput) {
     "生成 propose_setting 前必须先判断资产分类，并在 categoryReason 中说明：按设定本体分类，不按正文偶然提到的对象分类；运输机制、成本、窗口、约束属于世界规则；企业、组织、机构、政府、派系属于势力。",
     "不要声称已经保存、删除、发布或收费；这些危险操作必须由 WorldDock API 在用户确认后执行。",
     `世界：${input.worldId}`,
-    input.skills.length > 0
-      ? `可用技能：${input.skills.map((skill) => `${skill.name}(${skill.description})`).join("; ")}`
-      : "可用技能：world-context; world-suggestion",
+    buildSkillPromptSection(input.skills),
+  ].join("\n");
+}
+
+function buildSkillPromptSection(skills: PiSessionInput["skills"]) {
+  if (skills.length === 0) return "可用技能：world-context; world-suggestion";
+
+  return [
+    "可用技能：",
+    ...skills.map((skill) => {
+      const lines = [`- ${skill.name}: ${skill.description}`];
+      const instructions = skill.instructions?.trim();
+      if (instructions) {
+        lines.push("Skill instructions:", instructions);
+      }
+      return lines.join("\n");
+    }),
   ].join("\n");
 }
 

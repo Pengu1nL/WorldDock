@@ -1,7 +1,12 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 export type PiSkillDescriptor = {
   name: string;
   path: string;
   description: string;
+  instructions?: string;
 };
 
 export type SessionPiSkillKind =
@@ -11,13 +16,26 @@ export type SessionPiSkillKind =
 
 export type SessionPiSkillIntent = "asset_deposition";
 
-export type LoadSessionPiSkillsInput = {
-  kind: SessionPiSkillKind;
-  intent?: SessionPiSkillIntent;
+type LoadSessionPiSkillsBaseInput = {
   skillsDir?: string;
 };
 
+export type LoadSessionPiSkillsInput =
+  | (LoadSessionPiSkillsBaseInput & {
+      kind: "world_exploration";
+      intent?: SessionPiSkillIntent;
+    })
+  | (LoadSessionPiSkillsBaseInput & {
+      kind: "asset_edit";
+      intent?: never;
+    })
+  | (LoadSessionPiSkillsBaseInput & {
+      kind: "consistency_repair";
+      intent?: never;
+    });
+
 const DEFAULT_PI_SKILLS_DIR = "apps/api/src/modules/agent/pi/skills";
+const LOCAL_PI_SKILLS_DIR = join(dirname(fileURLToPath(import.meta.url)), "skills");
 
 const SESSION_SKILLS = {
   "world-exploration": {
@@ -36,19 +54,23 @@ const SESSION_SKILLS = {
     name: "consistency-repair",
     description: "Generate a repair patch batch for the bound issue and related assets.",
   },
-} satisfies Record<string, Omit<PiSkillDescriptor, "path">>;
+} satisfies Record<string, Omit<PiSkillDescriptor, "path" | "instructions">>;
 
 type SessionSkillName = keyof typeof SESSION_SKILLS;
 
-export function loadSessionPiSkills(input: LoadSessionPiSkillsInput): PiSkillDescriptor {
+export function loadSessionPiSkills(input: LoadSessionPiSkillsInput): PiSkillDescriptor[] {
   const name = selectSessionSkillName(input);
   const skill = SESSION_SKILLS[name];
   const basePath = input.skillsDir ?? DEFAULT_PI_SKILLS_DIR;
+  const skillPath = `${basePath}/${skill.name}`;
+  const instructionsPath = input.skillsDir ? skillPath : join(LOCAL_PI_SKILLS_DIR, skill.name);
+  const instructions = readSkillInstructions(instructionsPath);
 
-  return {
+  return [{
     ...skill,
-    path: `${basePath}/${skill.name}`,
-  };
+    path: skillPath,
+    ...(instructions ? { instructions } : {}),
+  }];
 }
 
 function selectSessionSkillName(input: LoadSessionPiSkillsInput): SessionSkillName {
@@ -65,4 +87,13 @@ function selectSessionSkillName(input: LoadSessionPiSkillsInput): SessionSkillNa
   }
 
   return "world-exploration";
+}
+
+function readSkillInstructions(skillPath: string): string | undefined {
+  try {
+    const instructions = readFileSync(join(skillPath, "SKILL.md"), "utf8").trim();
+    return instructions.length > 0 ? instructions : undefined;
+  } catch {
+    return undefined;
+  }
 }

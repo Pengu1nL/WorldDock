@@ -41,6 +41,27 @@ describe("createPiAgentCoreAdapter", () => {
     expect(systemPrompt).toContain("assetId 必须使用上下文或工具结果中明确标出的 assetId/targetId");
   });
 
+  it("injects skill instructions into the system prompt", () => {
+    const systemPrompt = buildSystemPrompt(baseInput({
+      skills: [
+        {
+          name: "world-exploration",
+          path: "apps/api/src/modules/agent/pi/skills/world-exploration",
+          description: "Discuss and analyze world exploration without creating formal assets.",
+          instructions: [
+            "# World Exploration Session Skill",
+            "## 禁止行为",
+            "- 禁止调用任何写入工具，包含正式资产写入。",
+          ].join("\n"),
+        },
+      ],
+    }));
+
+    expect(systemPrompt).toContain("world-exploration: Discuss and analyze world exploration");
+    expect(systemPrompt).toContain("## 禁止行为");
+    expect(systemPrompt).toContain("禁止调用任何写入工具");
+  });
+
   it("runs a real pi Agent loop and bridges WorldDock tool results back into the loop", async () => {
     const faux = registerFauxProvider({
       provider: "worlddock-test",
