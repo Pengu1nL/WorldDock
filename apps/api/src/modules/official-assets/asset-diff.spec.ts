@@ -11,4 +11,12 @@ describe("createLineDiff", () => {
       { type: "add", text: "D", lineTo: 4 },
     ]);
   });
+
+  it("normalizes CRLF and preserves trailing blank lines", () => {
+    expect(createLineDiff("A\r\nB", "A\nB\n")).toEqual([
+      { type: "context", text: "A", lineFrom: 1, lineTo: 1 },
+      { type: "context", text: "B", lineFrom: 2, lineTo: 2 },
+      { type: "add", text: "", lineTo: 3 },
+    ]);
+  });
 });

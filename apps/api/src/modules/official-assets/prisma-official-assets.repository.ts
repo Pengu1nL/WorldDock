@@ -5,6 +5,7 @@ import {
   decodeOfficialAssetListCursor,
   encodeOfficialAssetListCursor,
   normalizeOfficialAssetListLimit,
+  OfficialAssetPatchConflictError,
   type OfficialAssetPatchRecord,
   type OfficialAssetPatchesRepository,
   type OfficialAssetDetailRecord,
@@ -163,16 +164,28 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
         },
       });
       if (!current) return null;
+      const latestRevision = current.revisions[0] ?? null;
+      if (
+        current.version !== input.expectedVersion ||
+        (latestRevision?.id ?? null) !== input.expectedBeforeRevisionId
+      ) {
+        throw new OfficialAssetPatchConflictError();
+      }
 
-      const versionFrom = current.version;
-      const versionTo = versionFrom + 1;
-      await tx.officialWorldAsset.update({
-        where: { id: current.id },
+      const versionFrom = input.expectedVersion;
+      const versionTo = input.expectedVersion + 1;
+      const updated = await tx.officialWorldAsset.updateMany({
+        where: {
+          id: current.id,
+          worldId: input.worldId,
+          version: input.expectedVersion,
+        },
         data: {
           summary: input.summary,
           version: versionTo,
         },
       });
+      if (updated.count !== 1) throw new OfficialAssetPatchConflictError();
 
       const revision = await tx.officialWorldAssetRevision.create({
         data: {
@@ -208,7 +221,7 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
         data: {
           worldId: input.worldId,
           assetId: input.assetId,
-          beforeRevisionId: current.revisions[0]?.id ?? null,
+          beforeRevisionId: input.expectedBeforeRevisionId,
           afterRevisionId: revision.id,
           beforeMarkdown: input.beforeMarkdown,
           afterMarkdown: input.afterMarkdown,

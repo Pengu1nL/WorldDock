@@ -36,8 +36,8 @@ const WORLD_TOOL_DEFINITIONS: WorldToolDefinition[] = [
   },
   {
     name: "apply_world_asset_patch",
-    description: "Apply a bounded patch to an existing formal world asset during asset edit or consistency repair sessions.",
-    inputSchema: { type: "object", required: ["worldId", "assetId", "patch"] },
+    description: "Apply a bounded patch to an existing formal world asset during an asset edit session.",
+    inputSchema: { type: "object", required: ["worldId", "assetId", "sessionId", "afterMarkdown"] },
   },
   {
     name: "resolve_consistency_issue",

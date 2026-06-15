@@ -94,7 +94,7 @@ export function createWorldToolRegistry(
         worldId: readToolText(input.worldId),
         assetId: readToolText(input.assetId),
         sessionId: readToolText(input.sessionId, patch.sessionId),
-        afterMarkdown: readToolText(input.afterMarkdown, patch.afterMarkdown, patch.markdown),
+        afterMarkdown: readToolMarkdown(input.afterMarkdown, patch.afterMarkdown, patch.markdown),
         reason: readToolText(input.reason, patch.reason) || undefined,
       }),
     };
@@ -161,6 +161,15 @@ function readToolText(...values: unknown[]) {
     if (value === null || value === undefined) continue;
     const text = String(value).trim();
     if (text) return text;
+  }
+  return "";
+}
+
+function readToolMarkdown(...values: unknown[]) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value);
+    if (text.trim()) return text;
   }
   return "";
 }

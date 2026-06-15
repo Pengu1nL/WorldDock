@@ -11,6 +11,7 @@ import { LocalStorageService } from "../src/modules/local-storage/local-storage.
 import { OfficialAssetsController } from "../src/modules/official-assets/official-assets.controller";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
+  OfficialAssetPatchConflictError,
   type ApplyOfficialAssetPatchRecordInput,
   type CreateOfficialAssetRecordInput,
   type ListOfficialAssetsQuery,
@@ -41,6 +42,7 @@ describe("asset edit local endpoints", () => {
   let worlds: InMemoryWorlds;
   let world: Awaited<ReturnType<InMemoryWorlds["createWorld"]>>;
   let agentSessions: InMemoryAgentSessions;
+  let officialAssets: InMemoryOfficialAssets;
 
   beforeEach(async () => {
     previousDataDir = process.env.WORLD_DOCK_DATA_DIR;
@@ -57,7 +59,8 @@ describe("asset edit local endpoints", () => {
       maturity: 12,
     });
     agentSessions = createInMemoryAgentSessions();
-    app = await createAssetEditApp(worlds, agentSessions);
+    officialAssets = createInMemoryOfficialAssets();
+    app = await createAssetEditApp(worlds, agentSessions, officialAssets);
   });
 
   afterEach(async () => {
@@ -130,8 +133,136 @@ describe("asset edit local endpoints", () => {
 
     const detail = await getOfficialAsset(asset.id);
     expect(detail.asset.version).toBe(2);
+    expect(detail.asset.summary).toBe("登记许可必须每年续期。");
     expect(detail.markdown).toContain("每年续期");
     expect(detail.revisions).toHaveLength(2);
+    expect(detail.revisions[0]).toMatchObject({
+      version: 2,
+      summary: "登记许可必须每年续期。",
+    });
+  });
+
+  it("rejects patches from non asset edit sessions without changing the asset", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await agentSessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "世界探索",
+      status: "active",
+      current: false,
+      metadata: {},
+    });
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n非法更新。",
+      })
+      .expect(400);
+
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(1);
+    expect(detail.markdown).toContain("所有记忆交易都需要登记。");
+  });
+
+  it("rejects patches when the session primary subject is another asset", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const otherAsset = await createOfficialAsset("rule", "白塔许可");
+    const otherSession = await createAssetEditSession(otherAsset.id);
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: otherSession.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n非法更新。",
+      })
+      .expect(400);
+
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(1);
+    expect(detail.markdown).toContain("所有记忆交易都需要登记。");
+  });
+
+  it("does not expose patch list or detail across worlds", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await createAssetEditSession(asset.id);
+    const applied = await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。",
+      })
+      .expect(201);
+    const otherWorld = await worlds.createWorld({
+      name: "白塔城",
+      type: "奇幻",
+      summary: "白塔管理整座城市的记忆。",
+      tags: ["白塔"],
+      mode: "local",
+      maturity: 12,
+    });
+
+    await request(app?.getHttpServer())
+      .get(`/v1/worlds/${otherWorld.id}/official-assets/${asset.id}/patches`)
+      .expect(404);
+    await request(app?.getHttpServer())
+      .get(`/v1/worlds/${otherWorld.id}/official-assets/${asset.id}/patches/${applied.body.patch.id}`)
+      .expect(404);
+  });
+
+  it("rejects patches with an empty summary section before writing storage or database records", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await createAssetEditSession(asset.id);
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n  \n\n## 适用范围\n\n所有许可。",
+      })
+      .expect(400);
+
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(1);
+    expect(detail.markdown).toBe("# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。");
+    expect(detail.revisions).toHaveLength(1);
+    await request(app?.getHttpServer())
+      .get(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.patches).toEqual([]);
+      });
+  });
+
+  it("returns 409 on patch conflicts and restores storage to the latest database revision", async () => {
+    const latestMarkdown = "# 记忆交易许可\n\n## 概括\n\n另一个补丁已经成功写入。";
+    await app?.close();
+    officialAssets = createInMemoryOfficialAssets({ conflictOnApply: { markdown: latestMarkdown } });
+    app = await createAssetEditApp(worlds, agentSessions, officialAssets);
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await createAssetEditSession(asset.id);
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n这次失败的补丁不应留在文件里。",
+      })
+      .expect(409)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          code: "PATCH_CONFLICT",
+          message: "Official asset changed while applying patch.",
+        });
+      });
+
+    const storedMarkdown = await readStoredMarkdown(asset.documentKey);
+    expect(storedMarkdown).toBe(latestMarkdown);
+    expect(storedMarkdown).not.toContain("失败的补丁");
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(2);
+    expect(detail.markdown).toBe(latestMarkdown);
   });
 
   it("creates default titled asset edit sessions when the body is omitted or empty", async () => {
@@ -239,11 +370,25 @@ describe("asset edit local endpoints", () => {
       .get(`/v1/worlds/${world.id}/official-assets/${assetId}`)
       .expect(200);
 
-    return detail.body as { asset: OfficialAssetRecord; markdown: string; revisions: unknown[] };
+    return detail.body as {
+      asset: OfficialAssetRecord;
+      markdown: string;
+      revisions: Array<{ version: number; markdown: string; summary: string | null }>;
+    };
+  }
+
+  async function readStoredMarkdown(documentKey: string) {
+    const stored = await app?.get(LocalStorageService).readObject(documentKey);
+    if (!stored) throw new Error("Expected stored markdown.");
+    return new TextDecoder().decode(stored.body);
   }
 });
 
-async function createAssetEditApp(worlds: InMemoryWorlds, sessions: InMemoryAgentSessions = createInMemoryAgentSessions()) {
+async function createAssetEditApp(
+  worlds: InMemoryWorlds,
+  sessions: InMemoryAgentSessions = createInMemoryAgentSessions(),
+  officialAssets: InMemoryOfficialAssets = createInMemoryOfficialAssets(),
+) {
   return createHttpTestApp({
     controllers: [OfficialAssetsController],
     providers: [
@@ -253,12 +398,20 @@ async function createAssetEditApp(worlds: InMemoryWorlds, sessions: InMemoryAgen
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: AGENT_SESSIONS_REPOSITORY, useValue: sessions },
-      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
+      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: officialAssets },
     ],
   });
 }
 
-function createInMemoryOfficialAssets(): OfficialAssetsRepository & OfficialAssetPatchesRepository {
+type InMemoryOfficialAssets = OfficialAssetsRepository & OfficialAssetPatchesRepository;
+
+type InMemoryOfficialAssetsOptions = {
+  conflictOnApply?: {
+    markdown: string;
+  };
+};
+
+function createInMemoryOfficialAssets(options: InMemoryOfficialAssetsOptions = {}): InMemoryOfficialAssets {
   const assets = new Map<string, OfficialAssetRecord>();
   const revisions = new Map<string, OfficialAssetRevisionRecord[]>();
   const indexes = new Map<string, OfficialAssetSectionIndexRecord[]>();
@@ -350,8 +503,39 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository & OfficialAsse
       if (!asset || asset.worldId !== input.worldId) return null;
       const timestamp = new Date();
       const existingRevisions = revisions.get(asset.id) ?? [];
-      const versionFrom = asset.version;
-      const versionTo = versionFrom + 1;
+      if (options.conflictOnApply) {
+        const versionTo = asset.version + 1;
+        const latestMarkdown = options.conflictOnApply.markdown;
+        const latestSummary = "另一个补丁已经成功写入。";
+        const updated: OfficialAssetRecord = {
+          ...asset,
+          summary: latestSummary,
+          version: versionTo,
+          updatedAt: timestamp,
+        };
+        const revision: OfficialAssetRevisionRecord = {
+          id: `official_asset_revision_${revisionCount++}`,
+          worldId: input.worldId,
+          assetId: asset.id,
+          version: versionTo,
+          markdown: latestMarkdown,
+          summary: latestSummary,
+          metadata: { source: "concurrent_patch" },
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        assets.set(asset.id, updated);
+        revisions.set(asset.id, [revision, ...existingRevisions]);
+        throw new OfficialAssetPatchConflictError();
+      }
+      if (
+        asset.version !== input.expectedVersion ||
+        (existingRevisions[0]?.id ?? null) !== input.expectedBeforeRevisionId
+      ) {
+        throw new OfficialAssetPatchConflictError();
+      }
+      const versionFrom = input.expectedVersion;
+      const versionTo = input.expectedVersion + 1;
       const updated: OfficialAssetRecord = {
         ...asset,
         summary: input.summary,
@@ -385,7 +569,7 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository & OfficialAsse
         assetId: asset.id,
         sessionId: input.sessionId,
         batchId: null,
-        beforeRevisionId: existingRevisions[0]?.id ?? null,
+        beforeRevisionId: input.expectedBeforeRevisionId,
         afterRevisionId: revision.id,
         beforeMarkdown: input.beforeMarkdown,
         afterMarkdown: input.afterMarkdown,

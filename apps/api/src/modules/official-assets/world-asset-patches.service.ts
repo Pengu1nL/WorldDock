@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { AgentSessionsService } from "../agent-sessions/agent-sessions.service";
 import { LocalStorageService } from "../local-storage/local-storage.service";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
@@ -6,6 +6,7 @@ import { createLineDiff, parseLineDiff, type LineDiffOperation } from "./asset-d
 import { extractAssetSummary, indexMarkdownSections } from "./asset-markdown";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
+  OfficialAssetPatchConflictError,
   type OfficialAssetPatchRecord,
   type OfficialAssetPatchesRepository,
   type OfficialAssetsRepository,
@@ -34,9 +35,11 @@ export class WorldAssetPatchesService {
   ) {}
 
   async applyPatch(input: ApplyWorldAssetPatchInput): Promise<OfficialAssetPatchView> {
-    const afterMarkdown = input.afterMarkdown.trim();
+    const afterMarkdown = input.afterMarkdown;
     const sessionId = input.sessionId.trim();
-    if (!afterMarkdown || !sessionId) throw this.badRequest("Patch sessionId and afterMarkdown are required.");
+    if (afterMarkdown.trim().length === 0 || !sessionId) {
+      throw this.badRequest("Patch sessionId and afterMarkdown are required.");
+    }
 
     await this.requireWorld(input.worldId);
     const detail = await this.officialAssets.getAsset(input.worldId, input.assetId);
@@ -45,7 +48,10 @@ export class WorldAssetPatchesService {
 
     const beforeMarkdown = await this.readMarkdown(detail.asset.documentKey);
     const diff = createLineDiff(beforeMarkdown, afterMarkdown);
-    const summary = extractAssetSummary(afterMarkdown) || detail.asset.summary;
+    const summary = extractAssetSummary(afterMarkdown);
+    if (!summary) {
+      throw this.badRequest("Patch markdown must include a non-empty 概括 section.");
+    }
     const indexes = indexMarkdownSections(afterMarkdown).map((section, order) => ({
       title: section.heading,
       summary: section.summary,
@@ -67,6 +73,8 @@ export class WorldAssetPatchesService {
         worldId: input.worldId,
         assetId: input.assetId,
         sessionId,
+        expectedVersion: detail.asset.version,
+        expectedBeforeRevisionId: detail.revisions[0]?.id ?? null,
         beforeMarkdown,
         afterMarkdown,
         diff: JSON.stringify(diff),
@@ -76,11 +84,15 @@ export class WorldAssetPatchesService {
       });
       if (!patch) throw this.notFound();
     } catch (error) {
-      await this.localStorage.saveObject({
-        key: detail.asset.documentKey,
-        contentType: "text/markdown; charset=utf-8",
-        body: new TextEncoder().encode(beforeMarkdown),
-      });
+      if (error instanceof OfficialAssetPatchConflictError) {
+        await this.restoreLatestRevisionMarkdown(input.worldId, input.assetId, detail.asset.documentKey);
+        throw new ConflictException({
+          code: "PATCH_CONFLICT",
+          message: "Official asset changed while applying patch.",
+        });
+      }
+
+      await this.restoreBeforeMarkdownIfUnchanged(detail.asset.documentKey, beforeMarkdown, afterMarkdown);
       throw error;
     }
 
@@ -127,6 +139,35 @@ export class WorldAssetPatchesService {
   private async readMarkdown(documentKey: string) {
     const stored = await this.localStorage.readObject(documentKey);
     return new TextDecoder().decode(stored.body);
+  }
+
+  private async restoreLatestRevisionMarkdown(worldId: string, assetId: string, documentKey: string) {
+    try {
+      const latest = await this.officialAssets.getAsset(worldId, assetId);
+      const latestMarkdown = latest?.revisions[0]?.markdown;
+      if (latestMarkdown === undefined) return;
+      await this.saveMarkdown(documentKey, latestMarkdown);
+    } catch {
+      // Keep the original conflict as the surfaced error.
+    }
+  }
+
+  private async restoreBeforeMarkdownIfUnchanged(documentKey: string, beforeMarkdown: string, afterMarkdown: string) {
+    try {
+      const currentMarkdown = await this.readMarkdown(documentKey);
+      if (currentMarkdown !== afterMarkdown) return;
+      await this.saveMarkdown(documentKey, beforeMarkdown);
+    } catch {
+      // Keep the original repository/storage error as the surfaced error.
+    }
+  }
+
+  private async saveMarkdown(documentKey: string, markdown: string) {
+    await this.localStorage.saveObject({
+      key: documentKey,
+      contentType: "text/markdown; charset=utf-8",
+      body: new TextEncoder().encode(markdown),
+    });
   }
 
   private async requireWorld(worldId: string) {

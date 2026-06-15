@@ -49,7 +49,9 @@ const createOfficialAssetEditSessionSchema = z.object({
 
 const applyOfficialAssetPatchSchema = z.object({
   sessionId: z.string().trim().min(1),
-  afterMarkdown: z.string().trim().min(1),
+  afterMarkdown: z.string().refine((value) => value.trim().length > 0, {
+    message: "Patch markdown is required.",
+  }),
   reason: z.string().trim().min(1).optional(),
 }).strict();
 

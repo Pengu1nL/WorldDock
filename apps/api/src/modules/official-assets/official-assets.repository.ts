@@ -105,6 +105,8 @@ export type ApplyOfficialAssetPatchRecordInput = {
   worldId: string;
   assetId: string;
   sessionId: string;
+  expectedVersion: number;
+  expectedBeforeRevisionId: string | null;
   beforeMarkdown: string;
   afterMarkdown: string;
   diff: string;
@@ -143,6 +145,13 @@ export type OfficialAssetPatchesRepository = {
   listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]>;
   getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null>;
 };
+
+export class OfficialAssetPatchConflictError extends Error {
+  constructor() {
+    super("Official asset changed while applying patch.");
+    this.name = "OfficialAssetPatchConflictError";
+  }
+}
 
 export const DEFAULT_OFFICIAL_ASSET_LIST_LIMIT = 20;
 export const MAX_OFFICIAL_ASSET_LIST_LIMIT = 50;

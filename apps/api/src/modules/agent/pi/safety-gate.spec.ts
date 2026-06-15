@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SafetyGate } from "./safety-gate";
+import { createWorldToolRegistry } from "./world-tools";
 import { describeWorldTools } from "./world-tool-registry";
 
 describe("SafetyGate session policies", () => {
@@ -39,10 +40,20 @@ describe("describeWorldTools session policies", () => {
     expect(describeWorldTools({ kind: "world_exploration", intent: "asset_deposition" }).map((tool) => tool.name)).toContain("create_world_asset");
     expect(describeWorldTools({ kind: "asset_edit" }).map((tool) => tool.name)).toContain("apply_world_asset_patch");
     expect(describeWorldTools({ kind: "asset_edit" }).map((tool) => tool.name)).not.toContain("resolve_consistency_issue");
-    expect(describeWorldTools({ kind: "consistency_repair" }).map((tool) => tool.name)).toEqual(expect.arrayContaining([
-      "apply_world_asset_patch",
-      "resolve_consistency_issue",
-    ]));
+    expect(describeWorldTools({ kind: "consistency_repair" }).map((tool) => tool.name)).toContain("resolve_consistency_issue");
+    expect(describeWorldTools({ kind: "consistency_repair" }).map((tool) => tool.name)).not.toContain("apply_world_asset_patch");
+  });
+
+  it("describes apply_world_asset_patch with direct asset edit inputs", () => {
+    const tool = describeWorldTools({ kind: "asset_edit" }).find((item) => item.name === "apply_world_asset_patch");
+
+    expect(tool).toMatchObject({
+      description: expect.stringContaining("asset edit"),
+      inputSchema: {
+        type: "object",
+        required: ["worldId", "assetId", "sessionId", "afterMarkdown"],
+      },
+    });
   });
 
   it("limits asset deposition tools to read tools and create_world_asset", () => {
@@ -61,5 +72,32 @@ describe("describeWorldTools session policies", () => {
     expect(names.filter((name) => name.startsWith("propose_"))).toEqual([]);
     expect(names).not.toContain("apply_world_asset_patch");
     expect(names).not.toContain("resolve_consistency_issue");
+  });
+});
+
+describe("apply_world_asset_patch tool handler", () => {
+  it("calls the patch service and preserves markdown whitespace", async () => {
+    const applyPatch = vi.fn(async (input) => ({
+      id: "patch_1",
+      ...input,
+    }));
+    const registry = createWorldToolRegistry({} as never, undefined, { applyPatch } as never);
+    const afterMarkdown = "\n# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。\n";
+
+    await registry.execute("apply_world_asset_patch", {
+      worldId: "world_1",
+      assetId: "asset_1",
+      sessionId: "session_1",
+      afterMarkdown,
+      reason: "补充续期规则",
+    });
+
+    expect(applyPatch).toHaveBeenCalledWith({
+      worldId: "world_1",
+      assetId: "asset_1",
+      sessionId: "session_1",
+      afterMarkdown,
+      reason: "补充续期规则",
+    });
   });
 });

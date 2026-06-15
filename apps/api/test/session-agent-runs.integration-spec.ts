@@ -219,8 +219,8 @@ describe("agent session run local endpoints", () => {
     {
       kind: "consistency_repair" as const,
       skillName: "consistency-repair",
-      allowedWriteTools: ["apply_world_asset_patch", "resolve_consistency_issue"],
-      deniedTools: ["propose_setting", "propose_story_seed", "propose_conflict", "propose_release_notes", "create_world_asset"],
+      allowedWriteTools: ["resolve_consistency_issue"],
+      deniedTools: ["propose_setting", "propose_story_seed", "propose_conflict", "propose_release_notes", "create_world_asset", "apply_world_asset_patch"],
     },
   ])("passes $kind policy, tools, and skills to the provider", async ({ kind, skillName, allowedWriteTools, deniedTools }) => {
     const worlds = createInMemoryWorlds();
