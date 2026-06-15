@@ -81,8 +81,8 @@ export class OfficialAssetsController {
     @Param("assetId") assetId: string,
     @Body() body: unknown,
   ) {
-    const assetDetail = await this.officialAssets.getAsset(worldId, assetId);
     const input = createOfficialAssetEditSessionSchema.parse(body ?? {});
+    const assetDetail = await this.officialAssets.getAsset(worldId, assetId);
     const session = await this.agentSessions.createSession(worldId, {
       kind: "asset_edit",
       subjectAssetId: assetDetail.asset.id,

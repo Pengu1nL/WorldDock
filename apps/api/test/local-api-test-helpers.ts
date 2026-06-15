@@ -564,6 +564,10 @@ export type InMemoryPotentialAssets = PotentialAssetsRepository & {
   };
 };
 
+type InMemoryAgentSessionsOptions = {
+  failContextItemKinds?: ReadonlySet<AgentSessionContextItemRecord["kind"]>;
+};
+
 export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
   const stores: InMemoryPotentialAssets["stores"] = {
     potentialAssets: new Map(),
@@ -647,7 +651,7 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
   };
 }
 
-export function createInMemoryAgentSessions(): InMemoryAgentSessions {
+export function createInMemoryAgentSessions(options: InMemoryAgentSessionsOptions = {}): InMemoryAgentSessions {
   const stores: InMemoryAgentSessions["stores"] = {
     sessions: new Map(),
     subjects: [],
@@ -744,6 +748,10 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
         createdAt: timestamp,
         updatedAt: timestamp,
       }));
+      const failedContextItem = contextItems.find((item) => options.failContextItemKinds?.has(item.kind));
+      if (failedContextItem) {
+        throw new Error(`Configured context item failure: ${failedContextItem.kind}`);
+      }
 
       counters.session = nextSessionCounter;
       counters.subject = nextSubjectCounter;
@@ -832,6 +840,9 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
         .sort(compareCreatedAsc);
     },
     async createContextItem(input) {
+      if (options.failContextItemKinds?.has(input.kind)) {
+        throw new Error(`Configured context item failure: ${input.kind}`);
+      }
       const timestamp = now();
       const contextItem: AgentSessionContextItemRecord = {
         id: `agent_session_context_${counters.contextItem++}`,

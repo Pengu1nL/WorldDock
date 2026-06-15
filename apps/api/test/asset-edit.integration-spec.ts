@@ -36,6 +36,7 @@ describe("asset edit local endpoints", () => {
   let previousDataDir: string | undefined;
   let worlds: InMemoryWorlds;
   let world: Awaited<ReturnType<InMemoryWorlds["createWorld"]>>;
+  let agentSessions: InMemoryAgentSessions;
 
   beforeEach(async () => {
     previousDataDir = process.env.WORLD_DOCK_DATA_DIR;
@@ -51,7 +52,8 @@ describe("asset edit local endpoints", () => {
       mode: "local",
       maturity: 12,
     });
-    app = await createAssetEditApp(worlds);
+    agentSessions = createInMemoryAgentSessions();
+    app = await createAssetEditApp(worlds, agentSessions);
   });
 
   afterEach(async () => {
@@ -125,8 +127,38 @@ describe("asset edit local endpoints", () => {
     });
   });
 
+  it("returns 404 and creates no session when the official asset is missing", async () => {
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/missing/edit-sessions`)
+      .expect(404);
+
+    await expect(agentSessions.listSessions(world.id, { kind: "asset_edit" })).resolves.toMatchObject({
+      sessions: [],
+    });
+  });
+
+  it("returns 404 and creates no session when the asset belongs to another world", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const otherWorld = await worlds.createWorld({
+      name: "白塔城",
+      type: "奇幻",
+      summary: "白塔管理整座城市的记忆。",
+      tags: ["白塔"],
+      mode: "local",
+      maturity: 12,
+    });
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${otherWorld.id}/official-assets/${asset.id}/edit-sessions`)
+      .expect(404);
+
+    await expect(agentSessions.listSessions(otherWorld.id, { kind: "asset_edit" })).resolves.toMatchObject({
+      sessions: [],
+    });
+  });
+
   it("does not leave an asset edit session when initial context creation fails", async () => {
-    const sessions = createContextFailingAgentSessions();
+    const sessions = createInMemoryAgentSessions({ failContextItemKinds: new Set<"asset_document">(["asset_document"]) });
     await app?.close();
     app = await createAssetEditApp(worlds, sessions);
     const asset = await createOfficialAsset("rule", "记忆交易许可");
@@ -139,6 +171,9 @@ describe("asset edit local endpoints", () => {
     await expect(sessions.listSessions(world.id, { kind: "asset_edit" })).resolves.toMatchObject({
       sessions: [],
     });
+    expect(sessions.stores.sessions.size).toBe(0);
+    expect(sessions.stores.subjects).toEqual([]);
+    expect(sessions.stores.contextItems).toEqual([]);
   });
 
   async function createOfficialAsset(type: OfficialWorldAssetType, name: string) {
@@ -169,20 +204,6 @@ async function createAssetEditApp(worlds: InMemoryWorlds, sessions: InMemoryAgen
       { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
     ],
   });
-}
-
-function createContextFailingAgentSessions(): InMemoryAgentSessions {
-  const sessions = createInMemoryAgentSessions();
-  return {
-    ...sessions,
-    async createSessionWithSubject(input) {
-      if (input.contextItems?.length) throw new Error("context write failed");
-      return sessions.createSessionWithSubject(input);
-    },
-    async createContextItem() {
-      throw new Error("context write failed");
-    },
-  };
 }
 
 function createInMemoryOfficialAssets(): OfficialAssetsRepository {
