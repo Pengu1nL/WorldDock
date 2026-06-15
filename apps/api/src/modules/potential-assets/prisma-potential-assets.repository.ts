@@ -10,6 +10,8 @@ import {
   type PotentialAssetsRepository,
 } from "./potential-assets.repository";
 
+const ACTIVE_DEDUPE_INDEX_NAME = "potential_assets_active_session_type_title_key";
+
 @Injectable()
 export class PrismaPotentialAssetsRepository implements PotentialAssetsRepository, OnModuleDestroy {
   private readonly prisma: PrismaClient = createPrismaClient();
@@ -33,7 +35,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
           },
         }));
       } catch (error) {
-        if (isUniqueConstraintError(error)) continue;
+        if (isActiveDedupeUniqueConstraintError(error)) continue;
         throw error;
       }
     }
@@ -132,6 +134,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return isRecord(error) && error.code === "P2002";
+function isActiveDedupeUniqueConstraintError(error: unknown) {
+  if (!isRecord(error) || error.code !== "P2002") return false;
+
+  const meta = isRecord(error.meta) ? error.meta : {};
+  const target = meta.target;
+  if (typeof target === "string" && target.includes(ACTIVE_DEDUPE_INDEX_NAME)) return true;
+  if (Array.isArray(target) && target.some((item) => typeof item === "string" && item.includes(ACTIVE_DEDUPE_INDEX_NAME))) {
+    return true;
+  }
+
+  return typeof error.message === "string" && error.message.includes(ACTIVE_DEDUPE_INDEX_NAME);
 }
