@@ -11,6 +11,9 @@ type SecretPattern = {
   reason: SecretScanFinding["reason"];
 };
 
+type PackageAsset = ReleaseSnapshot["package"]["assets"][number];
+type SnapshotAsset = ReleaseSnapshot["assets"][number];
+
 const SECRET_PATTERNS: SecretPattern[] = [
   { needle: "OPENAI_API_KEY=", reason: "api_key" },
   { needle: "PI_PROVIDER_API_KEY=", reason: "api_key" },
@@ -43,7 +46,16 @@ export function scanReleaseSnapshotForSecrets(snapshot: ReleaseSnapshot): Secret
   return findings;
 }
 
-function scanAssetFields(findings: SecretScanFinding[], path: string, asset: { title: string; summary: string; body?: string; payload: unknown }) {
+function scanAssetFields(findings: SecretScanFinding[], path: string, asset: PackageAsset | SnapshotAsset) {
+  if ("name" in asset) {
+    scanText(findings, `${path}.name`, asset.name);
+    scanText(findings, `${path}.summary`, asset.summary);
+    scanText(findings, `${path}.markdown`, asset.markdown);
+    scanUnknown(findings, `${path}.tags`, asset.tags);
+    scanUnknown(findings, `${path}.metadata`, asset.metadata);
+    return;
+  }
+
   scanText(findings, `${path}.title`, asset.title);
   scanText(findings, `${path}.summary`, asset.summary);
   if (asset.body) scanText(findings, `${path}.body`, asset.body);

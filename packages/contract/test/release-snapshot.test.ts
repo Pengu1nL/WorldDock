@@ -32,6 +32,50 @@ describe("release snapshot contract", () => {
     expect(parsed.package.format).toBe("worlddock.world-package.v1");
   });
 
+  it("accepts a v2 published snapshot with official markdown assets", () => {
+    const parsed = releaseSnapshotSchema.parse({
+      contractVersion: "1.0.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-market",
+        name: "Memory Market",
+      },
+      package: {
+        format: "worlddock.world-package.v2",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "Memory Market",
+          type: "city",
+          summary: "A city built around traded memories.",
+          tags: ["urban"],
+          maturity: 32,
+        },
+        assets: [
+          {
+            type: "rule",
+            name: "Memory Trading Permit",
+            summary: "All memory trades require registration.",
+            markdown: "# Memory Trading Permit\n\nAll memory trades require registration.",
+            tags: ["law"],
+            metadata: { source: "test" },
+            status: "active",
+            version: 1,
+          },
+        ],
+        releases: [],
+      },
+      createdAt: "2026-06-12T00:00:00.000Z",
+      assets: [],
+    });
+
+    expect(parsed.package.format).toBe("worlddock.world-package.v2");
+    expect(parsed.package.assets[0]).toMatchObject({
+      type: "rule",
+      name: "Memory Trading Permit",
+      markdown: expect.stringContaining("All memory trades require registration"),
+    });
+  });
+
   it("does not expose hub contracts from the root entry", () => {
     expect("hubPersonalAccessTokenScopeSchema" in contract).toBe(false);
   });

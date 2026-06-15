@@ -1,12 +1,15 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import {
   releaseSnapshotAssetSchema,
   releaseSnapshotSchema,
   worldPackageSchema,
+  type LegacyWorldPackageAsset,
+  type OfficialWorldPackageAsset,
   type ReleaseSnapshot,
   type ReleaseSnapshotAsset,
   type WorldPackage,
 } from "@worlddock/domain";
+import { OfficialAssetsService } from "../official-assets/official-assets.service";
 import { WORLD_REPOSITORY, type WorldRecord, type WorldRepository } from "../worlds/world.repository";
 
 type ExportRecord = {
@@ -17,9 +20,8 @@ type ExportRecord = {
   createdAt: Date;
 };
 
-type WorldPackageAsset = WorldPackage["assets"][number];
 type ImportableAsset = {
-  kind: WorldPackageAsset["kind"];
+  kind: LegacyWorldPackageAsset["kind"];
   title: string;
   summary: string;
   body?: string;
@@ -41,6 +43,7 @@ const exportsStore = new Map<string, ExportRecord>();
 export class ExportsService {
   constructor(
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    @Optional() @Inject(OfficialAssetsService) private readonly officialAssets?: OfficialAssetsService,
   ) {}
 
   async exportWorld(worldId: string) {
@@ -65,7 +68,11 @@ export class ExportsService {
       mode: "local",
       maturity: worldPackage.world.maturity,
     });
-    await Promise.all(worldPackage.assets.map((asset, index) => this.createImportedAsset(world.id, asset, { position: index })));
+    if (worldPackage.format === "worlddock.world-package.v2") {
+      await Promise.all(worldPackage.assets.map((asset) => this.createImportedOfficialAsset(world.id, asset)));
+    } else {
+      await Promise.all(worldPackage.assets.map((asset, index) => this.createImportedAsset(world.id, asset, { position: index })));
+    }
     return { world: await this.toWorldResponse(world) };
   }
 
@@ -80,6 +87,34 @@ export class ExportsService {
       mode: "local",
       maturity: snapshot.package.world.maturity,
     });
+    if (snapshot.package.format === "worlddock.world-package.v2") {
+      try {
+        for (const asset of snapshot.package.assets) {
+          await this.createImportedOfficialAsset(world.id, asset);
+        }
+      } catch (error) {
+        try {
+          await this.worlds.deleteWorld(world.id);
+        } catch {
+          // Preserve the original import failure for callers.
+        }
+        throw error;
+      }
+
+      return {
+        world: await this.toWorldResponse(world),
+        remap: {
+          assets: [],
+          counts: {
+            assets: snapshot.package.assets.length,
+            archive: 0,
+            seeds: 0,
+            conflicts: 0,
+          },
+        },
+      };
+    }
+
     const assetIdMap = new Map<string, string>();
     for (const asset of snapshot.assets) {
       assetIdMap.set(asset.id, createLocalAssetId(asset.kind));
@@ -133,6 +168,25 @@ export class ExportsService {
   }
 
   private async buildWorldPackagePayload(world: WorldRecord): Promise<WorldPackageBuild> {
+    const officialAssets = await this.buildOfficialPackageAssets(world.id);
+    if (officialAssets.length > 0) {
+      const worldPackage = worldPackageSchema.parse({
+        format: "worlddock.world-package.v2",
+        exportedAt: new Date().toISOString(),
+        world: {
+          name: world.name,
+          type: world.type,
+          summary: world.summary,
+          tags: world.tags,
+          maturity: world.maturity,
+        },
+        assets: officialAssets,
+        releases: [],
+      });
+
+      return { worldPackage, snapshotAssets: [] };
+    }
+
     const [archiveEntries, storySeeds, conflicts] = await Promise.all([
       this.worlds.listArchiveEntries(world.id),
       this.worlds.listStorySeeds(world.id),
@@ -173,7 +227,7 @@ export class ExportsService {
           payload: { related: conflict.related ?? [], derivedSeeds: conflict.derivedSeeds ?? [] },
         },
       })),
-    ] satisfies Array<{ id: string; asset: WorldPackageAsset }>;
+    ] satisfies Array<{ id: string; asset: LegacyWorldPackageAsset }>;
 
     const worldPackage = worldPackageSchema.parse({
       format: "worlddock.world-package.v1",
@@ -229,6 +283,51 @@ export class ExportsService {
       derivedSeeds: remapAssetIds(stringArrayPayload(asset.payload.derivedSeeds), options.assetIdMap),
       position: options.position,
     });
+  }
+
+  private async createImportedOfficialAsset(worldId: string, asset: OfficialWorldPackageAsset) {
+    return this.requireOfficialAssets().createAsset(worldId, {
+      type: asset.type,
+      name: asset.name,
+      summary: asset.summary,
+      markdown: asset.markdown,
+      tags: asset.tags,
+      metadata: asset.metadata,
+    });
+  }
+
+  private async buildOfficialPackageAssets(worldId: string): Promise<OfficialWorldPackageAsset[]> {
+    if (!this.officialAssets) return [];
+
+    const records: Array<Awaited<ReturnType<OfficialAssetsService["listAssets"]>>["assets"][number]> = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.officialAssets.listAssets(worldId, { cursor, limit: 50 });
+      records.push(...page.assets);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+
+    const details = await Promise.all(records.map((asset) => this.officialAssets!.getAsset(worldId, asset.id)));
+    return details.map(({ asset, markdown }) => ({
+      type: asset.type,
+      name: asset.name,
+      summary: asset.summary,
+      markdown,
+      tags: asset.tags,
+      metadata: asset.metadata,
+      status: asset.status,
+      version: asset.version,
+    }));
+  }
+
+  private requireOfficialAssets() {
+    if (!this.officialAssets) {
+      throw new BadRequestException({
+        code: "OFFICIAL_ASSETS_UNAVAILABLE",
+        message: "Official assets are not configured for this export operation.",
+      });
+    }
+    return this.officialAssets;
   }
 
   private createExportRecord(kind: ExportRecord["kind"], payload: unknown) {
