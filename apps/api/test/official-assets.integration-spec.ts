@@ -13,6 +13,7 @@ import {
   type OfficialAssetRevisionRecord,
   type OfficialAssetsRepository,
   type OfficialAssetSectionIndexRecord,
+  type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
@@ -114,6 +115,76 @@ describe("official assets local endpoints", () => {
     expect(detail.body.asset.summary).toBe("Markdown 里的真实摘要。");
     expect(detail.body.revisions[0].summary).toBe("Markdown 里的真实摘要。");
   });
+
+  it("updates asset metadata without replacing markdown", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 12,
+    });
+    app = await createOfficialAssetsApp(worlds);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets`)
+      .send({
+        type: "rule",
+        name: "记忆交易许可",
+        summary: "所有记忆交易都需要登记。",
+        markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+        tags: ["法律"],
+      })
+      .expect(201);
+
+    const updated = await request(app.getHttpServer())
+      .patch(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .send({ name: "记忆交易登记许可", tags: ["法律", "登记"] })
+      .expect(200);
+
+    expect(updated.body.asset).toMatchObject({
+      name: "记忆交易登记许可",
+      tags: ["法律", "登记"],
+      version: 1,
+    });
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .expect(200);
+
+    expect(detail.body.markdown).toContain("记忆交易许可");
+  });
+
+  it("rejects markdown in metadata updates", async () => {
+    const worlds = createInMemoryWorlds();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 12,
+    });
+    app = await createOfficialAssetsApp(worlds);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets`)
+      .send({
+        type: "rule",
+        name: "记忆交易许可",
+        summary: "所有记忆交易都需要登记。",
+        markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+        tags: ["法律"],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/v1/worlds/${world.id}/official-assets/${created.body.asset.id}`)
+      .send({ markdown: "# 新正文" })
+      .expect(400);
+  });
 });
 
 async function createOfficialAssetsApp(worlds: InMemoryWorlds) {
@@ -179,6 +250,35 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
       revisions.set(asset.id, [revision]);
       indexes.set(asset.id, sectionIndexes);
       return { asset, revisions: [revision], indexes: sectionIndexes };
+    },
+    async updateAsset(
+      worldId: string,
+      assetId: string,
+      input: UpdateOfficialAssetRecordInput,
+    ): Promise<OfficialAssetDetailRecord | null> {
+      const asset = assets.get(assetId);
+      if (!asset || asset.worldId !== worldId) return null;
+      const timestamp = new Date();
+      const updated: OfficialAssetRecord = {
+        ...asset,
+        name: input.name ?? asset.name,
+        summary: input.summary ?? asset.summary,
+        tags: input.tags ?? asset.tags,
+        metadata: input.metadata ?? asset.metadata,
+        status: input.status ?? asset.status,
+        archivedAt: input.status === undefined
+          ? asset.archivedAt
+          : input.status === "archived"
+            ? timestamp
+            : null,
+        updatedAt: timestamp,
+      };
+      assets.set(asset.id, updated);
+      return {
+        asset: updated,
+        revisions: revisions.get(asset.id) ?? [],
+        indexes: indexes.get(asset.id) ?? [],
+      };
     },
     async listAssets(worldId: string, query: ListOfficialAssetsQuery = {}) {
       const filtered = [...assets.values()]

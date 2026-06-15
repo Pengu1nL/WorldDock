@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Inject, Param, Post, Query } from "@nestjs/common";
-import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import { Body, Controller, Get, Inject, Param, Patch, Post, Query } from "@nestjs/common";
+import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
 import { z } from "zod";
 import type {
   OfficialAssetDetailRecord,
@@ -25,6 +25,14 @@ const listOfficialAssetsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).optional(),
 });
 
+const updateOfficialAssetSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  summary: z.string().trim().min(1).optional(),
+  tags: z.array(z.string().trim().min(1)).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  status: officialWorldAssetStatusSchema.optional(),
+}).strict();
+
 @Controller("worlds/:worldId/official-assets")
 export class OfficialAssetsController {
   constructor(@Inject(OfficialAssetsService) private readonly officialAssets: OfficialAssetsService) {}
@@ -49,6 +57,19 @@ export class OfficialAssetsController {
   @Get(":assetId")
   async detail(@Param("worldId") worldId: string, @Param("assetId") assetId: string) {
     return serializeOfficialAssetDetail(await this.officialAssets.getAsset(worldId, assetId));
+  }
+
+  @Patch(":assetId")
+  async update(
+    @Param("worldId") worldId: string,
+    @Param("assetId") assetId: string,
+    @Body() body: unknown,
+  ) {
+    return serializeOfficialAssetDetail(await this.officialAssets.updateAsset(
+      worldId,
+      assetId,
+      updateOfficialAssetSchema.parse(body),
+    ));
   }
 }
 

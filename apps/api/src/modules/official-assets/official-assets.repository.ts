@@ -71,6 +71,14 @@ export type CreateOfficialAssetRecordInput = {
   }>;
 };
 
+export type UpdateOfficialAssetRecordInput = {
+  name?: string;
+  summary?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  status?: OfficialWorldAssetStatus;
+};
+
 export type ListOfficialAssetsQuery = {
   type?: OfficialWorldAssetType;
   q?: string;
@@ -80,6 +88,11 @@ export type ListOfficialAssetsQuery = {
 
 export type OfficialAssetsRepository = {
   createAsset(input: CreateOfficialAssetRecordInput): Promise<OfficialAssetDetailRecord>;
+  updateAsset(
+    worldId: string,
+    assetId: string,
+    input: UpdateOfficialAssetRecordInput,
+  ): Promise<OfficialAssetDetailRecord | null>;
   listAssets(
     worldId: string,
     query?: ListOfficialAssetsQuery,

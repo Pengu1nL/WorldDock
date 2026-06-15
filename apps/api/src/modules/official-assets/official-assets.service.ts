@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { OfficialWorldAssetType } from "@worlddock/contract/assets";
+import type { OfficialWorldAssetStatus, OfficialWorldAssetType } from "@worlddock/contract/assets";
 import { LocalStorageService } from "../local-storage/local-storage.service";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { buildInitialAssetMarkdown, extractAssetSummary, indexMarkdownSections } from "./asset-markdown";
@@ -19,6 +19,14 @@ export type CreateOfficialAssetInput = {
   markdown?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+};
+
+export type UpdateOfficialAssetInput = {
+  name?: string;
+  summary?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  status?: OfficialWorldAssetStatus;
 };
 
 @Injectable()
@@ -40,14 +48,7 @@ export class OfficialAssetsService {
     });
     const documentKey = `worlds/${worldId}/official-assets/${assetId}.md`;
     const summary = extractAssetSummary(markdown) || input.summary;
-    const indexes = indexMarkdownSections(markdown).map((section, order) => ({
-      title: section.heading,
-      summary: section.summary,
-      metadata: {
-        level: section.level,
-        order,
-      },
-    }));
+    const indexes = this.buildSectionIndexInputs(markdown);
 
     await this.localStorage.saveObject({
       key: documentKey,
@@ -81,6 +82,21 @@ export class OfficialAssetsService {
     return { ...created, markdown };
   }
 
+  async updateAsset(
+    worldId: string,
+    assetId: string,
+    input: UpdateOfficialAssetInput,
+  ): Promise<OfficialAssetDetailRecord & { markdown: string }> {
+    await this.requireWorld(worldId);
+    const detail = await this.officialAssets.updateAsset(worldId, assetId, input);
+    if (!detail) throw this.notFound();
+
+    return {
+      ...detail,
+      markdown: await this.readMarkdown(detail.asset.documentKey),
+    };
+  }
+
   async listAssets(worldId: string, query?: ListOfficialAssetsQuery) {
     await this.requireWorld(worldId);
     try {
@@ -96,11 +112,26 @@ export class OfficialAssetsService {
     const detail = await this.officialAssets.getAsset(worldId, assetId);
     if (!detail) throw this.notFound();
 
-    const stored = await this.localStorage.readObject(detail.asset.documentKey);
     return {
       ...detail,
-      markdown: new TextDecoder().decode(stored.body),
+      markdown: await this.readMarkdown(detail.asset.documentKey),
     };
+  }
+
+  private buildSectionIndexInputs(markdown: string) {
+    return indexMarkdownSections(markdown).map((section, order) => ({
+      title: section.heading,
+      summary: section.summary,
+      metadata: {
+        level: section.level,
+        order,
+      },
+    }));
+  }
+
+  private async readMarkdown(documentKey: string) {
+    const stored = await this.localStorage.readObject(documentKey);
+    return new TextDecoder().decode(stored.body);
   }
 
   private async requireWorld(worldId: string) {

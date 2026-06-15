@@ -62,6 +62,41 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
     });
   }
 
+  async updateAsset(
+    worldId: string,
+    assetId: string,
+    input: Parameters<OfficialAssetsRepository["updateAsset"]>[2],
+  ): Promise<OfficialAssetDetailRecord | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.officialWorldAsset.updateMany({
+        where: { worldId, id: assetId },
+        data: {
+          name: input.name,
+          summary: input.summary,
+          tags: input.tags,
+          metadata: input.metadata === undefined ? undefined : input.metadata as never,
+          status: input.status,
+          archivedAt: input.status === undefined ? undefined : input.status === "archived" ? new Date() : null,
+        },
+      });
+      if (updated.count === 0) return null;
+
+      const asset = await tx.officialWorldAsset.findFirst({
+        where: { worldId, id: assetId },
+        include: {
+          revisions: { orderBy: [{ version: "desc" }, { createdAt: "desc" }] },
+          indexes: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+        },
+      });
+      if (!asset) return null;
+      return {
+        asset: mapOfficialAsset(asset),
+        revisions: asset.revisions.map(mapOfficialAssetRevision),
+        indexes: asset.indexes.map(mapOfficialAssetIndex),
+      };
+    });
+  }
+
   async listAssets(worldId: string, query: Parameters<OfficialAssetsRepository["listAssets"]>[1] = {}) {
     const where: Record<string, unknown> = { worldId };
     if (query.type) where.type = query.type;
