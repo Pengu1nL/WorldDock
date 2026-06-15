@@ -311,6 +311,44 @@ describe("potential assets local endpoints", () => {
       .expect(404);
   });
 
+  it("returns 404 for missing worlds and runs in list endpoints", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const potentialAssets = createInMemoryPotentialAssets();
+    const provider = createSequenceAgentProvider([
+      [
+        { type: "delta", text: "### 镜港\n镜港是一座会记录梦境的城市。" },
+      ],
+    ]);
+    const world = await createWorld(worlds);
+    const otherWorld = await createWorld(worlds);
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "镜港推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    const testApp = await createPotentialAssetApp(worlds, agents, sessions, potentialAssets, provider);
+    app = testApp;
+
+    const run = await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+
+    await request(testApp.getHttpServer())
+      .get("/v1/worlds/world_missing/potential-assets")
+      .expect(404);
+
+    await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-runs/run_missing/potential-assets`)
+      .expect(404);
+
+    await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${otherWorld.id}/agent-runs/${run.runId}/potential-assets`)
+      .expect(404);
+  });
+
   it("deduplicates active potential assets within the same session", async () => {
     const created = await createAndStreamSessionRunWithText([
       "### 记忆交易许可\n这是一条世界规则，所有记忆交易都需要登记。",

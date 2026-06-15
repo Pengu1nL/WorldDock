@@ -4,6 +4,7 @@ import {
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
 import { AGENT_REPOSITORY, type AgentRepository } from "../agent/agent.repository";
+import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { PotentialAssetsAnalyzer } from "./potential-assets.analyzer";
 import {
   InvalidPotentialAssetListCursorError,
@@ -26,6 +27,7 @@ export class PotentialAssetsService {
     @Inject(POTENTIAL_ASSETS_REPOSITORY) private readonly potentialAssets: PotentialAssetsRepository,
     @Inject(AGENT_REPOSITORY) private readonly agents: AgentRepository,
     @Inject(AGENT_SESSIONS_REPOSITORY) private readonly sessions: AgentSessionsRepository,
+    @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     private readonly analyzer: PotentialAssetsAnalyzer,
   ) {}
 
@@ -86,10 +88,13 @@ export class PotentialAssetsService {
   }
 
   async listForRun(worldId: string, runId: string) {
+    const run = await this.agents.findRunById(runId);
+    if (!run || run.worldId !== worldId) throw this.notFound();
     return { potentialAssets: await this.potentialAssets.listForRun(worldId, runId), nextCursor: null };
   }
 
   async listForWorld(worldId: string, query?: ListPotentialAssetsForWorldQuery) {
+    await this.requireWorld(worldId);
     const normalizedQuery = { ...query, status: query?.status ?? "active" };
     if (normalizedQuery.cursor) {
       try {
@@ -120,6 +125,12 @@ export class PotentialAssetsService {
       code: "BAD_REQUEST",
       message: "Invalid potential asset cursor.",
     });
+  }
+
+  private async requireWorld(worldId: string) {
+    const world = await this.worlds.findWorldById(worldId);
+    if (!world) throw this.notFound();
+    return world;
   }
 }
 
