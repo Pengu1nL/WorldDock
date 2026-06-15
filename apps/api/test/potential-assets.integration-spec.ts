@@ -175,6 +175,142 @@ describe("potential assets local endpoints", () => {
     expect(worldDismissedBody.potentialAssets.every((asset) => asset.status === "dismissed")).toBe(true);
   });
 
+  it.each([
+    ["invalid status", { status: "deleted" }],
+    ["invalid type", { type: "artifact" }],
+    ["invalid cursor", { cursor: "not-a-valid-cursor" }],
+    ["zero limit", { limit: "0" }],
+    ["non-numeric limit", { limit: "abc" }],
+  ])("rejects %s in world potential asset query", async (_label, query) => {
+    const created = await createAndStreamSessionRunWithText([
+      "### 记忆交易许可\n这是一条世界规则，所有记忆交易都需要登记。",
+    ]);
+    app = created.app;
+
+    await request(app.getHttpServer())
+      .get(`/v1/worlds/${created.world.id}/potential-assets`)
+      .query(query)
+      .expect(400);
+  });
+
+  it("paginates world potential assets without repeating records", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const potentialAssets = createInMemoryPotentialAssets();
+    const provider = createSequenceAgentProvider([
+      [
+        { type: "delta", text: "### 镜港\n镜港是一座会记录梦境的城市。" },
+      ],
+      [
+        { type: "delta", text: "### 梦税局\n梦税局负责征收梦境交易税。" },
+      ],
+      [
+        { type: "delta", text: "### 旧梦节\n旧梦节是每年交换回忆的事件。" },
+      ],
+    ]);
+    const world = await createWorld(worlds);
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "镜港推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    const testApp = await createPotentialAssetApp(worlds, agents, sessions, potentialAssets, provider);
+    app = testApp;
+
+    await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+    await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+    await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+
+    const firstPageListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/potential-assets`)
+      .query({ limit: 1 })
+      .expect(200);
+    const firstPage = potentialAssetListResponseSchema.parse(firstPageListed.body);
+
+    expect(firstPage.potentialAssets).toHaveLength(1);
+    expect(firstPage.nextCursor).toEqual(expect.any(String));
+
+    const secondPageListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/potential-assets`)
+      .query({ limit: 1, cursor: firstPage.nextCursor })
+      .expect(200);
+    const secondPage = potentialAssetListResponseSchema.parse(secondPageListed.body);
+
+    expect(secondPage.potentialAssets).toHaveLength(1);
+    expect(secondPage.potentialAssets[0].id).not.toBe(firstPage.potentialAssets[0].id);
+  });
+
+  it("handles dismiss idempotency, cross-world isolation, and missing assets", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const potentialAssets = createInMemoryPotentialAssets();
+    const provider = createSequenceAgentProvider([
+      [
+        { type: "delta", text: "### 镜港\n镜港是一座会记录梦境的城市。" },
+      ],
+    ]);
+    const world = await createWorld(worlds);
+    const otherWorld = await createWorld(worlds);
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "镜港推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    const testApp = await createPotentialAssetApp(worlds, agents, sessions, potentialAssets, provider);
+    app = testApp;
+
+    await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+    const listed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-sessions/${session.id}/potential-assets`)
+      .expect(200);
+    const assetId = potentialAssetListResponseSchema.parse(listed.body).potentialAssets[0].id;
+
+    const firstDismissed = await request(testApp.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${assetId}/dismiss`)
+      .expect(200);
+    expect(potentialAssetDetailResponseSchema.parse(firstDismissed.body).potentialAsset.status).toBe("dismissed");
+
+    const secondDismissed = await request(testApp.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${assetId}/dismiss`)
+      .expect(200);
+    expect(potentialAssetDetailResponseSchema.parse(secondDismissed.body).potentialAsset.status).toBe("dismissed");
+
+    const activeAsset = (await potentialAssets.createMany([{
+      worldId: world.id,
+      sessionId: session.id,
+      runId: null,
+      type: "rule",
+      title: "梦境登记",
+      summary: "新的梦境交易必须登记。",
+      evidence: [{ quote: "新的梦境交易必须登记。", confidence: 0.9 }],
+    }]))[0];
+
+    await request(testApp.getHttpServer())
+      .post(`/v1/worlds/${otherWorld.id}/potential-assets/${activeAsset.id}/dismiss`)
+      .expect(404);
+
+    const afterCrossWorldAttempt = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-sessions/${session.id}/potential-assets`)
+      .expect(200);
+    const activeAfterCrossWorldAttempt = potentialAssetListResponseSchema
+      .parse(afterCrossWorldAttempt.body)
+      .potentialAssets.find((asset) => asset.id === activeAsset.id);
+
+    expect(activeAfterCrossWorldAttempt?.status).toBe("active");
+
+    await request(testApp.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/potential_asset_missing/dismiss`)
+      .expect(404);
+  });
+
   it("deduplicates active potential assets within the same session", async () => {
     const created = await createAndStreamSessionRunWithText([
       "### 记忆交易许可\n这是一条世界规则，所有记忆交易都需要登记。",
