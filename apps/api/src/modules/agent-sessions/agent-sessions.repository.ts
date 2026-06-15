@@ -52,6 +52,7 @@ export type AgentSessionContextItemRecord = {
 
 export type CreateAgentSessionContextItemInput = Pick<AgentSessionContextItemRecord, "sessionId" | "kind" | "targetId"> &
   Partial<Pick<AgentSessionContextItemRecord, "title" | "summary" | "metadata">>;
+export type CreateAgentSessionContextItemForSessionInput = Omit<CreateAgentSessionContextItemInput, "sessionId">;
 
 export type AgentSessionMessageRecord = {
   id: string;
@@ -125,6 +126,7 @@ export type CreateSessionWithSubjectInput = {
     Partial<Pick<AgentSessionRecord, "status" | "current" | "metadata">>;
   subject: Pick<AgentSessionSubjectRecord, "kind" | "targetId"> &
     Partial<Pick<AgentSessionSubjectRecord, "role" | "title" | "metadata">>;
+  contextItems?: CreateAgentSessionContextItemForSessionInput[];
   clearCurrentWorldExploration?: boolean;
 };
 

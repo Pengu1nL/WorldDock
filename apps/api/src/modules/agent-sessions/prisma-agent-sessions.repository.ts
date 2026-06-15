@@ -85,6 +85,18 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
           metadata: (input.subject.metadata ?? {}) as never,
         },
       });
+      for (const item of input.contextItems ?? []) {
+        await tx.agentSessionContextItem.create({
+          data: {
+            sessionId: created.id,
+            kind: item.kind,
+            targetId: item.targetId,
+            title: item.title ?? null,
+            summary: item.summary ?? null,
+            metadata: (item.metadata ?? {}) as never,
+          },
+        });
+      }
       return mapSession(created);
     });
   }

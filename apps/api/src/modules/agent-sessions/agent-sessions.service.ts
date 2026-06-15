@@ -2,36 +2,33 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import {
   AGENT_SESSIONS_REPOSITORY,
   InvalidAgentSessionListCursorError,
-  type CreateAgentSessionContextItemInput,
+  type CreateAgentSessionContextItemForSessionInput,
   type AgentSessionRecord,
   type AgentSessionsRepository,
   decodeAgentSessionListCursor,
 } from "./agent-sessions.repository";
 
+type BaseCreateAgentSessionInput = {
+  title?: string;
+  current?: boolean;
+  metadata?: Record<string, unknown>;
+  contextItems?: CreateAgentSessionContextItemForSessionInput[];
+};
+
 type CreateAgentSessionInput =
-  | {
+  | (BaseCreateAgentSessionInput & {
     kind: "world_exploration";
-    title?: string;
-    current?: boolean;
-    metadata?: Record<string, unknown>;
-  }
-  | {
+  })
+  | (BaseCreateAgentSessionInput & {
     kind: "asset_edit";
-    title?: string;
     subjectAssetId: string;
-    current?: boolean;
-    metadata?: Record<string, unknown>;
-  }
-  | {
+  })
+  | (BaseCreateAgentSessionInput & {
     kind: "consistency_repair";
-    title?: string;
     issueId: string;
-    current?: boolean;
-    metadata?: Record<string, unknown>;
-  };
+  });
 
 type ListAgentSessionsInput = Parameters<AgentSessionsRepository["listSessions"]>[1];
-type CreateSessionContextItemInput = Omit<CreateAgentSessionContextItemInput, "sessionId">;
 
 @Injectable()
 export class AgentSessionsService {
@@ -50,6 +47,7 @@ export class AgentSessionsService {
         metadata: input.metadata ?? {},
       },
       subject: primarySubjectFor(worldId, input),
+      ...(input.contextItems ? { contextItems: input.contextItems } : {}),
       clearCurrentWorldExploration: current,
     });
   }
@@ -82,10 +80,6 @@ export class AgentSessionsService {
     ]);
 
     return { session, subjects, contextItems, messages };
-  }
-
-  async createContextItem(sessionId: string, input: CreateSessionContextItemInput) {
-    return this.sessions.createContextItem({ sessionId, ...input });
   }
 
   async archiveSession(worldId: string, sessionId: string) {

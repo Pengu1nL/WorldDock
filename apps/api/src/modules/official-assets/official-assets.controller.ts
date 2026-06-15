@@ -82,23 +82,24 @@ export class OfficialAssetsController {
     @Body() body: unknown,
   ) {
     const assetDetail = await this.officialAssets.getAsset(worldId, assetId);
-    const input = createOfficialAssetEditSessionSchema.parse(body);
+    const input = createOfficialAssetEditSessionSchema.parse(body ?? {});
     const session = await this.agentSessions.createSession(worldId, {
       kind: "asset_edit",
-      subjectAssetId: assetId,
+      subjectAssetId: assetDetail.asset.id,
       title: input.title,
-    });
-
-    await this.agentSessions.createContextItem(session.id, {
-      kind: "asset_document",
-      targetId: assetDetail.asset.id,
-      title: assetDetail.asset.name,
-      summary: assetDetail.asset.summary,
-      metadata: {
-        documentKey: assetDetail.asset.documentKey,
-        version: assetDetail.asset.version,
-        source: "initial",
-      },
+      contextItems: [
+        {
+          kind: "asset_document",
+          targetId: assetDetail.asset.id,
+          title: assetDetail.asset.name,
+          summary: assetDetail.asset.summary,
+          metadata: {
+            documentKey: assetDetail.asset.documentKey,
+            version: assetDetail.asset.version,
+            source: "initial",
+          },
+        },
+      ],
     });
 
     return serializeAgentSessionDetail(await this.agentSessions.getSessionDetail(worldId, session.id));

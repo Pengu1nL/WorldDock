@@ -697,18 +697,22 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
       return session;
     },
     async createSessionWithSubject(input) {
+      const timestamp = now();
+      const currentSessionUpdates: Array<[string, AgentSessionRecord]> = [];
       if (input.clearCurrentWorldExploration) {
         for (const [id, session] of stores.sessions) {
           if (session.worldId !== input.session.worldId || session.kind !== "world_exploration" || !session.current) {
             continue;
           }
-          stores.sessions.set(id, { ...session, current: false, updatedAt: now() });
+          currentSessionUpdates.push([id, { ...session, current: false, updatedAt: timestamp }]);
         }
       }
 
-      const timestamp = now();
+      let nextSessionCounter = counters.session;
+      let nextSubjectCounter = counters.subject;
+      let nextContextItemCounter = counters.contextItem;
       const session: AgentSessionRecord = {
-        id: `agent_session_${counters.session++}`,
+        id: `agent_session_${nextSessionCounter++}`,
         worldId: input.session.worldId,
         kind: input.session.kind,
         title: input.session.title,
@@ -719,7 +723,7 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
         updatedAt: timestamp,
       };
       const subject: AgentSessionSubjectRecord = {
-        id: `agent_session_subject_${counters.subject++}`,
+        id: `agent_session_subject_${nextSubjectCounter++}`,
         sessionId: session.id,
         kind: input.subject.kind,
         targetId: input.subject.targetId,
@@ -729,8 +733,27 @@ export function createInMemoryAgentSessions(): InMemoryAgentSessions {
         createdAt: timestamp,
         updatedAt: timestamp,
       };
+      const contextItems: AgentSessionContextItemRecord[] = (input.contextItems ?? []).map((item) => ({
+        id: `agent_session_context_${nextContextItemCounter++}`,
+        sessionId: session.id,
+        kind: item.kind,
+        targetId: item.targetId,
+        title: item.title ?? null,
+        summary: item.summary ?? null,
+        metadata: item.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }));
+
+      counters.session = nextSessionCounter;
+      counters.subject = nextSubjectCounter;
+      counters.contextItem = nextContextItemCounter;
+      for (const [id, updated] of currentSessionUpdates) {
+        stores.sessions.set(id, updated);
+      }
       stores.sessions.set(session.id, session);
       stores.subjects.push(subject);
+      stores.contextItems.push(...contextItems);
       return session;
     },
     async findSessionById(id) {
