@@ -1,22 +1,13 @@
-export type PiSkillDescriptor = {
-  name: string;
-  path: string;
-  description: string;
-};
+import { loadSessionPiSkills, type PiSkillDescriptor } from "./session-skill-loader";
 
-export function loadWorldDockPiSkills(env: { PI_SKILLS_DIR?: string }): PiSkillDescriptor[] {
-  const basePath = env.PI_SKILLS_DIR ?? "apps/api/src/modules/agent/pi/skills";
+export type { PiSkillDescriptor } from "./session-skill-loader";
+
+export function loadWorldDockPiSkills(env: { PI_SKILLS_DIR?: string } = {}): PiSkillDescriptor[] {
   return [
-    {
-      name: "world-context",
-      path: `${basePath}/world-context`,
-      description: "Use WorldDock progressive disclosure: Manifest, Cards, Briefs, Details, then Source Fragments.",
-    },
-    {
-      name: "world-suggestion",
-      path: `${basePath}/world-suggestion`,
-      description: "Create typed pending suggestions instead of writing product data directly.",
-    },
+    loadSessionPiSkills({
+      kind: "world_exploration",
+      skillsDir: env.PI_SKILLS_DIR,
+    }),
   ];
 }
 
