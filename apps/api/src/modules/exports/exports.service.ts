@@ -5,6 +5,7 @@ import {
   worldPackageSchema,
   type LegacyWorldPackageAsset,
   type OfficialWorldPackageAsset,
+  type LegacyReleaseSnapshotAsset,
   type ReleaseSnapshot,
   type ReleaseSnapshotAsset,
   type WorldPackage,
@@ -30,6 +31,10 @@ type ImportableAsset = {
 type WorldPackageBuild = {
   worldPackage: WorldPackage;
   snapshotAssets: ReleaseSnapshotAsset[];
+};
+type OfficialPackageAssetBuild = {
+  id: string;
+  asset: OfficialWorldPackageAsset;
 };
 type ImportAssetOptions = {
   id?: string;
@@ -88,9 +93,12 @@ export class ExportsService {
       maturity: snapshot.package.world.maturity,
     });
     if (snapshot.package.format === "worlddock.world-package.v2") {
+      const assetIdMap = new Map<string, string>();
       try {
-        for (const asset of snapshot.package.assets) {
-          await this.createImportedOfficialAsset(world.id, asset);
+        for (const [index, asset] of snapshot.package.assets.entries()) {
+          const created = await this.createImportedOfficialAsset(world.id, asset);
+          const upstreamId = snapshot.assets[index]?.id;
+          if (upstreamId) assetIdMap.set(upstreamId, created.asset.id);
         }
       } catch (error) {
         try {
@@ -104,7 +112,7 @@ export class ExportsService {
       return {
         world: await this.toWorldResponse(world),
         remap: {
-          assets: [],
+          assets: [...assetIdMap.entries()].map(([upstreamId, localId]) => ({ upstreamId, localId })),
           counts: {
             assets: snapshot.package.assets.length,
             archive: 0,
@@ -115,13 +123,14 @@ export class ExportsService {
       };
     }
 
+    const legacySnapshotAssets = requireLegacySnapshotAssets(snapshot.assets);
     const assetIdMap = new Map<string, string>();
-    for (const asset of snapshot.assets) {
+    for (const asset of legacySnapshotAssets) {
       assetIdMap.set(asset.id, createLocalAssetId(asset.kind));
     }
 
     try {
-      for (const [index, asset] of snapshot.assets.entries()) {
+      for (const [index, asset] of legacySnapshotAssets.entries()) {
         await this.createImportedAsset(world.id, asset, {
           id: assetIdMap.get(asset.id),
           assetIdMap,
@@ -141,7 +150,7 @@ export class ExportsService {
       world: await this.toWorldResponse(world),
       remap: {
         assets: [...assetIdMap.entries()].map(([upstreamId, localId]) => ({ upstreamId, localId })),
-        counts: countImportedAssets(snapshot.assets),
+        counts: countImportedAssets(legacySnapshotAssets),
       },
     };
   }
@@ -180,11 +189,12 @@ export class ExportsService {
           tags: world.tags,
           maturity: world.maturity,
         },
-        assets: officialAssets,
+        assets: officialAssets.map(({ asset }) => asset),
         releases: [],
       });
+      const snapshotAssets = officialAssets.map(({ id, asset }) => releaseSnapshotAssetSchema.parse({ id, ...asset }));
 
-      return { worldPackage, snapshotAssets: [] };
+      return { worldPackage, snapshotAssets };
     }
 
     const [archiveEntries, storySeeds, conflicts] = await Promise.all([
@@ -296,7 +306,7 @@ export class ExportsService {
     });
   }
 
-  private async buildOfficialPackageAssets(worldId: string): Promise<OfficialWorldPackageAsset[]> {
+  private async buildOfficialPackageAssets(worldId: string): Promise<OfficialPackageAssetBuild[]> {
     if (!this.officialAssets) return [];
 
     const records: Array<Awaited<ReturnType<OfficialAssetsService["listAssets"]>>["assets"][number]> = [];
@@ -309,14 +319,17 @@ export class ExportsService {
 
     const details = await Promise.all(records.map((asset) => this.officialAssets!.getAsset(worldId, asset.id)));
     return details.map(({ asset, markdown }) => ({
-      type: asset.type,
-      name: asset.name,
-      summary: asset.summary,
-      markdown,
-      tags: asset.tags,
-      metadata: asset.metadata,
-      status: asset.status,
-      version: asset.version,
+      id: asset.id,
+      asset: {
+        type: asset.type,
+        name: asset.name,
+        summary: asset.summary,
+        markdown,
+        tags: asset.tags,
+        metadata: asset.metadata,
+        status: asset.status,
+        version: asset.version,
+      },
     }));
   }
 
@@ -410,12 +423,12 @@ function remapAssetIds(values: string[], assetIdMap?: Map<string, string>) {
   return values.map((value) => assetIdMap.get(value) ?? value);
 }
 
-function createLocalAssetId(kind: ReleaseSnapshotAsset["kind"]) {
+function createLocalAssetId(kind: LegacyReleaseSnapshotAsset["kind"]) {
   const prefix = kind === "setting" ? "archive" : kind;
   return `${prefix}_${crypto.randomUUID()}`;
 }
 
-function countImportedAssets(assets: ReleaseSnapshotAsset[]) {
+function countImportedAssets(assets: LegacyReleaseSnapshotAsset[]) {
   return assets.reduce(
     (counts, asset) => {
       counts.assets += 1;
@@ -426,4 +439,15 @@ function countImportedAssets(assets: ReleaseSnapshotAsset[]) {
     },
     { assets: 0, archive: 0, seeds: 0, conflicts: 0 },
   );
+}
+
+function requireLegacySnapshotAssets(assets: ReleaseSnapshotAsset[]): LegacyReleaseSnapshotAsset[] {
+  return assets.map((asset) => {
+    if ("kind" in asset) return asset;
+    throw new BadRequestException({
+      code: "VALIDATION_FAILED",
+      message: "Release snapshot contains official assets for a legacy package.",
+      details: { assetId: asset.id },
+    });
+  });
 }

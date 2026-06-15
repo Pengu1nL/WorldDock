@@ -3,6 +3,8 @@ import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionsService } from "../connections/connections.service";
 import { ExportsService } from "../exports/exports.service";
+import type { OfficialAssetDetailRecord, OfficialAssetRecord } from "../official-assets/official-assets.repository";
+import type { OfficialAssetsService } from "../official-assets/official-assets.service";
 import { WORLD_REPOSITORY } from "../worlds/world.repository";
 import { WorldsController } from "../worlds/worlds.controller";
 import { createHttpTestApp, createInMemoryWorlds, type InMemoryWorlds } from "../../../test/local-api-test-helpers";
@@ -56,6 +58,39 @@ describe("PullClientService", () => {
     expect(archive?.relations).toEqual([localConflictId, "unknown_text_ref"]);
     expect(conflict?.related).toEqual([localArchiveId, "missing_related"]);
     expect(conflict?.derivedSeeds).toEqual([localSeedId]);
+  });
+
+  it("pulls a v2 release snapshot and imports official markdown assets", async () => {
+    const worlds = createInMemoryWorlds();
+    const officialAssets = createFakeOfficialAssetsService();
+    const service = createPullClientService(
+      worlds,
+      async () => jsonResponse(pulledOfficialRepositoryResponse()),
+      { officialAssets },
+    );
+
+    const result = await service.pullWorld({ owner: "studio", slug: "memory-market" });
+
+    expect(result.world).toMatchObject({
+      name: "回忆所",
+      type: "近未来",
+      mode: "local",
+      archive: 0,
+      seeds: 0,
+      conflicts: 0,
+    });
+    expect(result.remap.counts).toEqual({ assets: 1, archive: 0, seeds: 0, conflicts: 0 });
+
+    const listed = await officialAssets.listAssets(result.world.id);
+    expect(listed.assets).toHaveLength(1);
+    const detail = await officialAssets.getAsset(result.world.id, listed.assets[0].id);
+    expect(detail.asset).toMatchObject({
+      type: "rule",
+      name: "记忆交易许可",
+      tags: ["法律"],
+      metadata: { authority: "记忆署" },
+    });
+    expect(detail.markdown).toContain("所有记忆交易都需要登记");
   });
 
   it("rejects when the Hub connection is not configured without calling fetch", async () => {
@@ -230,7 +265,10 @@ describe("world pull route", () => {
 function createPullClientService(
   worlds: InMemoryWorlds,
   hubFetch: PullClientFetch,
-  options: { connection?: Awaited<ReturnType<ConnectionsService["getInternalHubConnection"]>> | null } = {},
+  options: {
+    connection?: Awaited<ReturnType<ConnectionsService["getInternalHubConnection"]>> | null;
+    officialAssets?: OfficialAssetsService;
+  } = {},
 ) {
   const defaultConnection = {
     id: "default",
@@ -247,7 +285,7 @@ function createPullClientService(
   } as ConnectionsService;
   return new PullClientService(
     connections,
-    new ExportsService(worlds),
+    new ExportsService(worlds, options.officialAssets),
     hubFetch,
   );
 }
@@ -306,6 +344,94 @@ function pulledRepositoryResponse() {
       createdAt: "2026-06-12T00:00:00.000Z",
     },
   };
+}
+
+function pulledOfficialRepositoryResponse() {
+  const officialAsset = {
+    id: "official_asset_upstream_1",
+    type: "rule" as const,
+    name: "记忆交易许可",
+    summary: "所有记忆交易都需要登记。",
+    markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+    tags: ["法律"],
+    metadata: { authority: "记忆署" },
+    status: "active" as const,
+    version: 1,
+  };
+  const { id: _id, ...packageAsset } = officialAsset;
+
+  return {
+    repository: { owner: "studio", slug: "memory-market", name: "回忆所", summary: "公开仓库" },
+    snapshot: {
+      contractVersion: "1.0.0",
+      repository: { owner: "studio", slug: "memory-market", name: "回忆所" },
+      package: {
+        format: "worlddock.world-package.v2",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "回忆所",
+          type: "近未来",
+          summary: "记忆可以被买卖。",
+          tags: ["记忆", "城市"],
+          maturity: 27,
+        },
+        assets: [packageAsset],
+        releases: [],
+      },
+      assets: [officialAsset],
+      createdAt: "2026-06-12T00:00:00.000Z",
+    },
+  };
+}
+
+function createFakeOfficialAssetsService(): OfficialAssetsService {
+  const details = new Map<string, OfficialAssetDetailRecord & { markdown: string }>();
+  let assetCount = 1;
+
+  return {
+    async createAsset(worldId: string, input: Parameters<OfficialAssetsService["createAsset"]>[1]) {
+      const timestamp = new Date("2026-06-12T00:00:00.000Z");
+      const asset: OfficialAssetRecord = {
+        id: `official_asset_${assetCount++}`,
+        worldId,
+        type: input.type,
+        name: input.name,
+        summary: input.summary,
+        documentKey: `worlds/${worldId}/official-assets/official_asset_${assetCount}.md`,
+        status: "active",
+        version: 1,
+        tags: input.tags ?? [],
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        archivedAt: null,
+      };
+      const detail: OfficialAssetDetailRecord & { markdown: string } = {
+        asset,
+        markdown: input.markdown ?? input.summary,
+        revisions: [],
+        indexes: [],
+      };
+      details.set(asset.id, detail);
+      return detail;
+    },
+    async listAssets(worldId: string) {
+      return {
+        assets: [...details.values()].map((detail) => detail.asset).filter((asset) => asset.worldId === worldId),
+        nextCursor: null,
+      };
+    },
+    async getAsset(worldId: string, assetId: string) {
+      const detail = details.get(assetId);
+      if (!detail || detail.asset.worldId !== worldId) {
+        throw new Error("Official asset not found.");
+      }
+      return detail;
+    },
+    async updateAsset() {
+      throw new Error("Not implemented in test fake.");
+    },
+  } as unknown as OfficialAssetsService;
 }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {

@@ -69,4 +69,61 @@ describe("scanReleaseSnapshotForSecrets", () => {
     expect(excerpts).not.toContain("sk-live-secret");
     expect(excerpts).not.toContain("ghp_live_secret");
   });
+
+  it("scans v2 official package assets and snapshot assets", () => {
+    const findings = scanReleaseSnapshotForSecrets({
+      contractVersion: "1.0.0",
+      repository: {
+        owner: "studio",
+        slug: "memory-market",
+        name: "Memory Market",
+      },
+      package: {
+        format: "worlddock.world-package.v2",
+        exportedAt: "2026-06-12T00:00:00.000Z",
+        world: {
+          name: "Memory Market",
+          type: "city",
+          summary: "A city built around traded memories.",
+          tags: ["urban"],
+          maturity: 32,
+        },
+        assets: [
+          {
+            type: "rule",
+            name: "Operator Token Policy",
+            summary: "No secrets in official assets.",
+            markdown: "OPENAI_API_KEY=sk-package-secret",
+            tags: [],
+            metadata: { runbook: ".env" },
+          },
+        ],
+        releases: [],
+      },
+      assets: [
+        {
+          id: "official_asset_1",
+          type: "rule",
+          name: "Operator Token Policy",
+          summary: "No secrets in official assets.",
+          markdown: "GITHUB_TOKEN=ghp_snapshot_secret",
+          tags: [],
+          metadata: { auth: "Bearer sk-live-secret" },
+        },
+      ],
+      createdAt: "2026-06-12T00:00:00.000Z",
+    });
+
+    expect(findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "package.assets[0].markdown", reason: "api_key" }),
+      expect.objectContaining({ path: "package.assets[0].markdown", reason: "token" }),
+      expect.objectContaining({ path: "package.assets[0].metadata.runbook", reason: "env_file" }),
+      expect.objectContaining({ path: "assets[0].markdown", reason: "token" }),
+      expect.objectContaining({ path: "assets[0].metadata.auth", reason: "token" }),
+    ]));
+    const excerpts = findings.map((finding) => finding.excerpt).join("\n");
+    expect(excerpts).not.toContain("sk-package-secret");
+    expect(excerpts).not.toContain("ghp_snapshot_secret");
+    expect(excerpts).not.toContain("sk-live-secret");
+  });
 });

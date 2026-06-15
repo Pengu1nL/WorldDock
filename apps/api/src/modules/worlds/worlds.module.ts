@@ -1,6 +1,7 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { ConnectionsModule } from "../connections/connections.module";
 import { ExportsService } from "../exports/exports.service";
+import { OfficialAssetsModule } from "../official-assets/official-assets.module";
 import { PULL_CLIENT_FETCH, PullClientService } from "../pull-client/pull-client.service";
 import { PUSH_CLIENT_FETCH, PushClientService } from "../push-client/push-client.service";
 import { PrismaWorldRepository } from "./prisma-world.repository";
@@ -8,7 +9,7 @@ import { WORLD_REPOSITORY } from "./world.repository";
 import { WorldsController } from "./worlds.controller";
 
 @Module({
-  imports: [ConnectionsModule],
+  imports: [ConnectionsModule, forwardRef(() => OfficialAssetsModule)],
   controllers: [WorldsController],
   providers: [
     PrismaWorldRepository,

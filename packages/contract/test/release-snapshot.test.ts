@@ -65,7 +65,19 @@ describe("release snapshot contract", () => {
         releases: [],
       },
       createdAt: "2026-06-12T00:00:00.000Z",
-      assets: [],
+      assets: [
+        {
+          id: "official_asset_1",
+          type: "rule",
+          name: "Memory Trading Permit",
+          summary: "All memory trades require registration.",
+          markdown: "# Memory Trading Permit\n\nAll memory trades require registration.",
+          tags: ["law"],
+          metadata: { source: "test" },
+          status: "active",
+          version: 1,
+        },
+      ],
     });
 
     expect(parsed.package.format).toBe("worlddock.world-package.v2");
@@ -73,6 +85,11 @@ describe("release snapshot contract", () => {
       type: "rule",
       name: "Memory Trading Permit",
       markdown: expect.stringContaining("All memory trades require registration"),
+    });
+    expect(parsed.assets[0]).toMatchObject({
+      id: "official_asset_1",
+      type: "rule",
+      name: "Memory Trading Permit",
     });
   });
 

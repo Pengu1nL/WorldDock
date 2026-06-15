@@ -25,6 +25,8 @@ export type ReleaseDiff = z.infer<typeof releaseDiffSchema>;
 
 export {
   contractVersionSchema,
+  legacyReleaseSnapshotAssetSchema,
+  officialReleaseSnapshotAssetSchema,
   releaseSnapshotAssetSchema as contractReleaseSnapshotAssetSchema,
   releaseSnapshotAssetSchema,
   releaseSnapshotRepositorySchema as contractReleaseSnapshotRepositorySchema,
@@ -33,6 +35,8 @@ export {
   releaseSnapshotSchema,
 } from "@worlddock/contract/releases";
 export type {
+  LegacyReleaseSnapshotAsset,
+  OfficialReleaseSnapshotAsset,
   ReleaseSnapshot as ContractReleaseSnapshot,
   ReleaseSnapshotAsset as ContractReleaseSnapshotAsset,
   ReleaseSnapshotRepository as ContractReleaseSnapshotRepository,

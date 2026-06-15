@@ -3,6 +3,8 @@ import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionsService } from "../connections/connections.service";
 import { ExportsService } from "../exports/exports.service";
+import type { OfficialAssetDetailRecord, OfficialAssetRecord } from "../official-assets/official-assets.repository";
+import type { OfficialAssetsService } from "../official-assets/official-assets.service";
 import { WORLD_REPOSITORY } from "../worlds/world.repository";
 import { WorldsController } from "../worlds/worlds.controller";
 import { createHttpTestApp, createInMemoryWorlds, type InMemoryWorlds } from "../../../test/local-api-test-helpers";
@@ -50,6 +52,47 @@ describe("PushClientService", () => {
     });
     expect(payload.snapshot.assets.map((asset: { id: string }) => asset.id)).toEqual(["archive_1"]);
     expect(payload.snapshot.package.assets.map((asset: { title: string }) => asset.title)).toEqual(["记忆交易法"]);
+  });
+
+  it("pushes selected official assets as a v2 release snapshot", async () => {
+    const { worlds, officialAssets } = await createWorldWithOfficialAssets();
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const service = createPushClientService(worlds, async (url, init) => {
+      calls.push({ url: String(url), init });
+      return jsonResponse({
+        repository: { owner: "studio", slug: "memory-market" },
+        release: {
+          id: "rel_1",
+          version: "1.0.0",
+          url: "https://hub.example.test/studio/memory-market/releases/rel_1",
+        },
+      });
+    }, { officialAssets });
+
+    await expect(service.pushWorld({
+      worldId: "world_1",
+      owner: "studio",
+      slug: "memory-market",
+      selectedAssetIds: ["official_asset_1"],
+    })).resolves.toMatchObject({ release: { id: "rel_1" } });
+
+    const payload = JSON.parse(String(calls[0]?.init?.body));
+    expect(payload.snapshot.package.format).toBe("worlddock.world-package.v2");
+    expect(payload.snapshot.assets).toEqual([
+      expect.objectContaining({
+        id: "official_asset_1",
+        type: "rule",
+        name: "记忆交易许可",
+        markdown: expect.stringContaining("所有记忆交易都需要登记"),
+      }),
+    ]);
+    expect(payload.snapshot.package.assets).toEqual([
+      expect.objectContaining({
+        type: "rule",
+        name: "记忆交易许可",
+        markdown: expect.stringContaining("所有记忆交易都需要登记"),
+      }),
+    ]);
   });
 
   it("rejects when the Hub connection is not configured", async () => {
@@ -390,7 +433,10 @@ async function createWorldWithAssets(options: { archiveBody?: string } = {}) {
 function createPushClientService(
   worlds: InMemoryWorlds,
   hubFetch: PushClientFetch,
-  options: { connection?: Awaited<ReturnType<ConnectionsService["getInternalHubConnection"]>> | null } = {},
+  options: {
+    connection?: Awaited<ReturnType<ConnectionsService["getInternalHubConnection"]>> | null;
+    officialAssets?: OfficialAssetsService;
+  } = {},
 ) {
   const defaultConnection = {
     id: "default",
@@ -407,9 +453,81 @@ function createPushClientService(
   } as ConnectionsService;
   return new PushClientService(
     connections,
-    new ExportsService(worlds),
+    new ExportsService(worlds, options.officialAssets),
     hubFetch,
   );
+}
+
+async function createWorldWithOfficialAssets() {
+  const worlds = createInMemoryWorlds();
+  const officialAssets = createFakeOfficialAssetsService();
+  const world = await worlds.createWorld({
+    name: "回忆所",
+    type: "近未来",
+    summary: "记忆可以被买卖。",
+    tags: ["记忆", "城市"],
+    mode: "local",
+    maturity: 27,
+  });
+  await officialAssets.createAsset(world.id, {
+    type: "rule",
+    name: "记忆交易许可",
+    summary: "所有记忆交易都需要登记。",
+    markdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。",
+    tags: ["法律"],
+    metadata: { authority: "记忆署" },
+  });
+  return { worlds, officialAssets };
+}
+
+function createFakeOfficialAssetsService(): OfficialAssetsService {
+  const details = new Map<string, OfficialAssetDetailRecord & { markdown: string }>();
+  let assetCount = 1;
+
+  return {
+    async createAsset(worldId: string, input: Parameters<OfficialAssetsService["createAsset"]>[1]) {
+      const timestamp = new Date("2026-06-12T00:00:00.000Z");
+      const asset: OfficialAssetRecord = {
+        id: `official_asset_${assetCount++}`,
+        worldId,
+        type: input.type,
+        name: input.name,
+        summary: input.summary,
+        documentKey: `worlds/${worldId}/official-assets/official_asset_${assetCount}.md`,
+        status: "active",
+        version: 1,
+        tags: input.tags ?? [],
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        archivedAt: null,
+      };
+      const detail: OfficialAssetDetailRecord & { markdown: string } = {
+        asset,
+        markdown: input.markdown ?? input.summary,
+        revisions: [],
+        indexes: [],
+      };
+      details.set(asset.id, detail);
+      return detail;
+    },
+    async listAssets(worldId: string) {
+      return {
+        assets: [...details.values()].map((detail) => detail.asset).filter((asset) => asset.worldId === worldId),
+        nextCursor: null,
+      };
+    },
+    async getAsset(worldId: string, assetId: string) {
+      const detail = details.get(assetId);
+      if (!detail || detail.asset.worldId !== worldId) {
+        throw new Error("Official asset not found.");
+      }
+      return detail;
+    },
+    async updateAsset() {
+      throw new Error("Not implemented in test fake.");
+    },
+  } as unknown as OfficialAssetsService;
 }
 
 function jsonResponse(body: unknown, init: ResponseInit = {}) {

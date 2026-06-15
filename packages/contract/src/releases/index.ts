@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { worldPackageSchema } from "../worlds/world-package";
+import { officialWorldPackageAssetSchema, worldPackageSchema } from "../worlds/world-package";
 
 export const contractVersionSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
 
-export const releaseSnapshotAssetSchema = z.object({
+export const legacyReleaseSnapshotAssetSchema = z.object({
   id: z.string().min(1),
   kind: z.enum(["setting", "seed", "conflict"]),
   title: z.string().min(1),
@@ -12,6 +12,16 @@ export const releaseSnapshotAssetSchema = z.object({
   payload: z.record(z.string(), z.unknown()).default({}),
   contentHash: z.string().min(1).optional(),
 });
+
+export const officialReleaseSnapshotAssetSchema = officialWorldPackageAssetSchema.extend({
+  id: z.string().min(1),
+  contentHash: z.string().min(1).optional(),
+});
+
+export const releaseSnapshotAssetSchema = z.union([
+  legacyReleaseSnapshotAssetSchema,
+  officialReleaseSnapshotAssetSchema,
+]);
 
 export const releaseSnapshotRepositorySchema = z.object({
   owner: z.string().min(1),
@@ -29,4 +39,6 @@ export const releaseSnapshotSchema = z.object({
 
 export type ReleaseSnapshot = z.infer<typeof releaseSnapshotSchema>;
 export type ReleaseSnapshotAsset = z.infer<typeof releaseSnapshotAssetSchema>;
+export type LegacyReleaseSnapshotAsset = z.infer<typeof legacyReleaseSnapshotAssetSchema>;
+export type OfficialReleaseSnapshotAsset = z.infer<typeof officialReleaseSnapshotAssetSchema>;
 export type ReleaseSnapshotRepository = z.infer<typeof releaseSnapshotRepositorySchema>;
