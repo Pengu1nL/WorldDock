@@ -27,9 +27,11 @@ export interface PotentialAssetAnalyzerResult {
 interface MarkdownBlock {
   title: string;
   body: string;
+  rawText: string;
 }
 
-const HEADING_PATTERN = /^#{2,3}\s+(.+?)\s*$/gm;
+const HEADING_PATTERN = /^#{2,3}\s+(.+?)\s*$/;
+const FENCE_PATTERN = /^\s{0,3}(`{3,}|~{3,})/;
 const MAX_SUMMARY_LENGTH = 240;
 const MAX_QUOTE_LENGTH = 240;
 const CONFIDENCE = 0.62;
@@ -43,7 +45,7 @@ export class PotentialAssetsAnalyzer {
 
       return parseMarkdownBlocks(message.content).map((block) => {
         const summary = truncate(firstParagraph(block.body) || block.title, MAX_SUMMARY_LENGTH);
-        const quote = truncate(`${block.title}\n${summary}`, MAX_QUOTE_LENGTH);
+        const quote = truncate(normalizeWhitespace(block.rawText), MAX_QUOTE_LENGTH);
 
         return {
           worldId: input.worldId,
@@ -64,21 +66,65 @@ export class PotentialAssetsAnalyzer {
 }
 
 function parseMarkdownBlocks(content: string): MarkdownBlock[] {
-  const matches = Array.from(content.matchAll(HEADING_PATTERN));
+  const headings = findHeadingsOutsideFences(content);
 
-  return matches
-    .map((match, index) => {
-      const title = match[1]?.trim() ?? "";
-      const bodyStart = (match.index ?? 0) + match[0].length;
-      const nextMatch = matches[index + 1];
-      const bodyEnd = nextMatch?.index ?? content.length;
+  return headings
+    .map((heading, index) => {
+      const nextHeading = headings[index + 1];
+      const bodyEnd = nextHeading?.start ?? content.length;
 
       return {
-        title,
-        body: content.slice(bodyStart, bodyEnd).trim(),
+        title: heading.title,
+        body: content.slice(heading.end, bodyEnd).trim(),
+        rawText: content.slice(heading.start, bodyEnd).trim(),
       };
     })
     .filter((block) => block.title.length > 0);
+}
+
+function findHeadingsOutsideFences(content: string): Array<{ title: string; start: number; end: number }> {
+  const lines = content.match(/[^\n]*(?:\n|$)/g) ?? [];
+  const headings: Array<{ title: string; start: number; end: number }> = [];
+  let offset = 0;
+  let fence: string | null = null;
+
+  for (const line of lines) {
+    if (line.length === 0) {
+      continue;
+    }
+
+    const lineWithoutBreak = line.replace(/\r?\n$/, "");
+    const fenceMatch = lineWithoutBreak.match(FENCE_PATTERN);
+
+    if (fenceMatch) {
+      const marker = fenceMatch[1]?.[0] ?? "";
+      if (fence === marker) {
+        fence = null;
+      } else if (fence === null) {
+        fence = marker;
+      }
+
+      offset += line.length;
+      continue;
+    }
+
+    if (fence === null) {
+      const headingMatch = lineWithoutBreak.match(HEADING_PATTERN);
+      const title = headingMatch?.[1]?.trim();
+
+      if (title) {
+        headings.push({
+          title,
+          start: offset,
+          end: offset + line.length,
+        });
+      }
+    }
+
+    offset += line.length;
+  }
+
+  return headings;
 }
 
 function firstParagraph(body: string): string {
