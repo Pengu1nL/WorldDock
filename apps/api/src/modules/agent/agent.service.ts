@@ -6,6 +6,7 @@ import {
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
 import { PotentialAssetsService } from "../potential-assets/potential-assets.service";
+import type { PotentialAssetRecord } from "../potential-assets/potential-assets.repository";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -527,18 +528,24 @@ export class AgentService {
           status: "complete",
           metadata: { runId: run.id, tokenUsage },
         });
-        const detectedAssets = await this.potentialAssets?.analyzeCompletedRun({
-          worldId: run.worldId,
-          sessionId: run.sessionId,
-          runId: run.id,
-        }) ?? [];
-        for (const potentialAsset of detectedAssets) {
-          const event = await this.append(run.id, sequence++, "potential_asset.detected", {
-            potentialAssetId: potentialAsset.id,
-            potentialAsset,
-          });
-          yield event;
-          lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+        try {
+          const detectedAssets = await this.potentialAssets?.analyzeCompletedRun({
+            worldId: run.worldId,
+            sessionId: run.sessionId,
+            runId: run.id,
+          }) ?? [];
+          for (const potentialAsset of detectedAssets) {
+            const currentSequence = sequence;
+            const event = await this.append(run.id, currentSequence, "potential_asset.detected", {
+              potentialAssetId: potentialAsset.id,
+              potentialAsset: serializePotentialAssetForEvent(potentialAsset),
+            });
+            sequence = currentSequence + 1;
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+        } catch {
+          // Potential asset detection must not prevent the run from reaching its terminal event.
         }
         const event = await this.append(run.id, sequence++, "run.completed", { tokenUsage });
         yield event;
@@ -1058,6 +1065,14 @@ function mapProviderContextToSessionItem(contextRef: AgentProviderChunkContext):
 
 function resolveRunModel(env: Record<string, string | undefined>) {
   return env.PI_MODEL_ID ?? env.AI_MODEL ?? null;
+}
+
+function serializePotentialAssetForEvent(asset: PotentialAssetRecord) {
+  return {
+    ...asset,
+    createdAt: asset.createdAt.toISOString(),
+    updatedAt: asset.updatedAt.toISOString(),
+  };
 }
 
 function archiveEntryToWorldAsset(entry: ArchiveEntryRecord): WorldAsset {

@@ -1,5 +1,7 @@
 import { Injectable, type OnModuleDestroy } from "@nestjs/common";
 import { createPrismaClient, type PrismaClient } from "@worlddock/db";
+import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import { potentialAssetEvidenceSchema, potentialAssetStatusSchema } from "@worlddock/contract/potential-assets";
 import {
   decodePotentialAssetListCursor,
   encodePotentialAssetListCursor,
@@ -15,20 +17,25 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
   async createMany(input: Parameters<PotentialAssetsRepository["createMany"]>[0]) {
     const created = [];
     for (const item of input) {
-      created.push(await this.prisma.potentialAsset.create({
-        data: {
-          worldId: item.worldId,
-          sessionId: item.sessionId,
-          runId: item.runId ?? null,
-          type: item.type,
-          title: item.title,
-          summary: item.summary,
-          evidence: item.evidence as never,
-          status: item.status ?? "active",
-          promotedAssetId: item.promotedAssetId ?? null,
-          metadata: (item.metadata ?? {}) as never,
-        },
-      }));
+      try {
+        created.push(await this.prisma.potentialAsset.create({
+          data: {
+            worldId: item.worldId,
+            sessionId: item.sessionId,
+            runId: item.runId ?? null,
+            type: item.type,
+            title: item.title,
+            summary: item.summary,
+            evidence: item.evidence as never,
+            status: item.status ?? "active",
+            promotedAssetId: item.promotedAssetId ?? null,
+            metadata: (item.metadata ?? {}) as never,
+          },
+        }));
+      } catch (error) {
+        if (isUniqueConstraintError(error)) continue;
+        throw error;
+      }
     }
     return created.map(mapPotentialAsset);
   }
@@ -109,11 +116,11 @@ function mapPotentialAsset(asset: {
     worldId: asset.worldId,
     sessionId: asset.sessionId,
     runId: asset.runId,
-    type: asset.type as PotentialAssetRecord["type"],
+    type: officialWorldAssetTypeSchema.parse(asset.type),
     title: asset.title,
     summary: asset.summary,
-    evidence: Array.isArray(asset.evidence) ? asset.evidence as PotentialAssetRecord["evidence"] : [],
-    status: asset.status as PotentialAssetRecord["status"],
+    evidence: potentialAssetEvidenceSchema.array().parse(asset.evidence),
+    status: potentialAssetStatusSchema.parse(asset.status),
     promotedAssetId: asset.promotedAssetId,
     metadata: isRecord(asset.metadata) ? asset.metadata : {},
     createdAt: asset.createdAt,
@@ -123,4 +130,8 @@ function mapPotentialAsset(asset: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return isRecord(error) && error.code === "P2002";
 }

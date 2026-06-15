@@ -38,7 +38,12 @@ export class PotentialAssetsService {
     const session = await this.sessions.findSessionForWorld(input.worldId, input.sessionId);
     if (!session || session.kind !== "world_exploration") return [];
 
-    const messages = await this.sessions.listMessages(input.sessionId);
+    const messages = (await this.sessions.listMessages(input.sessionId)).filter((message) =>
+      message.role === "assistant" &&
+      message.status === "complete" &&
+      isRecord(message.metadata) &&
+      message.metadata.runId === input.runId
+    );
     const extracted = this.analyzer.extract({
       worldId: input.worldId,
       sessionId: input.sessionId,
@@ -119,4 +124,8 @@ export class PotentialAssetsService {
 
 function dedupeKey(item: Pick<PotentialAssetRecord, "type" | "title">) {
   return `${item.type}:${item.title.trim().toLocaleLowerCase()}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
