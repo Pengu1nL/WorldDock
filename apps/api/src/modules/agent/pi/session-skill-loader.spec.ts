@@ -9,6 +9,12 @@ describe("loadSessionPiSkills", () => {
     expect(loadSessionPiSkills({ kind: "world_exploration" }).map((skill) => skill.name)).toEqual(["world-exploration"]);
   });
 
+  it("reads default skill instructions without a configured skillsDir", () => {
+    const [skill] = loadSessionPiSkills({ kind: "world_exploration" });
+
+    expect(skill.instructions).toContain("围绕用户给出的世界、上下文和问题");
+  });
+
   it("loads the asset deposition skill for world exploration deposition intent", () => {
     expect(
       loadSessionPiSkills({

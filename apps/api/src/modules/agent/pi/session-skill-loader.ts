@@ -63,8 +63,9 @@ export function loadSessionPiSkills(input: LoadSessionPiSkillsInput): PiSkillDes
   const skill = SESSION_SKILLS[name];
   const basePath = input.skillsDir ?? DEFAULT_PI_SKILLS_DIR;
   const skillPath = `${basePath}/${skill.name}`;
-  const instructionsPath = input.skillsDir ? skillPath : join(LOCAL_PI_SKILLS_DIR, skill.name);
-  const instructions = readSkillInstructions(instructionsPath);
+  const instructions = input.skillsDir
+    ? readSkillInstructions(skillPath)
+    : readFirstSkillInstructions(getDefaultSkillInstructionPaths(skill.name));
 
   return [{
     ...skill,
@@ -96,4 +97,23 @@ function readSkillInstructions(skillPath: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function readFirstSkillInstructions(skillPaths: string[]): string | undefined {
+  for (const skillPath of skillPaths) {
+    const instructions = readSkillInstructions(skillPath);
+    if (instructions) {
+      return instructions;
+    }
+  }
+
+  return undefined;
+}
+
+function getDefaultSkillInstructionPaths(skillName: string): string[] {
+  return [
+    join(LOCAL_PI_SKILLS_DIR, skillName),
+    join(process.cwd(), DEFAULT_PI_SKILLS_DIR, skillName),
+    join(process.cwd(), "src/modules/agent/pi/skills", skillName),
+  ];
 }
