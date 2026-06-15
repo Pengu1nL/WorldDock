@@ -90,15 +90,16 @@ export class PotentialAssetsService {
   }
 
   async listForWorld(worldId: string, query?: ListPotentialAssetsForWorldQuery) {
-    if (query?.cursor) {
+    const normalizedQuery = { ...query, status: query?.status ?? "active" };
+    if (normalizedQuery.cursor) {
       try {
-        return await this.potentialAssets.listForWorld(worldId, query);
+        return await this.potentialAssets.listForWorld(worldId, normalizedQuery);
       } catch (error) {
         if (error instanceof InvalidPotentialAssetListCursorError) throw this.badCursor();
         throw error;
       }
     }
-    return this.potentialAssets.listForWorld(worldId, query);
+    return this.potentialAssets.listForWorld(worldId, normalizedQuery);
   }
 
   async updateStatus(worldId: string, id: string, status: PotentialAssetRecord["status"]) {

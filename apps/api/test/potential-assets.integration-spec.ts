@@ -1,4 +1,8 @@
 import { type INestApplication } from "@nestjs/common";
+import {
+  potentialAssetDetailResponseSchema,
+  potentialAssetListResponseSchema,
+} from "@worlddock/contract/potential-assets";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { AgentSessionsController } from "../src/modules/agent-sessions/agent-sessions.controller";
@@ -76,6 +80,99 @@ describe("potential assets local endpoints", () => {
       "potential_asset.detected",
       "run.completed",
     ]);
+  });
+
+  it("lists potential assets by world, session, and run, and dismisses them", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const potentialAssets = createInMemoryPotentialAssets();
+    const provider = createSequenceAgentProvider([
+      [
+        { type: "delta", text: "### 镜港\n镜港是一座会记录梦境的城市。" },
+      ],
+      [
+        { type: "delta", text: "### 梦税局\n梦税局负责征收梦境交易税。" },
+      ],
+    ]);
+    const world = await createWorld(worlds);
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "镜港推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    const testApp = await createPotentialAssetApp(worlds, agents, sessions, potentialAssets, provider);
+    app = testApp;
+
+    const firstRun = await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+    const secondRun = await createAndStreamExistingSessionRun(testApp, world.id, session.id);
+
+    const firstRunListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-runs/${firstRun.runId}/potential-assets`)
+      .expect(200);
+    const firstRunBody = potentialAssetListResponseSchema.parse(firstRunListed.body);
+
+    expect(firstRunBody.nextCursor).toBeNull();
+    expect(firstRunBody.potentialAssets.map((asset) => asset.title)).toEqual(["镜港"]);
+    expect(firstRunBody.potentialAssets[0]).toEqual(expect.objectContaining({
+      runId: firstRun.runId,
+      type: "location",
+      status: "active",
+      createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    }));
+
+    const secondRunListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-runs/${secondRun.runId}/potential-assets`)
+      .expect(200);
+    const secondRunBody = potentialAssetListResponseSchema.parse(secondRunListed.body);
+
+    expect(secondRunBody.potentialAssets.map((asset) => asset.title)).toEqual(["梦税局"]);
+    expect(secondRunBody.potentialAssets[0]?.runId).toBe(secondRun.runId);
+
+    const dismissed = await request(testApp.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${firstRunBody.potentialAssets[0].id}/dismiss`)
+      .expect(200);
+    const dismissedBody = potentialAssetDetailResponseSchema.parse(dismissed.body);
+
+    expect(dismissedBody.potentialAsset).toEqual(expect.objectContaining({
+      id: firstRunBody.potentialAssets[0].id,
+      status: "dismissed",
+    }));
+
+    const sessionListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/agent-sessions/${session.id}/potential-assets`)
+      .expect(200);
+    const sessionBody = potentialAssetListResponseSchema.parse(sessionListed.body);
+
+    expect(sessionBody.nextCursor).toBeNull();
+    expect(sessionBody.potentialAssets.map((asset) => ({
+      title: asset.title,
+      status: asset.status,
+    }))).toEqual([
+      { title: "镜港", status: "dismissed" },
+      { title: "梦税局", status: "active" },
+    ]);
+
+    const worldDefaultListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/potential-assets`)
+      .expect(200);
+    const worldDefaultBody = potentialAssetListResponseSchema.parse(worldDefaultListed.body);
+
+    expect(worldDefaultBody.potentialAssets.map((asset) => asset.title)).toEqual(["梦税局"]);
+    expect(worldDefaultBody.potentialAssets.every((asset) => asset.status === "active")).toBe(true);
+
+    const worldDismissedListed = await request(testApp.getHttpServer())
+      .get(`/v1/worlds/${world.id}/potential-assets`)
+      .query({ status: "dismissed" })
+      .expect(200);
+    const worldDismissedBody = potentialAssetListResponseSchema.parse(worldDismissedListed.body);
+
+    expect(worldDismissedBody.potentialAssets.map((asset) => asset.title)).toEqual(["镜港"]);
+    expect(worldDismissedBody.potentialAssets.every((asset) => asset.status === "dismissed")).toBe(true);
   });
 
   it("deduplicates active potential assets within the same session", async () => {
