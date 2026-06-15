@@ -5,6 +5,7 @@ import {
   type CreateAgentSessionContextItemInput,
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
+import { PotentialAssetsService } from "../potential-assets/potential-assets.service";
 import {
   WORLD_REPOSITORY,
   type ArchiveEntryRecord,
@@ -65,6 +66,7 @@ export class AgentService {
     @Inject(AGENT_PROVIDER) private readonly provider: AgentProvider,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     @Optional() @Inject(AGENT_SESSIONS_REPOSITORY) private readonly sessions?: AgentSessionsRepository,
+    @Optional() @Inject(PotentialAssetsService) private readonly potentialAssets?: PotentialAssetsService,
   ) {}
 
   async createRun(worldId: string, input: { prompt: string }) {
@@ -525,6 +527,19 @@ export class AgentService {
           status: "complete",
           metadata: { runId: run.id, tokenUsage },
         });
+        const detectedAssets = await this.potentialAssets?.analyzeCompletedRun({
+          worldId: run.worldId,
+          sessionId: run.sessionId,
+          runId: run.id,
+        }) ?? [];
+        for (const potentialAsset of detectedAssets) {
+          const event = await this.append(run.id, sequence++, "potential_asset.detected", {
+            potentialAssetId: potentialAsset.id,
+            potentialAsset,
+          });
+          yield event;
+          lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+        }
         const event = await this.append(run.id, sequence++, "run.completed", { tokenUsage });
         yield event;
       } catch (error) {

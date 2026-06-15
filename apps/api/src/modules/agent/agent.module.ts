@@ -1,5 +1,6 @@
-import { Module } from "@nestjs/common";
+import { forwardRef, Module } from "@nestjs/common";
 import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
+import { PotentialAssetsModule } from "../potential-assets/potential-assets.module";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { WorldsModule } from "../worlds/worlds.module";
 import { AgentController } from "./agent.controller";
@@ -14,7 +15,7 @@ import { createWorldToolRegistry } from "./pi/world-tools";
 import { PrismaAgentRepository } from "./prisma-agent.repository";
 
 @Module({
-  imports: [WorldsModule, AgentSessionsModule],
+  imports: [WorldsModule, AgentSessionsModule, forwardRef(() => PotentialAssetsModule)],
   controllers: [AgentController],
   providers: [
     AgentService,

@@ -23,6 +23,13 @@ import {
   encodeAgentSessionListCursor,
   normalizeAgentSessionListLimit,
 } from "../src/modules/agent-sessions/agent-sessions.repository";
+import {
+  decodePotentialAssetListCursor,
+  encodePotentialAssetListCursor,
+  normalizePotentialAssetListLimit,
+  type PotentialAssetRecord,
+  type PotentialAssetsRepository,
+} from "../src/modules/potential-assets/potential-assets.repository";
 import type {
   ArchiveEntryRecord,
   ConflictRecord,
@@ -551,6 +558,78 @@ export type InMemoryAgentSessions = AgentSessionsRepository & {
   };
 };
 
+export type InMemoryPotentialAssets = PotentialAssetsRepository & {
+  stores: {
+    potentialAssets: Map<string, PotentialAssetRecord>;
+  };
+};
+
+export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
+  const stores: InMemoryPotentialAssets["stores"] = {
+    potentialAssets: new Map(),
+  };
+  const counters = { potentialAsset: 1 };
+
+  return {
+    stores,
+    async createMany(input) {
+      return input.map((item) => {
+        const timestamp = now();
+        const potentialAsset: PotentialAssetRecord = {
+          id: `potential_asset_${counters.potentialAsset++}`,
+          worldId: item.worldId,
+          sessionId: item.sessionId,
+          runId: item.runId ?? null,
+          type: item.type,
+          title: item.title,
+          summary: item.summary,
+          evidence: [...item.evidence],
+          status: item.status ?? "active",
+          promotedAssetId: item.promotedAssetId ?? null,
+          metadata: item.metadata ?? {},
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+        stores.potentialAssets.set(potentialAsset.id, potentialAsset);
+        return potentialAsset;
+      });
+    },
+    async listForSession(worldId, sessionId) {
+      return [...stores.potentialAssets.values()]
+        .filter((asset) => asset.worldId === worldId && asset.sessionId === sessionId)
+        .sort(compareCreatedAsc);
+    },
+    async listForRun(worldId, runId) {
+      return [...stores.potentialAssets.values()]
+        .filter((asset) => asset.worldId === worldId && asset.runId === runId)
+        .sort(compareCreatedAsc);
+    },
+    async listForWorld(worldId, query = {}) {
+      const cursor = query.cursor ? decodePotentialAssetListCursor(query.cursor) : null;
+      const limit = normalizePotentialAssetListLimit(query.limit);
+      const assets = [...stores.potentialAssets.values()]
+        .filter((asset) => asset.worldId === worldId)
+        .filter((asset) => !query.status || asset.status === query.status)
+        .filter((asset) => !query.type || asset.type === query.type)
+        .filter((asset) => !cursor || isAfterPotentialAssetCursor(asset, cursor))
+        .sort(compareCreatedDesc)
+        .slice(0, limit + 1);
+      const page = assets.slice(0, limit);
+      return {
+        potentialAssets: page,
+        nextCursor: assets.length > limit ? encodePotentialAssetListCursor(page[page.length - 1]) : null,
+      };
+    },
+    async updateStatus(worldId, id, status) {
+      const asset = stores.potentialAssets.get(id);
+      if (!asset || asset.worldId !== worldId) return null;
+      const updated: PotentialAssetRecord = { ...asset, status, updatedAt: now() };
+      stores.potentialAssets.set(id, updated);
+      return updated;
+    },
+  };
+}
+
 export function createInMemoryAgentSessions(): InMemoryAgentSessions {
   const stores: InMemoryAgentSessions["stores"] = {
     sessions: new Map(),
@@ -955,6 +1034,10 @@ function compareCreatedAsc<T extends { createdAt: Date }>(left: T, right: T) {
   return left.createdAt.getTime() - right.createdAt.getTime();
 }
 
+function compareCreatedDesc<T extends { createdAt: Date; id: string }>(left: T, right: T) {
+  return right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id);
+}
+
 function compareUpdatedDesc<T extends { updatedAt: Date; id: string }>(left: T, right: T) {
   return right.updatedAt.getTime() - left.updatedAt.getTime() || left.id.localeCompare(right.id);
 }
@@ -966,6 +1049,15 @@ function isAfterAgentSessionCursor(
   const sessionUpdatedAt = session.updatedAt.getTime();
   const cursorUpdatedAt = cursor.updatedAt.getTime();
   return sessionUpdatedAt < cursorUpdatedAt || (sessionUpdatedAt === cursorUpdatedAt && session.id > cursor.id);
+}
+
+function isAfterPotentialAssetCursor(
+  asset: PotentialAssetRecord,
+  cursor: { createdAt: Date; id: string },
+) {
+  const assetCreatedAt = asset.createdAt.getTime();
+  const cursorCreatedAt = cursor.createdAt.getTime();
+  return assetCreatedAt < cursorCreatedAt || (assetCreatedAt === cursorCreatedAt && asset.id > cursor.id);
 }
 
 function archiveEntriesFor(worlds: InMemoryWorlds, worldId: string) {

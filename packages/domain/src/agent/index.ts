@@ -181,6 +181,31 @@ export const agentEventSchema = z.discriminatedUnion("type", [
     }),
   }),
   baseAgentEventSchema.extend({
+    type: z.literal("potential_asset.detected"),
+    payload: z.object({
+      potentialAssetId: z.string().min(1),
+      potentialAsset: z.object({
+        id: z.string().min(1),
+        worldId: z.string().min(1),
+        sessionId: z.string().min(1),
+        runId: z.string().min(1).nullable().optional(),
+        type: z.enum(["character", "organization", "location", "event", "rule"]),
+        title: z.string().min(1),
+        summary: z.string().min(1),
+        evidence: z.array(z.object({
+          messageId: z.string().min(1).optional(),
+          quote: z.string().min(1),
+          confidence: z.number().min(0).max(1),
+        })).default([]),
+        status: z.enum(["active", "dismissed", "promoted"]),
+        promotedAssetId: z.string().min(1).nullable().optional(),
+        metadata: z.record(z.string(), z.unknown()).default({}),
+        createdAt: z.union([z.string().datetime(), z.date()]),
+        updatedAt: z.union([z.string().datetime(), z.date()]),
+      }),
+    }),
+  }),
+  baseAgentEventSchema.extend({
     type: z.literal("run.completed"),
     payload: z.object({ tokenUsage: tokenUsageSchema.optional() }).default({}),
   }),
