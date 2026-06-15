@@ -54,6 +54,40 @@ describe("PotentialAssetsAnalyzer", () => {
     ]);
   });
 
+  it("does not close longer fences on shorter backtick lines with info strings", () => {
+    const analyzer = new PotentialAssetsAnalyzer();
+
+    expect(analyzer.extract({
+      worldId: "world_1",
+      sessionId: "session_1",
+      runId: "run_1",
+      messages: [{
+        id: "msg_1",
+        role: "assistant",
+        content: "````markdown\n```ts\n### 误报组织\n这是代码块里的组织示例。\n```\n````\n\n### 真实机构\n这是一个机构，负责登记记忆交易。",
+      }],
+    })).toEqual([
+      expect.objectContaining({ type: "organization", title: "真实机构" }),
+    ]);
+  });
+
+  it("ignores headings inside tilde fenced code blocks", () => {
+    const analyzer = new PotentialAssetsAnalyzer();
+
+    expect(analyzer.extract({
+      worldId: "world_1",
+      sessionId: "session_1",
+      runId: "run_1",
+      messages: [{
+        id: "msg_1",
+        role: "assistant",
+        content: "~~~text\n## 误报城市\n这是代码示例。\n~~~\n\n## 星门港\n这是一个港口，连接不同轨道城市。",
+      }],
+    })).toEqual([
+      expect.objectContaining({ type: "location", title: "星门港" }),
+    ]);
+  });
+
   it("truncates summaries to 240 characters", () => {
     const analyzer = new PotentialAssetsAnalyzer();
     const longSummary = "记".repeat(241);
