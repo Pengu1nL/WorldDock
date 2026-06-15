@@ -94,6 +94,7 @@ describe("asset deposition local endpoints", () => {
       .expect(201);
 
     expect(promoted.body.asset).toMatchObject({
+      id: `official_asset_${potentialAsset.id}`,
       type: "rule",
       name: "记忆交易登记令",
       summary: "登记后的记忆交易规则摘要。",
@@ -197,7 +198,28 @@ describe("asset deposition local endpoints", () => {
       message: "Potential asset is not active and cannot be promoted.",
     });
     expect(officialAssets.stores.assets.size).toBe(1);
+    expect([...officialAssets.stores.assets.keys()]).toEqual([`official_asset_${potentialAsset.id}`]);
     expect(countDepositionRuns(agents)).toBe(1);
+  });
+
+  it("returns 409 when a concurrent promotion already created the deterministic official asset", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    seedOfficialAsset(officialAssets, world.id, `official_asset_${potentialAsset.id}`);
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    const duplicate = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(409);
+
+    expect(duplicate.body).toMatchObject({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: "Potential asset is not active and cannot be promoted.",
+    });
+    expect(officialAssets.stores.assets.size).toBe(1);
+    expect([...officialAssets.stores.assets.keys()]).toEqual([`official_asset_${potentialAsset.id}`]);
+    expect(countDepositionRuns(agents)).toBe(0);
   });
 
   it("returns 409 when promoting a dismissed potential asset", async () => {
@@ -331,6 +353,27 @@ function countDepositionRuns(agents: InMemoryAgents) {
     .length;
 }
 
+function seedOfficialAsset(officialAssets: InMemoryOfficialAssets, worldId: string, assetId: string) {
+  const timestamp = new Date();
+  officialAssets.stores.assets.set(assetId, {
+    id: assetId,
+    worldId,
+    type: "rule",
+    name: "已有正式资产",
+    summary: "并发请求已创建的正式资产。",
+    documentKey: `worlds/${worldId}/official-assets/${assetId}.md`,
+    status: "active",
+    version: 1,
+    tags: [],
+    metadata: {},
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    archivedAt: null,
+  });
+  officialAssets.stores.revisions.set(assetId, []);
+  officialAssets.stores.indexes.set(assetId, []);
+}
+
 function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
   const assets = new Map<string, OfficialAssetRecord>();
   const revisions = new Map<string, OfficialAssetRevisionRecord[]>();
@@ -341,6 +384,11 @@ function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
   return {
     stores: { assets, revisions, indexes },
     async createAsset(input: CreateOfficialAssetRecordInput) {
+      if (assets.has(input.id)) {
+        const error = new Error(`Duplicate official asset id: ${input.id}`) as Error & { code: string };
+        error.code = "P2002";
+        throw error;
+      }
       const timestamp = new Date();
       const asset: OfficialAssetRecord = {
         id: input.id,

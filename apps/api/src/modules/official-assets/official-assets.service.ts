@@ -13,6 +13,7 @@ import {
 } from "./official-assets.repository";
 
 export type CreateOfficialAssetInput = {
+  id?: string;
   type: OfficialWorldAssetType;
   name: string;
   summary: string;
@@ -40,13 +41,14 @@ export class OfficialAssetsService {
   async createAsset(worldId: string, input: CreateOfficialAssetInput): Promise<OfficialAssetDetailRecord & { markdown: string }> {
     await this.requireWorld(worldId);
 
-    const assetId = `official_asset_${randomUUID()}`;
+    const requestedAssetId = cleanAssetId(input.id);
+    const assetId = requestedAssetId ?? `official_asset_${randomUUID()}`;
     const markdown = input.markdown?.trim() || buildInitialAssetMarkdown({
       type: input.type,
       name: input.name,
       summary: input.summary,
     });
-    const documentKey = `worlds/${worldId}/official-assets/${assetId}.md`;
+    const documentKey = `worlds/${worldId}/official-assets/${documentKeyStemForAsset(assetId, Boolean(requestedAssetId))}.md`;
     const summary = extractAssetSummary(markdown) || input.summary;
     const indexes = this.buildSectionIndexInputs(markdown);
 
@@ -153,4 +155,14 @@ export class OfficialAssetsService {
       message: "Invalid official asset cursor.",
     });
   }
+}
+
+function cleanAssetId(assetId: string | undefined) {
+  const trimmed = assetId?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function documentKeyStemForAsset(assetId: string, deterministicAssetId: boolean) {
+  if (!deterministicAssetId) return assetId;
+  return `${assetId}-${randomUUID()}`;
 }

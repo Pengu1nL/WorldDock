@@ -159,7 +159,9 @@ export class AgentService {
       sourceSessionId: potentialAsset.sessionId,
       sourceRunId: potentialAsset.runId,
     };
+    const officialAssetId = officialAssetIdForPotentialAsset(potentialAsset.id);
     const createAssetInput: CreateOfficialAssetInput = {
+      id: officialAssetId,
       type: potentialAsset.type,
       name: cleanOptional(input.name) ?? potentialAsset.title,
       summary: potentialAsset.summary,
@@ -170,7 +172,13 @@ export class AgentService {
         ...sourceMetadata,
       },
     };
-    const created = await officialAssets.createAsset(worldId, createAssetInput);
+    let created: Awaited<ReturnType<OfficialAssetsService["createAsset"]>>;
+    try {
+      created = await officialAssets.createAsset(worldId, createAssetInput);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) throw this.potentialAssetNotActive();
+      throw error;
+    }
     const depositionRun = await this.createCompletedAssetDepositionRun(
       worldId,
       potentialAsset,
@@ -961,6 +969,17 @@ function normalizeCreateWorldDraftInput(input: CreateWorldDraftInput): CreateWor
 function cleanOptional(value: string | undefined) {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
+}
+
+function officialAssetIdForPotentialAsset(potentialAssetId: string) {
+  return `official_asset_${potentialAssetId}`;
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "P2002";
 }
 
 function buildWorldDraftPrompt(input: CreateWorldDraftInput) {

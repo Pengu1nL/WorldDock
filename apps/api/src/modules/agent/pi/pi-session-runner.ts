@@ -1,7 +1,22 @@
-import type { PiRuntimeEvent, PiToolName } from "@worlddock/domain/agent/pi";
+import type { PiRuntimeEvent, PiToolCall, PiToolName } from "@worlddock/domain/agent/pi";
 import type { PiRuntimeClient, PiSessionInput } from "./pi-runtime.client";
 import type { SafetyGate } from "./safety-gate";
 import type { WorldToolRegistry } from "./world-tool-registry";
+
+const SESSION_WORLD_SCOPED_TOOLS = new Set<PiToolName>([
+  "get_world_manifest",
+  "search_world_assets",
+  "get_asset_brief",
+  "get_asset_detail",
+  "get_asset_source_fragments",
+  "list_local_releases",
+  "create_world_asset",
+  "update_world_asset_index",
+  "apply_world_asset_patch",
+  "create_consistency_issue",
+  "resolve_consistency_issue",
+  "propose_release_notes",
+]);
 
 function contextEventsFromToolResult(toolName: PiToolName, result: Record<string, unknown>): PiRuntimeEvent[] {
   if (toolName === "get_world_manifest" && result.manifest && typeof result.manifest === "object") {
@@ -41,8 +56,9 @@ export class PiSessionRunner {
   async *run(input: PiSessionInput): AsyncIterable<PiRuntimeEvent> {
     const disclosedAssetIds = new Set(input.context.map((ref) => ref.targetId).filter((id): id is string => Boolean(id)));
 
-    const executeTool = async (toolCall: { id: string; name: PiToolName; arguments: Record<string, unknown> }) => {
+    const executeTool = async (toolCall: PiToolCall) => {
       this.safetyGate.assertToolAllowed(toolCall, disclosedAssetIds, input.policy);
+      assertToolWorldMatchesSession(toolCall, input.worldId);
       const result = await this.tools.execute(toolCall.name, toolCall.arguments);
       const contextEvents = contextEventsFromToolResult(toolCall.name, result);
       for (const assetId of disclosedAssetIdsFromToolResult(toolCall.name, result)) {
@@ -58,6 +74,14 @@ export class PiSessionRunner {
       yield event;
     }
   }
+}
+
+function assertToolWorldMatchesSession(toolCall: PiToolCall, worldId: string) {
+  if (!SESSION_WORLD_SCOPED_TOOLS.has(toolCall.name)) return;
+  const toolWorldId = typeof toolCall.arguments.worldId === "string" ? toolCall.arguments.worldId.trim() : "";
+  if (toolWorldId === worldId) return;
+
+  throw new Error(`Blocked cross-world pi tool: ${toolCall.name} requires worldId ${worldId}`);
 }
 
 function disclosedAssetIdsFromToolResult(toolName: PiToolName, result: Record<string, unknown>) {
