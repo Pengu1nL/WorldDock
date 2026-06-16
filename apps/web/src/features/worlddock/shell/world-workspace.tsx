@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
-import { ArchiveView, ConflictsView } from "../view-archive";
+import { ArchiveView, ConflictsView, SeedsView } from "../view-archive";
 import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
 import { Composer, Message } from "../view-workbench";
@@ -95,15 +95,19 @@ export function WorldWorkspace({
         />
       )}
       {view === "asset-library" && currentWorld && (
-        <ArchiveView world={currentWorld} savedSettings={savedSettings} savedIssues={savedIssues}
-          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-          onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
-          onCreateAsset={openAssetEditor}
-          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-          onDeleteAsset={removeEditedAsset}
-          onReorderAssets={reorderAssets}
-          onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("exploration")}/>
+        <AssetLibraryWorkspace
+          world={currentWorld}
+          savedSettings={savedSettings}
+          savedSeeds={savedSeeds}
+          savedConflicts={savedConflicts}
+          savedIssues={savedIssues}
+          setDrawerOpen={setDrawerOpen}
+          setView={setView}
+          openAssetEditor={openAssetEditor}
+          removeEditedAsset={removeEditedAsset}
+          reorderAssets={reorderAssets}
+          openAssetRelation={openAssetRelation}
+        />
       )}
       {view === "consistency" && currentWorld && (
         <ConflictsView world={currentWorld} savedConflicts={savedConflicts} savedSeeds={savedSeeds}
@@ -133,6 +137,77 @@ export function WorldWorkspace({
     </>
   );
 }
+
+const AssetLibraryWorkspace = ({
+  world,
+  savedSettings,
+  savedSeeds,
+  savedConflicts,
+  savedIssues,
+  setDrawerOpen,
+  setView,
+  openAssetEditor,
+  removeEditedAsset,
+  reorderAssets,
+  openAssetRelation,
+}: any) => {
+  const [assetView, setAssetView] = useState<"archive" | "seeds">("archive");
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{
+        padding: "10px 32px",
+        borderBottom: "1px solid var(--hairline)",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+      }}>
+        <button
+          className={"sb-btn " + (assetView === "archive" ? "primary" : "")}
+          onClick={() => setAssetView("archive")}
+          style={{ height: 26, fontSize: 12 }}
+          type="button"
+        >
+          设定 <span className="mono sb-dim">{savedSettings.length}</span>
+        </button>
+        <button
+          className={"sb-btn " + (assetView === "seeds" ? "primary" : "")}
+          onClick={() => setAssetView("seeds")}
+          style={{ height: 26, fontSize: 12 }}
+          type="button"
+        >
+          种子 <span className="mono sb-dim">{savedSeeds.length}</span>
+        </button>
+      </div>
+      {assetView === "archive" ? (
+        <ArchiveView world={world} savedSettings={savedSettings} savedIssues={savedIssues}
+          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
+          onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
+          onCreateAsset={openAssetEditor}
+          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
+          onDeleteAsset={removeEditedAsset}
+          onReorderAssets={reorderAssets}
+          onRelateAssets={openAssetRelation}
+          onBackToWorkbench={() => setView("exploration")}/>
+      ) : (
+        <SeedsView world={world} savedSeeds={savedSeeds} savedConflicts={savedConflicts}
+          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
+          onJumpToConflict={(c: any) => {
+            setDrawerOpen(null);
+            setView("consistency");
+            setTimeout(() => setDrawerOpen({ kind: "detail", item: c, readonly: true }), 50);
+          }}
+          onCreateAsset={openAssetEditor}
+          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
+          onDeleteAsset={removeEditedAsset}
+          onReorderAssets={reorderAssets}
+          onRelateAssets={openAssetRelation}
+          onBackToWorkbench={() => setView("exploration")}/>
+      )}
+    </div>
+  );
+};
 
 const Workbench = ({
   world, messages, agentBusy, savedIds, pendingCount,

@@ -25,10 +25,26 @@ describe("world navigation", () => {
     ]);
   });
 
+  it("hides world navigation items when no world is open", () => {
+    expect(getWorldNavigationItems({ hasWorld: false })).toEqual([]);
+  });
+
+  it("passes through new view ids", () => {
+    expect(normalizeWorldDockView("consistency")).toBe("consistency");
+  });
+
+  it("falls back unknown view ids to worlds", () => {
+    expect(normalizeWorldDockView("unknown-view")).toBe("worlds");
+  });
+
   it("normalizes legacy view ids", () => {
     expect(normalizeWorldDockView("workbench")).toBe("exploration");
     expect(normalizeWorldDockView("archive")).toBe("asset-library");
     expect(normalizeWorldDockView("seeds")).toBe("asset-library");
+  });
+
+  it("keeps legacy conflicts events on asset-library during the transition", () => {
+    // Phase 9.2 keeps old conflicts events compatible while the new consistency page settles.
     expect(normalizeWorldDockView("conflicts")).toBe("asset-library");
   });
 });
