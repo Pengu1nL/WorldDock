@@ -138,18 +138,20 @@ describe("ConsistencyChecker", () => {
       },
     ]);
 
-    expect(issues).toEqual([
-      expect.objectContaining({
-        title: expect.stringContaining("Memory Market A"),
-        keyword: "Memory Market A",
-        severity: "normal",
-        subjectAssetIds: ["asset_1", "asset_2"],
-        evidence: [
-          expect.objectContaining({ quote: expect.stringContaining("Memory Market A") }),
-          expect.objectContaining({ quote: expect.stringContaining("Memory Market A") }),
-        ],
-      }),
-    ]);
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: expect.stringContaining("Memory Market A"),
+          keyword: "Memory Market A",
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+          evidence: [
+            expect.objectContaining({ quote: expect.stringContaining("Memory Market A") }),
+            expect.objectContaining({ quote: expect.stringContaining("Memory Market A") }),
+          ],
+        }),
+      ]),
+    );
   });
 
   it("deduplicates the same asset pair and keyword across summary and markdown", () => {
@@ -287,5 +289,73 @@ describe("ConsistencyChecker", () => {
         }),
       ]),
     );
+  });
+
+  it("does not report identical mixed-polarity spans as contradictions", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "alpha beta",
+        summary: "alpha 必须登记。beta 无需登记。",
+        markdown: "alpha 必须登记。beta 无需登记。",
+      },
+      {
+        assetId: "asset_2",
+        type: "rule",
+        name: "alpha beta",
+        summary: "alpha 必须登记。beta 无需登记。",
+        markdown: "alpha 必须登记。beta 无需登记。",
+      },
+    ]);
+
+    expect(issues).toEqual([]);
+  });
+
+  it("reports both broader and shorter keywords when each has matching spans", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "alpha beta",
+        summary: "alpha beta 必须登记。alpha 必须登记。",
+        markdown: "alpha beta 必须登记。alpha 必须登记。",
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "alpha beta",
+        summary: "alpha beta 无需登记。alpha 无需登记。",
+        markdown: "alpha beta 无需登记。alpha 无需登记。",
+      },
+    ]);
+    const alphaIssue = issues.find((issue) => issue.keyword === "alpha");
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          keyword: "alpha beta",
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+        expect.objectContaining({
+          keyword: "alpha",
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+      ]),
+    );
+    expect(alphaIssue?.evidence).toEqual([
+      expect.objectContaining({
+        quote: expect.stringContaining("alpha"),
+      }),
+      expect.objectContaining({
+        quote: expect.stringContaining("alpha"),
+      }),
+    ]);
+    expect(alphaIssue?.evidence[0].quote).not.toContain("无需");
+    expect(alphaIssue?.evidence[1].quote).not.toContain("必须");
   });
 });
