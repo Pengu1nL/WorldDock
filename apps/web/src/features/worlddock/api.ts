@@ -9,7 +9,6 @@ import type {
   AgentSessionKind,
   AgentSessionMessage,
   AgentSessionStatus,
-  AgentSessionSubject,
   ConsistencyIssue,
   ConsistencyIssueStatus,
   OfficialWorldAsset,
@@ -171,6 +170,15 @@ export type AgentEvent =
   | (AgentEventBase & { type: "run.failed"; payload: { code: string; message: string } })
   | (AgentEventBase & { type: "run.cancelled"; payload: { reason?: string } });
 
+export type AgentSessionRunEvent = AgentEvent | (AgentEventBase & {
+  type: "potential_asset.detected";
+  payload: {
+    potentialAssetId: string;
+    potentialAsset?: PotentialAsset;
+    [key: string]: unknown;
+  };
+});
+
 export type SaveAgentSuggestionResponse = {
   suggestion?: {
     savedAssetId?: string | null;
@@ -225,9 +233,21 @@ export type PushWorldReleaseResponse = {
 
 export type AgentSessionDetail = {
   session: AgentSession;
-  subjects: AgentSessionSubject[];
+  subjects: AgentSessionDetailSubject[];
   contextItems: AgentSessionContextItem[];
   messages: AgentSessionMessage[];
+};
+
+export type AgentSessionDetailSubject = {
+  id: string;
+  sessionId: string;
+  subjectKind: AgentSession["subjects"][number]["kind"];
+  subjectId: string;
+  role: AgentSession["subjects"][number]["role"];
+  title?: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CreateAgentSessionInput = {
@@ -861,21 +881,21 @@ export async function streamAgentEvents(
   onEvent: (event: AgentEvent) => void,
 ): Promise<void> {
   const response = await openAgentEventResponse(runId, options);
-  await streamSseEvents(response, onEvent);
+  await streamSseEvents<AgentEvent>(response, onEvent);
 }
 
 export async function streamAgentSessionRunEvents(
   runId: string,
   options: ApiClientOptions,
-  onEvent: (event: AgentEvent) => void,
+  onEvent: (event: AgentSessionRunEvent) => void,
 ): Promise<void> {
   const response = await openAgentSessionRunEventResponse(runId, options);
-  await streamSseEvents(response, onEvent);
+  await streamSseEvents<AgentSessionRunEvent>(response, onEvent);
 }
 
-async function streamSseEvents(response: Response, onEvent: (event: AgentEvent) => void): Promise<void> {
+async function streamSseEvents<TEvent extends AgentEventBase>(response: Response, onEvent: (event: TEvent) => void): Promise<void> {
   if (!response.body) {
-    for (const event of parseSseEvents(await response.text())) onEvent(event);
+    for (const event of parseSseEvents<TEvent>(await response.text())) onEvent(event);
     return;
   }
 
@@ -890,7 +910,7 @@ async function streamSseEvents(response: Response, onEvent: (event: AgentEvent) 
     let boundary = findSseBoundary(buffer);
     while (boundary !== -1) {
       const block = buffer.slice(0, boundary);
-      const parsed = parseSseBlock(block);
+      const parsed = parseSseBlock<TEvent>(block);
       if (parsed) onEvent(parsed);
       buffer = buffer.slice(boundary + getBoundaryLength(buffer, boundary));
       boundary = findSseBoundary(buffer);
@@ -927,11 +947,11 @@ export async function discardAgentSuggestion(suggestionId: string, options: ApiC
   });
 }
 
-function parseSseEvents(text: string): AgentEvent[] {
+function parseSseEvents<TEvent extends AgentEventBase = AgentEvent>(text: string): TEvent[] {
   return text
     .split(/\r?\n\r?\n+/)
-    .map(parseSseBlock)
-    .filter((event): event is AgentEvent => Boolean(event));
+    .map((block) => parseSseBlock<TEvent>(block))
+    .filter((event): event is TEvent => Boolean(event));
 }
 
 async function openAgentEventResponse(runId: string, options: ApiClientOptions): Promise<Response> {
@@ -964,14 +984,14 @@ async function openAgentSessionRunEventResponse(runId: string, options: ApiClien
   return response;
 }
 
-function parseSseBlock(block: string): AgentEvent | null {
+function parseSseBlock<TEvent extends AgentEventBase = AgentEvent>(block: string): TEvent | null {
   const data = block
     .split(/\r?\n/)
     .filter((line) => line.startsWith("data:"))
     .map((line) => line.replace(/^data:\s?/, ""))
     .join("\n");
 
-  return data ? JSON.parse(data) as AgentEvent : null;
+  return data ? JSON.parse(data) as TEvent : null;
 }
 
 function findSseBoundary(text: string) {

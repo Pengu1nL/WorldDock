@@ -35,6 +35,7 @@ import {
   saveAgentSuggestion,
   saveHubConnection,
   streamAgentEvents,
+  streamAgentSessionRunEvents,
   testHubConnection,
   unrelateWorldAssets,
   updateWorldAsset,
@@ -291,6 +292,46 @@ describe("worlddock local API client", () => {
     });
 
     expect(events).toEqual(["message.delta", "run.completed"]);
+  });
+
+  it("streams agent session run SSE events including potential assets", async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode([
+          "event: message.delta",
+          "data: {\"type\":\"message.delta\",\"payload\":{\"text\":\"好。\"}}",
+        ].join("\n") + "\n\n"));
+        controller.enqueue(encoder.encode([
+          "event: potential_asset.detected",
+          "data: {\"type\":\"potential_asset.detected\",\"payload\":{\"potentialAssetId\":\"pa_1\",\"potentialAsset\":{\"id\":\"pa_1\",\"title\":\"记忆税则\"}}}",
+        ].join("\n") + "\n\n"));
+        controller.close();
+      },
+    });
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      body: stream,
+      text: async () => "",
+    } as Response));
+    const eventTypes: string[] = [];
+    let potentialAssetId: string | undefined;
+
+    await streamAgentSessionRunEvents("run_1", { fetcher }, (event) => {
+      eventTypes.push(event.type);
+      if (event.type === "potential_asset.detected") {
+        potentialAssetId = event.payload.potentialAssetId;
+      }
+    });
+
+    expect(eventTypes).toEqual(["message.delta", "potential_asset.detected"]);
+    expect(potentialAssetId).toBe("pa_1");
+    expect(fetcher).toHaveBeenCalledWith("http://localhost:4000/v1/agent-session-runs/run_1/events", {
+      method: "GET",
+      headers: {},
+      signal: undefined,
+    });
   });
 
   it("exports and imports world packages through local endpoints", async () => {
