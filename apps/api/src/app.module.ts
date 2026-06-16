@@ -4,6 +4,7 @@ import { RequestIdMiddleware } from "./common/request-id.middleware";
 import { AgentModule } from "./modules/agent/agent.module";
 import { AgentSessionsModule } from "./modules/agent-sessions/agent-sessions.module";
 import { ConnectionsModule } from "./modules/connections/connections.module";
+import { ConsistencyModule } from "./modules/consistency/consistency.module";
 import { ExportsModule } from "./modules/exports/exports.module";
 import { LocalStorageModule } from "./modules/local-storage/local-storage.module";
 import { OfficialAssetsModule } from "./modules/official-assets/official-assets.module";
@@ -17,6 +18,7 @@ import { WorldsModule } from "./modules/worlds/worlds.module";
     AgentModule,
     AgentSessionsModule,
     ConnectionsModule,
+    ConsistencyModule,
     ExportsModule,
     LocalStorageModule,
     OfficialAssetsModule,
