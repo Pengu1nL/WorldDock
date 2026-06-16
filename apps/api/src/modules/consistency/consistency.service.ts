@@ -32,14 +32,9 @@ export class ConsistencyService {
 
     for (const issue of checked) {
       const sortedSubjectAssetIds = [...issue.subjectAssetIds].sort();
-      const dedupeKey = `${sortedSubjectAssetIds.join(":")}${issue.title}`;
-      const existing = await this.consistencyIssues.findOpenIssueByDedupeKey(worldId, dedupeKey);
-      if (existing) {
-        issues.push(existing);
-        continue;
-      }
+      const dedupeKey = `${sortedSubjectAssetIds.join(":")}::${issue.title}`;
 
-      issues.push(await this.consistencyIssues.createIssue({
+      issues.push(await this.consistencyIssues.createIssueIfOpenDedupeKeyAbsent({
         worldId,
         title: issue.title,
         description: `检测到官方资产围绕「${issue.keyword}」存在潜在冲突。`,
@@ -56,7 +51,7 @@ export class ConsistencyService {
           dedupeKey,
           keyword: issue.keyword,
         },
-      }));
+      }, dedupeKey));
     }
 
     return { issues };

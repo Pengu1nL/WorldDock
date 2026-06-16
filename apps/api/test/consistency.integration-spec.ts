@@ -21,10 +21,14 @@ import { ConsistencyChecker } from "../src/modules/consistency/consistency-check
 import { ConsistencyController } from "../src/modules/consistency/consistency.controller";
 import {
   CONSISTENCY_REPOSITORY,
+  decodeConsistencyIssueListCursor,
+  encodeConsistencyIssueListCursor,
+  InvalidConsistencyIssueListCursorError,
   type ConsistencyIssueRecord,
   type ConsistencyRepository,
   type CreateConsistencyIssueRecordInput,
   type ListConsistencyIssuesQuery,
+  normalizeConsistencyIssueListLimit,
 } from "../src/modules/consistency/consistency.repository";
 import { ConsistencyService } from "../src/modules/consistency/consistency.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
@@ -59,51 +63,151 @@ describe("consistency issues local endpoints", () => {
   });
 
   it("checks official assets and lists consistency issues", async () => {
-    const worlds = createInMemoryWorlds();
-    const world = await worlds.createWorld({
-      name: "回忆所",
-      type: "近未来",
-      summary: "记忆可以被买卖。",
-      tags: ["记忆"],
-      mode: "local",
-      maturity: 12,
-    });
-    app = await createConsistencyApp(worlds);
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
 
-    await createOfficialAssetWithMarkdown("rule", "记忆交易许可", "所有记忆交易必须登记。");
-    await createOfficialAssetWithMarkdown("event", "自由交易日", "自由交易日当天记忆交易无需登记。");
+    await setup.createOfficialAssetWithMarkdown("rule", "记忆交易许可", "所有记忆交易必须登记。");
+    await setup.createOfficialAssetWithMarkdown("event", "自由交易日", "自由交易日当天记忆交易无需登记。");
 
     const checked = await request(app.getHttpServer())
-      .post(`/v1/worlds/${world.id}/consistency-issues/check`)
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/check`)
       .expect(201);
 
     expect(checked.body.issues).toHaveLength(1);
     expect(checked.body.issues[0]).toMatchObject({
-      worldId: world.id,
+      worldId: setup.world.id,
       status: "open",
       severity: "normal",
     });
 
     const listed = await request(app.getHttpServer())
-      .get(`/v1/worlds/${world.id}/consistency-issues`)
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues`)
       .expect(200);
 
     expect(listed.body.issues).toHaveLength(1);
+  });
 
-    async function createOfficialAssetWithMarkdown(type: "rule" | "event", name: string, markdown: string) {
-      await app?.get(OfficialAssetsService).createAsset(world.id, {
-        type,
-        name,
-        summary: markdown,
-        markdown,
-        tags: [],
-      });
-    }
+  it("does not create duplicate open issues on repeated checks", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+
+    await setup.createOfficialAssetWithMarkdown("rule", "记忆交易许可", "所有记忆交易必须登记。");
+    await setup.createOfficialAssetWithMarkdown("event", "自由交易日", "自由交易日当天记忆交易无需登记。");
+
+    const first = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/check`)
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/check`)
+      .expect(201);
+
+    expect(first.body.issues).toHaveLength(1);
+    expect(second.body.issues).toHaveLength(1);
+    expect(second.body.issues[0].id).toBe(first.body.issues[0].id);
+
+    const listed = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues`)
+      .expect(200);
+
+    expect(listed.body.issues).toHaveLength(1);
+  });
+
+  it("filters ignored issues and clears resolvedAt when reopened", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const issue = await setup.seedIssue("记忆交易许可冲突", "memory-trade");
+
+    const ignored = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/ignore`)
+      .expect(200);
+
+    expect(ignored.body.issue).toMatchObject({ id: issue.id, status: "ignored" });
+    expect(ignored.body.issue.resolvedAt).toEqual(expect.any(String));
+
+    const defaultList = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues`)
+      .expect(200);
+    expect(defaultList.body.issues).toHaveLength(0);
+
+    const ignoredList = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues?status=ignored`)
+      .expect(200);
+    expect(ignoredList.body.issues).toHaveLength(1);
+
+    const reopened = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/reopen`)
+      .expect(200);
+
+    expect(reopened.body.issue).toMatchObject({ id: issue.id, status: "open", resolvedAt: null });
+
+    const openList = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues`)
+      .expect(200);
+    expect(openList.body.issues).toHaveLength(1);
+  });
+
+  it("paginates consistency issues with a stable cursor", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    await setup.seedIssue("第一条冲突", "first");
+    await wait(5);
+    await setup.seedIssue("第二条冲突", "second");
+
+    const firstPage = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues?limit=1`)
+      .expect(200);
+
+    expect(firstPage.body.issues).toHaveLength(1);
+    expect(firstPage.body.issues[0].title).toBe("第二条冲突");
+    expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+    const secondPage = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues?limit=1&cursor=${firstPage.body.nextCursor}`)
+      .expect(200);
+
+    expect(secondPage.body.issues).toHaveLength(1);
+    expect(secondPage.body.issues[0].title).toBe("第一条冲突");
+    expect(secondPage.body.nextCursor).toBeNull();
+  });
+
+  it("rejects invalid list cursors", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+
+    await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues?cursor=not-a-cursor`)
+      .expect(400);
+  });
+
+  it("returns issue details and 404 for missing issues", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const issue = await setup.seedIssue("记忆交易许可冲突", "memory-trade");
+
+    const detail = await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}`)
+      .expect(200);
+
+    expect(detail.body.issue).toMatchObject({ id: issue.id, title: "记忆交易许可冲突" });
+
+    await request(app.getHttpServer())
+      .get(`/v1/worlds/${setup.world.id}/consistency-issues/missing_issue`)
+      .expect(404);
   });
 });
 
-async function createConsistencyApp(worlds: InMemoryWorlds) {
-  return createHttpTestApp({
+async function createConsistencyTestSetup() {
+  const worlds = createInMemoryWorlds();
+  const world = await worlds.createWorld({
+    name: "回忆所",
+    type: "近未来",
+    summary: "记忆可以被买卖。",
+    tags: ["记忆"],
+    mode: "local",
+    maturity: 12,
+  });
+  const consistencyIssues = createInMemoryConsistencyIssues();
+  const app = await createHttpTestApp({
     controllers: [ConsistencyController],
     providers: [
       ConsistencyService,
@@ -113,9 +217,39 @@ async function createConsistencyApp(worlds: InMemoryWorlds) {
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
-      { provide: CONSISTENCY_REPOSITORY, useValue: createInMemoryConsistencyIssues() },
+      { provide: CONSISTENCY_REPOSITORY, useValue: consistencyIssues },
     ],
   });
+
+  return {
+    app,
+    world,
+    consistencyIssues,
+    async createOfficialAssetWithMarkdown(type: "rule" | "event", name: string, markdown: string) {
+      await app.get(OfficialAssetsService).createAsset(world.id, {
+        type,
+        name,
+        summary: markdown,
+        markdown,
+        tags: [],
+      });
+    },
+    async seedIssue(title: string, dedupeKey: string) {
+      return consistencyIssues.createIssueIfOpenDedupeKeyAbsent({
+        worldId: world.id,
+        title,
+        description: `${title} 描述`,
+        involves: ["official_asset_1", "official_asset_2"],
+        severity: "normal",
+        subjectAssetIds: ["official_asset_1", "official_asset_2"],
+        evidence: [
+          { assetId: "official_asset_1", quote: "所有记忆交易必须登记。", confidence: 1 },
+          { assetId: "official_asset_2", quote: "记忆交易无需登记。", confidence: 1 },
+        ],
+        metadata: { source: "test" },
+      }, dedupeKey);
+    },
+  };
 }
 
 function createInMemoryOfficialAssets(): OfficialAssetsRepository {
@@ -201,7 +335,9 @@ function createInMemoryConsistencyIssues(): ConsistencyRepository {
   let issueCount = 1;
 
   return {
-    async createIssue(input: CreateConsistencyIssueRecordInput) {
+    async createIssueIfOpenDedupeKeyAbsent(input: CreateConsistencyIssueRecordInput, dedupeKey: string) {
+      const existing = findOpenByDedupeKey(worldIssues(input.worldId), dedupeKey);
+      if (existing) return existing;
       const timestamp = new Date();
       const issue: ConsistencyIssueRecord = {
         id: `consistency_issue_${issueCount++}`,
@@ -213,7 +349,7 @@ function createInMemoryConsistencyIssues(): ConsistencyRepository {
         status: "open",
         subjectAssetIds: [...input.subjectAssetIds],
         evidence: [...input.evidence],
-        metadata: input.metadata ?? {},
+        metadata: { ...(input.metadata ?? {}), dedupeKey },
         createdAt: timestamp,
         updatedAt: timestamp,
         resolvedAt: null,
@@ -221,18 +357,18 @@ function createInMemoryConsistencyIssues(): ConsistencyRepository {
       issues.set(issue.id, issue);
       return issue;
     },
-    async findOpenIssueByDedupeKey(worldId: string, dedupeKey: string) {
-      return [...issues.values()].find((issue) =>
-        issue.worldId === worldId &&
-        issue.status === "open" &&
-        issue.metadata.dedupeKey === dedupeKey,
-      ) ?? null;
-    },
     async listIssues(worldId: string, query: ListConsistencyIssuesQuery = {}) {
-      const filtered = [...issues.values()]
-        .filter((issue) => issue.worldId === worldId)
+      const cursor = query.cursor ? decodeConsistencyIssueListCursor(query.cursor) : null;
+      const limit = normalizeConsistencyIssueListLimit(query.limit);
+      const filtered = worldIssues(worldId)
         .filter((issue) => !query.status || issue.status === query.status);
-      return { issues: filtered, nextCursor: null };
+      if (query.cursor && !cursor) throw new InvalidConsistencyIssueListCursorError("Invalid consistency issue cursor.");
+      const cursorFiltered = filtered.filter((issue) => !cursor || isAfterCursor(issue, cursor));
+      const page = cursorFiltered.slice(0, limit);
+      return {
+        issues: page,
+        nextCursor: cursorFiltered.length > limit ? encodeConsistencyIssueListCursor(page[page.length - 1]) : null,
+      };
     },
     async getIssue(worldId: string, issueId: string) {
       const issue = issues.get(issueId);
@@ -252,4 +388,27 @@ function createInMemoryConsistencyIssues(): ConsistencyRepository {
       return updated;
     },
   };
+
+  function worldIssues(worldId: string) {
+    return [...issues.values()]
+      .filter((issue) => issue.worldId === worldId)
+      .sort(compareCreatedDesc);
+  }
+}
+
+function findOpenByDedupeKey(issues: ConsistencyIssueRecord[], dedupeKey: string) {
+  return issues.find((issue) => issue.status === "open" && issue.metadata.dedupeKey === dedupeKey) ?? null;
+}
+
+function isAfterCursor(issue: ConsistencyIssueRecord, cursor: { createdAt: Date; id: string }) {
+  return issue.createdAt.getTime() < cursor.createdAt.getTime() ||
+    (issue.createdAt.getTime() === cursor.createdAt.getTime() && issue.id > cursor.id);
+}
+
+function compareCreatedDesc(left: ConsistencyIssueRecord, right: ConsistencyIssueRecord) {
+  return right.createdAt.getTime() - left.createdAt.getTime() || left.id.localeCompare(right.id);
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }

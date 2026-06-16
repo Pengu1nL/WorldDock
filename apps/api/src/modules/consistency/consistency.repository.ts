@@ -44,8 +44,10 @@ export type ListConsistencyIssuesQuery = {
 };
 
 export type ConsistencyRepository = {
-  createIssue(input: CreateConsistencyIssueRecordInput): Promise<ConsistencyIssueRecord>;
-  findOpenIssueByDedupeKey(worldId: string, dedupeKey: string): Promise<ConsistencyIssueRecord | null>;
+  createIssueIfOpenDedupeKeyAbsent(
+    input: CreateConsistencyIssueRecordInput,
+    dedupeKey: string,
+  ): Promise<ConsistencyIssueRecord>;
   listIssues(
     worldId: string,
     query?: ListConsistencyIssuesQuery,

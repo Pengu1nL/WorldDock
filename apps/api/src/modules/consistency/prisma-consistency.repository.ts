@@ -17,32 +17,39 @@ import {
 export class PrismaConsistencyRepository implements ConsistencyRepository, OnModuleDestroy {
   private readonly prisma: PrismaClient = createPrismaClient();
 
-  async createIssue(input: Parameters<ConsistencyRepository["createIssue"]>[0]) {
-    const issue = await this.prisma.consistencyIssue.create({
-      data: {
-        worldId: input.worldId,
-        title: input.title,
-        description: input.description,
-        involves: input.involves,
-        severity: input.severity,
-        status: "open",
-        subjectAssetIds: input.subjectAssetIds,
-        evidence: input.evidence as never,
-        metadata: (input.metadata ?? {}) as never,
-      },
-    });
-    return mapConsistencyIssue(issue);
-  }
+  async createIssueIfOpenDedupeKeyAbsent(
+    input: Parameters<ConsistencyRepository["createIssueIfOpenDedupeKeyAbsent"]>[0],
+    dedupeKey: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${dedupeLockKey(input.worldId, dedupeKey)}))`;
 
-  async findOpenIssueByDedupeKey(worldId: string, dedupeKey: string) {
-    const issues = await this.prisma.consistencyIssue.findMany({
-      where: {
-        worldId,
-        status: "open",
-      },
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      const existingIssues = await tx.consistencyIssue.findMany({
+        where: {
+          worldId: input.worldId,
+          status: "open",
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      });
+      const existingIssue = existingIssues.map(mapConsistencyIssue)
+        .find((issue) => issue.metadata.dedupeKey === dedupeKey);
+      if (existingIssue) return existingIssue;
+
+      const issue = await tx.consistencyIssue.create({
+        data: {
+          worldId: input.worldId,
+          title: input.title,
+          description: input.description,
+          involves: input.involves,
+          severity: input.severity,
+          status: "open",
+          subjectAssetIds: input.subjectAssetIds,
+          evidence: input.evidence as never,
+          metadata: { ...(input.metadata ?? {}), dedupeKey } as never,
+        },
+      });
+      return mapConsistencyIssue(issue);
     });
-    return issues.map(mapConsistencyIssue).find((issue) => issue.metadata.dedupeKey === dedupeKey) ?? null;
   }
 
   async listIssues(worldId: string, query: Parameters<ConsistencyRepository["listIssues"]>[1] = {}) {
@@ -137,4 +144,8 @@ function isEvidence(value: unknown): value is ConsistencyIssueEvidenceRecord {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function dedupeLockKey(worldId: string, dedupeKey: string) {
+  return `consistency-issue:${worldId}:${dedupeKey}`;
 }
