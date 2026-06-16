@@ -232,7 +232,14 @@ function createChineseSuffixes(text: string): string[] {
 }
 
 function containsKeyword(longerKeyword: string, keyword: string): boolean {
-  return longerKeyword !== keyword && longerKeyword.toLowerCase().includes(keyword.toLowerCase());
+  if (isAsciiKeyword(keyword)) {
+    const escapedKeyword = escapeRegExp(keyword);
+    const pattern = new RegExp(`(^|[^A-Za-z0-9_])${escapedKeyword}(?=$|[^A-Za-z0-9_])`, "i");
+
+    return pattern.test(longerKeyword);
+  }
+
+  return longerKeyword.includes(keyword);
 }
 
 function splitEvidenceSpans(text: string): string[] {
@@ -240,4 +247,12 @@ function splitEvidenceSpans(text: string): string[] {
     .split(/[。！？!?；;\n]+/u)
     .map((span) => span.trim())
     .filter((span) => span.length > 0);
+}
+
+function isAsciiKeyword(keyword: string): boolean {
+  return /^[A-Za-z0-9_ ]+$/.test(keyword);
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

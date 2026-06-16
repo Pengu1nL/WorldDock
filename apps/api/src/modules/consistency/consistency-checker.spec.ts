@@ -358,4 +358,35 @@ describe("ConsistencyChecker", () => {
     expect(alphaIssue?.evidence[0].quote).not.toContain("无需");
     expect(alphaIssue?.evidence[1].quote).not.toContain("必须");
   });
+
+  it("does not match an English keyword inside a longer token", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "alpha",
+        summary: "alphabet 必须登记。",
+        markdown: null,
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "alpha",
+        summary: "alphabet 无需登记。",
+        markdown: null,
+      },
+    ]);
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          keyword: "alphabet",
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+      ]),
+    );
+    expect(issues.some((issue) => issue.keyword === "alpha")).toBe(false);
+  });
 });
