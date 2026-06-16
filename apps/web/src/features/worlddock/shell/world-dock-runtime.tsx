@@ -29,12 +29,18 @@ import { AgentRunPanel } from "../../agent/agent-run-panel";
 import { ContextInspector } from "../../agent/context-inspector";
 import { AssetEditor } from "../../world-assets/asset-editor";
 import { AssetSearch } from "../../world-assets/asset-search";
-import { Drawer, Rail, StatusBar, Toasts } from "../components";
+import { Drawer, Toasts } from "../components";
+import {
+  normalizeWorldDockView,
+  WorldNavigationRail,
+  type LegacyWorldDockView,
+  type WorldDockView,
+} from "./world-navigation";
+import { WorldStatusBar } from "./world-status-bar";
 import {
   WorldWorkspace,
   type WorldDockActions,
   type WorldDockRuntimeState,
-  type WorldDockView,
 } from "./world-workspace";
 import {
   IssuesDrawer,
@@ -420,7 +426,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       setAgentRunStatus("failed");
     }
     setCurrentWorld(w);
-    setView("workbench");
+    setView("exploration");
     // Restore prior state if we have it
     const saved = worldStatesRef.current[id];
     if (saved) {
@@ -498,7 +504,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       setAgentToolEvents([]);
       setAgentRunStatus("idle");
       setRunTokens(0);
-      setView("workbench");
+      setView("exploration");
       setTimeout(() => startAgentRun(inspiration, newWorld), 200);
     } catch {
       pushToast({ kind: "warn", text: "创建世界失败 · 请检查本地 API 服务" });
@@ -541,9 +547,9 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       if (savedItem.kind === "conflict") setSavedConflicts((prev: any[]) => [...prev, savedItem]);
     }
     if (savedItem.kind === "setting") {
-      pushToast({ kind: "save", text: `已保存到档案 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("archive") } });
+      pushToast({ kind: "save", text: `已保存到档案 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("asset-library") } });
     } else if (savedItem.kind === "seed") {
-      pushToast({ kind: "save", text: `已保存到种子池 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("seeds") } });
+      pushToast({ kind: "save", text: `已保存到种子池 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("asset-library") } });
     } else if (savedItem.kind === "conflict") {
       pushToast({ kind: "save", text: `已记入冲突池 · ${savedItem.title}` });
     }
@@ -773,7 +779,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     pushToast({
       kind: "save",
       text: `已升格为冲突 · ${issue.title}`,
-      action: { label: "查看", onClick: () => setView("conflicts") },
+      action: { label: "查看", onClick: () => setView("consistency") },
     });
   };
 
@@ -795,19 +801,25 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
   // ────────── Top-level render ──────────
   return (
     <div className="app">
-      <StatusBar
+      <WorldStatusBar
         world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
         mode={t.mode}
         tokens={runTokens}
+        assetCount={allSavedAssets.length}
+        openIssueCount={savedIssues.length}
       />
       <div className="app-body">
-        <Rail
+        <WorldNavigationRail
           view={view}
-          onNav={(v: any) => {
-            if (v === "worlds") setView("worlds");
-            else if (v === "settings") setView("settings");
-            else if (currentWorld) setView(v as WorldDockView);
-            else setView("worlds");
+          onNav={(nextView: LegacyWorldDockView | string) => {
+            const normalizedView = normalizeWorldDockView(nextView);
+            if (normalizedView === "worlds" || normalizedView === "settings") {
+              setView(normalizedView);
+            } else if (currentWorld) {
+              setView(normalizedView);
+            } else {
+              setView("worlds");
+            }
           }}
           world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
           pendingCount={pendingItems.length}
@@ -951,13 +963,12 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
                 onSave={handleSave}
                 onDiscard={handleDiscard}
                 onClose={() => setDrawerOpen(null)}
-                onBackToWorkbench={() => { setDrawerOpen(null); setView("workbench"); }}
+                onBackToWorkbench={() => { setDrawerOpen(null); setView("exploration"); }}
                 onJumpToItem={(targetItem: any) => {
                   // Jump to a linked item: switch to the appropriate pool and reopen drawer on it
-                  const targetView = targetItem.kind === "seed" ? "seeds" :
-                                     targetItem.kind === "conflict" ? "conflicts" : "archive";
+                  const targetView: WorldDockView = targetItem.kind === "conflict" ? "consistency" : "asset-library";
                   setDrawerOpen(null);
-                  setView(targetView as WorldDockView);
+                  setView(targetView);
                   setTimeout(() => setDrawerOpen({ kind: "detail", item: targetItem, readonly: true }), 50);
                 }}
               />

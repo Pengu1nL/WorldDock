@@ -3,20 +3,11 @@
 import { useEffect, useRef } from "react";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
-import { ArchiveView, ConflictsView, SeedsView } from "../view-archive";
+import { ArchiveView, ConflictsView } from "../view-archive";
 import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
 import { Composer, Message } from "../view-workbench";
-
-export type WorldDockView =
-  | "worlds"
-  | "create"
-  | "workbench"
-  | "archive"
-  | "seeds"
-  | "conflicts"
-  | "publish"
-  | "settings";
+import type { WorldDockView } from "./world-navigation";
 
 export type WorldDockRuntimeState = {
   messages: any[];
@@ -84,7 +75,7 @@ export function WorldWorkspace({
 
   return (
     <>
-      {view === "workbench" && currentWorld && (
+      {view === "exploration" && currentWorld && (
         <Workbench
           world={currentWorld}
           messages={messages}
@@ -103,7 +94,7 @@ export function WorldWorkspace({
           onOpenSuggestions={() => setDrawerOpen({ kind: "pending" })}
         />
       )}
-      {view === "archive" && currentWorld && (
+      {view === "asset-library" && currentWorld && (
         <ArchiveView world={currentWorld} savedSettings={savedSettings} savedIssues={savedIssues}
           onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
           onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
@@ -112,20 +103,9 @@ export function WorldWorkspace({
           onDeleteAsset={removeEditedAsset}
           onReorderAssets={reorderAssets}
           onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("workbench")}/>
+          onBackToWorkbench={() => setView("exploration")}/>
       )}
-      {view === "seeds" && currentWorld && (
-        <SeedsView world={currentWorld} savedSeeds={savedSeeds} savedConflicts={savedConflicts}
-          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-          onJumpToConflict={(c: any) => { setDrawerOpen(null); setView("conflicts"); setTimeout(() => setDrawerOpen({ kind: "detail", item: c, readonly: true }), 50); }}
-          onCreateAsset={openAssetEditor}
-          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-          onDeleteAsset={removeEditedAsset}
-          onReorderAssets={reorderAssets}
-          onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("workbench")}/>
-      )}
-      {view === "conflicts" && currentWorld && (
+      {view === "consistency" && currentWorld && (
         <ConflictsView world={currentWorld} savedConflicts={savedConflicts} savedSeeds={savedSeeds}
           onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
           onCreateAsset={openAssetEditor}
@@ -133,14 +113,14 @@ export function WorldWorkspace({
           onDeleteAsset={removeEditedAsset}
           onReorderAssets={reorderAssets}
           onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("workbench")}/>
+          onBackToWorkbench={() => setView("exploration")}/>
       )}
       {view === "publish" && currentWorld && (
         <PublishView
           currentWorld={currentWorld}
           assets={allSavedAssets}
           onToast={pushToast}
-          onBack={() => setView("workbench")}
+          onBack={() => setView("exploration")}
         />
       )}
       {view === "settings" && (

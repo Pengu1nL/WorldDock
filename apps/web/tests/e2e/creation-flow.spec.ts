@@ -16,6 +16,6 @@ test("creator can create a world, continue a run, and save suggestions", async (
 
   await page.getByRole("button", { name: "保存 《记忆交易法》" }).first().click();
   await expect(page.getByText(/已保存到档案/)).toBeVisible();
-  await page.getByRole("button", { name: /档案/ }).click();
+  await page.getByRole("button", { name: /资产库/ }).click();
   await expect(page.locator("main").getByText("《记忆交易法》", { exact: true })).toBeVisible();
 });

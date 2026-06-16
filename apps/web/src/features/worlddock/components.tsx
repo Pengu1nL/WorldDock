@@ -7,6 +7,9 @@ import * as Lucide from "lucide-react";
 const ICONS: Record<string, Lucide.LucideIcon> = {
   worlds: Lucide.Globe2,
   create: Lucide.Plus,
+  assets: Lucide.Library,
+  consistency: Lucide.TriangleAlert,
+  session: Lucide.MessagesSquare,
   explore: Lucide.Search,
   archive: Lucide.Archive,
   seed: Lucide.Sprout,
@@ -120,36 +123,36 @@ export const StatusBar = ({ world, mode, tokens }: any) => {
 };
 
 // ────────── Left Rail ──────────
-export const Rail = ({ view, onNav, world, pendingCount }: any) => {
-  const items = [
-    { id: "worlds",   label: "世界",  ico: "worlds" },
+export const Rail = ({ view, onNav, world, pendingCount, items, worldItems }: any) => {
+  const railItems = items ?? [
+    { id: "worlds", label: "世界", icon: "worlds" },
   ];
-  const worldItems = world ? [
-    { id: "workbench", label: "推演", ico: "spark", badge: pendingCount },
-    { id: "archive",   label: "档案", ico: "archive" },
-    { id: "seeds",     label: "种子", ico: "seed" },
-    { id: "conflicts", label: "冲突", ico: "conflict" },
-    { id: "publish",   label: "发布", ico: "push" },
-  ] : [];
+  const railWorldItems = world ? (worldItems ?? [
+    { id: "exploration", label: "推演", icon: "session", badge: pendingCount },
+    { id: "asset-library", label: "资产库", icon: "assets" },
+    { id: "consistency", label: "矛盾", icon: "consistency" },
+    { id: "publish", label: "发布", icon: "push" },
+  ]) : [];
   return (
     <div className="rail">
       <div className="rail-logo title-font">界</div>
-      {items.map(it => (
+      {railItems.map((it: any) => (
         <button key={it.id} className={"rail-item " + (view === it.id ? "active" : "")} onClick={() => onNav(it.id)}>
-          <Icon name={it.ico} size={18}/>
+          <Icon name={it.icon ?? it.ico} size={18}/>
           <span className="lbl">{it.label}</span>
+          {it.badge ? <span className="rail-badge">{it.badge}</span> : null}
         </button>
       ))}
-      {worldItems.length > 0 && <div style={{ height: 1, background: "var(--hairline)", margin: "8px 12px" }}/>}
-      {worldItems.map(it => (
+      {railWorldItems.length > 0 && <div style={{ height: 1, background: "var(--hairline)", margin: "8px 12px" }}/>}
+      {railWorldItems.map((it: any) => (
         <button key={it.id} className={"rail-item " + (view === it.id ? "active" : "")} onClick={() => onNav(it.id)}>
-          <Icon name={it.ico} size={18}/>
+          <Icon name={it.icon ?? it.ico} size={18}/>
           <span className="lbl">{it.label}</span>
           {it.badge ? <span className="rail-badge">{it.badge}</span> : null}
         </button>
       ))}
       <div className="rail-spacer"/>
-      <button className="rail-item" onClick={() => onNav("settings")} aria-label="设置">
+      <button className={"rail-item " + (view === "settings" ? "active" : "")} onClick={() => onNav("settings")} aria-label="设置">
         <Icon name="settings" size={16}/>
       </button>
     </div>
