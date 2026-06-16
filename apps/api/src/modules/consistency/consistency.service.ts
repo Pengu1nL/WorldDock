@@ -1,9 +1,11 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { type ConsistencyIssueStatus } from "@worlddock/contract/consistency";
+import { AgentSessionsService } from "../agent-sessions/agent-sessions.service";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
   type OfficialAssetsRepository,
 } from "../official-assets/official-assets.repository";
+import { WorldAssetPatchesService, type OfficialAssetPatchBatchView } from "../official-assets/world-asset-patches.service";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { ConsistencyChecker } from "./consistency-checker";
 import {
@@ -21,6 +23,8 @@ export class ConsistencyService {
     @Inject(CONSISTENCY_REPOSITORY) private readonly consistencyIssues: ConsistencyRepository,
     @Inject(OFFICIAL_ASSETS_REPOSITORY) private readonly officialAssets: OfficialAssetsRepository,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
+    private readonly agentSessions: AgentSessionsService,
+    private readonly assetPatches: WorldAssetPatchesService,
     private readonly checker: ConsistencyChecker,
   ) {}
 
@@ -84,6 +88,124 @@ export class ConsistencyService {
     return this.consistencyIssues.updateIssueStatus(worldId, issueId, status);
   }
 
+  async createRepairSession(worldId: string, issueId: string, input: { title?: string }) {
+    await this.requireWorld(worldId);
+    const issue = await this.consistencyIssues.getIssue(worldId, issueId);
+    if (!issue) throw this.notFound();
+
+    const assets = await this.listIssueAssetContext(worldId, issue.subjectAssetIds);
+    const session = await this.agentSessions.createSession(worldId, {
+      kind: "consistency_repair",
+      issueId,
+      title: input.title,
+      contextItems: [
+        {
+          kind: "consistency_issue",
+          targetId: issue.id,
+          title: issue.title,
+          summary: issue.description,
+          metadata: {
+            severity: issue.severity,
+            status: issue.status,
+            subjectAssetIds: issue.subjectAssetIds,
+          },
+        },
+        ...assets.map((asset) => ({
+          kind: "asset_document" as const,
+          targetId: asset.id,
+          title: asset.name,
+          summary: asset.summary,
+          metadata: {
+            documentKey: asset.documentKey,
+            version: asset.version,
+            type: asset.type,
+            source: "consistency_issue",
+          },
+        })),
+      ],
+    });
+
+    return this.agentSessions.getSessionDetail(worldId, session.id);
+  }
+
+  async applyPatchBatch(input: {
+    worldId: string;
+    issueId: string;
+    sessionId: string;
+    patches: Array<{
+      assetId: string;
+      afterMarkdown: string;
+      reason?: string;
+    }>;
+  }): Promise<OfficialAssetPatchBatchView> {
+    await this.requireWorld(input.worldId);
+    if (!input.patches.length) throw this.badRequest("Patch batch must include at least one patch.");
+    const issue = await this.consistencyIssues.getIssue(input.worldId, input.issueId);
+    if (!issue) throw this.notFound();
+
+    const batch = await this.assetPatches.createPatchBatch({
+      worldId: input.worldId,
+      issueId: input.issueId,
+      sessionId: input.sessionId,
+    });
+    const applied: Array<{ assetId: string; patchId: string }> = [];
+
+    try {
+      for (const patch of input.patches) {
+        const appliedPatch = await this.assetPatches.applyConsistencyRepairPatch({
+          worldId: input.worldId,
+          issueId: input.issueId,
+          sessionId: input.sessionId,
+          batchId: batch.id,
+          allowedAssetIds: issue.subjectAssetIds,
+          assetId: patch.assetId,
+          afterMarkdown: patch.afterMarkdown,
+          reason: patch.reason,
+        });
+        applied.push({ assetId: patch.assetId, patchId: appliedPatch.id });
+      }
+      const appliedBatch = await this.assetPatches.markPatchBatchApplied(input.worldId, batch.id);
+      await this.consistencyIssues.updateIssueStatus(input.worldId, input.issueId, "resolved");
+      return appliedBatch;
+    } catch (error) {
+      for (const patch of [...applied].reverse()) {
+        try {
+          await this.assetPatches.revertPatch(input.worldId, patch.assetId, patch.patchId);
+        } catch {
+          // Surface the original apply error; best-effort compensation may fail under concurrent edits.
+        }
+      }
+      try {
+        await this.assetPatches.markPatchBatchReverted(input.worldId, batch.id);
+      } catch {
+        // Keep the original error.
+      }
+      throw error;
+    }
+  }
+
+  async revertPatchBatch(worldId: string, issueId: string, batchId: string): Promise<OfficialAssetPatchBatchView> {
+    await this.requireWorld(worldId);
+    const issue = await this.consistencyIssues.getIssue(worldId, issueId);
+    if (!issue) throw this.notFound();
+    const batch = await this.assetPatches.getPatchBatch(worldId, batchId);
+    if (batch.issueId !== issueId) {
+      throw this.badRequest("Patch batch does not belong to the consistency issue.");
+    }
+    if (batch.status !== "applied") {
+      throw this.badRequest("Only applied patch batches can be reverted.");
+    }
+
+    const patches = await this.assetPatches.listPatchesByBatch(worldId, batchId);
+    for (const patch of [...patches].reverse()) {
+      await this.assetPatches.revertPatch(worldId, patch.assetId, patch.id);
+    }
+
+    const reverted = await this.assetPatches.markPatchBatchReverted(worldId, batchId);
+    await this.consistencyIssues.updateIssueStatus(worldId, issueId, "open");
+    return reverted;
+  }
+
   private async listActiveOfficialAssetsWithMarkdown(worldId: string) {
     const assets = [];
     let cursor: string | undefined;
@@ -108,6 +230,15 @@ export class ConsistencyService {
     return assets;
   }
 
+  private async listIssueAssetContext(worldId: string, assetIds: string[]) {
+    const assets = [];
+    for (const assetId of assetIds) {
+      const detail = await this.officialAssets.getAsset(worldId, assetId);
+      if (detail) assets.push(detail.asset);
+    }
+    return assets;
+  }
+
   private async requireWorld(worldId: string) {
     const world = await this.worlds.findWorldById(worldId);
     if (!world) throw this.notFound();
@@ -125,6 +256,13 @@ export class ConsistencyService {
     return new BadRequestException({
       code: "BAD_REQUEST",
       message: "Invalid consistency issue cursor.",
+    });
+  }
+
+  private badRequest(message: string) {
+    return new BadRequestException({
+      code: "BAD_REQUEST",
+      message,
     });
   }
 }

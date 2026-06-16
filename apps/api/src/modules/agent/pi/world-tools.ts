@@ -1,4 +1,5 @@
 import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import type { ConsistencyService } from "../../consistency/consistency.service";
 import type { OfficialAssetsService } from "../../official-assets/official-assets.service";
 import type { WorldAssetPatchesService } from "../../official-assets/world-asset-patches.service";
 import type { ArchiveEntryRecord, ConflictRecord, StorySeedRecord, WorldRecord, WorldRepository } from "../../worlds/world.repository";
@@ -21,6 +22,7 @@ export function createWorldToolRegistry(
   worlds: WorldRepository,
   officialAssets?: OfficialAssetsService,
   assetPatches?: WorldAssetPatchesService,
+  consistency?: ConsistencyService,
 ) {
   const registry = new WorldToolRegistry();
 
@@ -100,7 +102,19 @@ export function createWorldToolRegistry(
     };
   });
 
-  registry.register("resolve_consistency_issue", async () => unimplementedFormalAssetTool("resolve_consistency_issue"));
+  registry.register("resolve_consistency_issue", async (input) => {
+    if (!consistency) {
+      throw new Error("Consistency issue resolve tool is unavailable: ConsistencyService is not configured.");
+    }
+    return {
+      batch: await consistency.applyPatchBatch({
+        worldId: readToolText(input.worldId),
+        issueId: readToolText(input.issueId),
+        sessionId: readToolText(input.sessionId),
+        patches: readToolPatches(input.patches),
+      }),
+    };
+  });
 
   registry.register("propose_setting", async (input) => {
     const body = readToolText(input.body, input.summary, "待整理设定建议。");
@@ -152,10 +166,6 @@ export function createWorldToolRegistry(
   return registry;
 }
 
-function unimplementedFormalAssetTool(toolName: string): never {
-  throw new Error(`World asset write tool is not implemented yet: ${toolName}`);
-}
-
 function readToolText(...values: unknown[]) {
   for (const value of values) {
     if (value === null || value === undefined) continue;
@@ -172,6 +182,17 @@ function readToolMarkdown(...values: unknown[]) {
     if (text.trim()) return text;
   }
   return "";
+}
+
+function readToolPatches(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isRecord)
+    .map((patch) => ({
+      assetId: readToolText(patch.assetId),
+      afterMarkdown: readToolMarkdown(patch.afterMarkdown, patch.markdown),
+      reason: readToolText(patch.reason) || undefined,
+    }));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

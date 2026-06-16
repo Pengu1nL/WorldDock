@@ -42,7 +42,7 @@ const WORLD_TOOL_DEFINITIONS: WorldToolDefinition[] = [
   {
     name: "resolve_consistency_issue",
     description: "Resolve a tracked consistency issue after repair work has been applied.",
-    inputSchema: { type: "object", required: ["worldId", "issueId", "resolution"] },
+    inputSchema: { type: "object", required: ["worldId", "issueId", "sessionId", "patches"] },
   },
   {
     name: "propose_setting",

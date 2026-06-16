@@ -72,6 +72,19 @@ export type OfficialAssetPatchRecord = {
   revertedAt: Date | null;
 };
 
+export type OfficialAssetPatchBatchRecord = {
+  id: string;
+  worldId: string;
+  sessionId: string;
+  issueId: string | null;
+  status: "applying" | "applied" | "reverted";
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+  appliedAt: Date | null;
+  revertedAt: Date | null;
+};
+
 export type CreateOfficialAssetRecordInput = {
   id: string;
   worldId: string;
@@ -105,6 +118,7 @@ export type ApplyOfficialAssetPatchRecordInput = {
   worldId: string;
   assetId: string;
   sessionId: string;
+  batchId?: string | null;
   expectedVersion: number;
   expectedBeforeRevisionId: string | null;
   beforeMarkdown: string;
@@ -117,6 +131,14 @@ export type ApplyOfficialAssetPatchRecordInput = {
     summary: string | null;
     metadata?: Record<string, unknown>;
   }>;
+};
+
+export type CreateOfficialAssetPatchBatchRecordInput = {
+  worldId: string;
+  sessionId: string;
+  issueId?: string | null;
+  status?: OfficialAssetPatchBatchRecord["status"];
+  metadata?: Record<string, unknown>;
 };
 
 export type RevertOfficialAssetPatchRecordInput = {
@@ -157,8 +179,16 @@ export type OfficialAssetsRepository = {
 };
 
 export type OfficialAssetPatchesRepository = {
+  createPatchBatch?(input: CreateOfficialAssetPatchBatchRecordInput): Promise<OfficialAssetPatchBatchRecord>;
+  getPatchBatch?(worldId: string, batchId: string): Promise<OfficialAssetPatchBatchRecord | null>;
+  updatePatchBatchStatus?(
+    worldId: string,
+    batchId: string,
+    status: OfficialAssetPatchBatchRecord["status"],
+  ): Promise<OfficialAssetPatchBatchRecord | null>;
   applyPatch(input: ApplyOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null>;
   listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]>;
+  listPatchesByBatch?(worldId: string, batchId: string): Promise<OfficialAssetPatchRecord[]>;
   getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null>;
   revertPatch(input: RevertOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null>;
 };

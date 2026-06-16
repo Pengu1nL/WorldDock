@@ -8,6 +8,7 @@ import {
   OFFICIAL_ASSETS_REPOSITORY,
   OfficialAssetPatchAlreadyRevertedError,
   OfficialAssetPatchConflictError,
+  type OfficialAssetPatchBatchRecord,
   type OfficialAssetPatchRecord,
   type OfficialAssetPatchesRepository,
   type OfficialAssetsRepository,
@@ -22,9 +23,24 @@ export type ApplyWorldAssetPatchInput = {
   reason?: string;
 };
 
+export type ApplyConsistencyRepairAssetPatchInput = ApplyWorldAssetPatchInput & {
+  issueId: string;
+  batchId: string;
+  allowedAssetIds: string[];
+};
+
 export type OfficialAssetPatchView = Omit<OfficialAssetPatchRecord, "diff"> & {
   diff: LineDiffOperation[] | null;
 };
+
+export type OfficialAssetPatchBatchView = OfficialAssetPatchBatchRecord & {
+  patchIds: string[];
+};
+
+type OfficialAssetPatchBatchRepository = OfficialAssetPatchesRepository & Required<Pick<
+  OfficialAssetPatchesRepository,
+  "createPatchBatch" | "getPatchBatch" | "updatePatchBatchStatus" | "listPatchesByBatch"
+>>;
 
 const MAX_PATCH_MARKDOWN_BYTES = 256 * 1024;
 const MAX_PATCH_MARKDOWN_LINES = 1000;
@@ -42,6 +58,79 @@ export class WorldAssetPatchesService {
   ) {}
 
   async applyPatch(input: ApplyWorldAssetPatchInput): Promise<OfficialAssetPatchView> {
+    return this.applyPatchWithSessionPolicy(input, {
+      batchId: null,
+      requireSession: () => this.requireAssetEditSession(input.worldId, input.assetId, input.sessionId.trim()),
+    });
+  }
+
+  async createPatchBatch(input: {
+    worldId: string;
+    issueId: string;
+    sessionId: string;
+  }): Promise<OfficialAssetPatchBatchView> {
+    await this.requireWorld(input.worldId);
+    await this.requireConsistencyRepairSession(input.worldId, input.issueId, input.sessionId, []);
+    const batch = await this.patchBatchRepository().createPatchBatch({
+      worldId: input.worldId,
+      issueId: input.issueId,
+      sessionId: input.sessionId,
+      status: "applying",
+    });
+    return this.toPatchBatchView(batch, []);
+  }
+
+  async markPatchBatchApplied(worldId: string, batchId: string): Promise<OfficialAssetPatchBatchView> {
+    const repository = this.patchBatchRepository();
+    const batch = await repository.updatePatchBatchStatus(worldId, batchId, "applied");
+    if (!batch) throw this.notFound();
+    const patches = await repository.listPatchesByBatch(worldId, batchId);
+    return this.toPatchBatchView(batch, patches.map((patch) => patch.id));
+  }
+
+  async markPatchBatchReverted(worldId: string, batchId: string): Promise<OfficialAssetPatchBatchView> {
+    const repository = this.patchBatchRepository();
+    const batch = await repository.updatePatchBatchStatus(worldId, batchId, "reverted");
+    if (!batch) throw this.notFound();
+    const patches = await repository.listPatchesByBatch(worldId, batchId);
+    return this.toPatchBatchView(batch, patches.map((patch) => patch.id));
+  }
+
+  async getPatchBatch(worldId: string, batchId: string): Promise<OfficialAssetPatchBatchView> {
+    await this.requireWorld(worldId);
+    const repository = this.patchBatchRepository();
+    const batch = await repository.getPatchBatch(worldId, batchId);
+    if (!batch) throw this.notFound();
+    const patches = await repository.listPatchesByBatch(worldId, batchId);
+    return this.toPatchBatchView(batch, patches.map((patch) => patch.id));
+  }
+
+  async listPatchesByBatch(worldId: string, batchId: string): Promise<OfficialAssetPatchView[]> {
+    await this.requireWorld(worldId);
+    const patches = await this.patchBatchRepository().listPatchesByBatch(worldId, batchId);
+    return patches.map((patch) => this.toPatchView(patch));
+  }
+
+  async applyConsistencyRepairPatch(input: ApplyConsistencyRepairAssetPatchInput): Promise<OfficialAssetPatchView> {
+    return this.applyPatchWithSessionPolicy(input, {
+      batchId: input.batchId,
+      requireSession: () => this.requireConsistencyRepairSession(
+        input.worldId,
+        input.issueId,
+        input.sessionId.trim(),
+        input.allowedAssetIds,
+        input.assetId,
+      ),
+    });
+  }
+
+  private async applyPatchWithSessionPolicy(
+    input: ApplyWorldAssetPatchInput,
+    options: {
+      batchId: string | null;
+      requireSession: () => Promise<unknown>;
+    },
+  ): Promise<OfficialAssetPatchView> {
     const afterMarkdown = input.afterMarkdown;
     const sessionId = input.sessionId.trim();
     if (afterMarkdown.trim().length === 0 || !sessionId) {
@@ -53,7 +142,7 @@ export class WorldAssetPatchesService {
       await this.requireWorld(input.worldId);
       const detail = await this.officialAssets.getAsset(input.worldId, input.assetId);
       if (!detail) throw this.notFound();
-      await this.requireAssetEditSession(input.worldId, input.assetId, sessionId);
+      await options.requireSession();
 
       const beforeMarkdown = await this.readMarkdown(detail.asset.documentKey);
       this.assertMarkdownWithinBounds(beforeMarkdown, "Current asset markdown");
@@ -77,6 +166,7 @@ export class WorldAssetPatchesService {
           worldId: input.worldId,
           assetId: input.assetId,
           sessionId,
+          batchId: options.batchId,
           expectedVersion: detail.asset.version,
           expectedBeforeRevisionId: detail.revisions[0]?.id ?? null,
           beforeMarkdown,
@@ -192,6 +282,31 @@ export class WorldAssetPatchesService {
     return detail.session;
   }
 
+  private async requireConsistencyRepairSession(
+    worldId: string,
+    issueId: string,
+    sessionId: string,
+    allowedAssetIds: string[],
+    assetId?: string,
+  ) {
+    const detail = await this.agentSessions.getSessionDetail(worldId, sessionId);
+    if (detail.session.kind !== "consistency_repair") {
+      throw this.badRequest("Patch session must be a consistency repair session.");
+    }
+    const primaryIssueSubject = detail.subjects.find((subject) =>
+      subject.kind === "consistency_issue" &&
+      subject.role === "primary" &&
+      subject.targetId === issueId,
+    );
+    if (!primaryIssueSubject) {
+      throw this.badRequest("Patch session primary subject must be the consistency issue.");
+    }
+    if (assetId && !allowedAssetIds.includes(assetId)) {
+      throw this.badRequest("Patch asset must be one of the consistency issue subject assets.");
+    }
+    return detail.session;
+  }
+
   private async requireAsset(worldId: string, assetId: string) {
     const detail = await this.officialAssets.getAsset(worldId, assetId);
     if (!detail) throw this.notFound();
@@ -253,10 +368,25 @@ export class WorldAssetPatchesService {
     return repository as OfficialAssetPatchesRepository;
   }
 
+  private patchBatchRepository(): OfficialAssetPatchBatchRepository {
+    const repository = this.patchRepository();
+    if (!repository.createPatchBatch || !repository.getPatchBatch || !repository.updatePatchBatchStatus || !repository.listPatchesByBatch) {
+      throw new Error("Official asset patch batch repository is not configured.");
+    }
+    return repository as OfficialAssetPatchBatchRepository;
+  }
+
   private toPatchView(patch: OfficialAssetPatchRecord): OfficialAssetPatchView {
     return {
       ...patch,
       diff: parseLineDiff(patch.diff),
+    };
+  }
+
+  private toPatchBatchView(batch: OfficialAssetPatchBatchRecord, patchIds: string[]): OfficialAssetPatchBatchView {
+    return {
+      ...batch,
+      patchIds,
     };
   }
 

@@ -8,7 +8,9 @@ import {
   OfficialAssetPatchAlreadyRevertedError,
   OfficialAssetPatchConflictError,
   type OfficialAssetPatchRecord,
+  type OfficialAssetPatchBatchRecord,
   type OfficialAssetPatchesRepository,
+  type CreateOfficialAssetPatchBatchRecordInput,
   type OfficialAssetDetailRecord,
   type OfficialAssetRecord,
   type OfficialAssetRevisionRecord,
@@ -64,6 +66,45 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
         indexes: indexes.map(mapOfficialAssetIndex),
       };
     });
+  }
+
+  async createPatchBatch(input: CreateOfficialAssetPatchBatchRecordInput) {
+    const timestamp = new Date();
+    const batch = await this.prisma.worldAssetPatchBatch.create({
+      data: {
+        worldId: input.worldId,
+        sessionId: input.sessionId,
+        issueId: input.issueId ?? null,
+        status: input.status ?? "applying",
+        metadata: (input.metadata ?? {}) as never,
+        appliedAt: input.status === "applied" ? timestamp : null,
+        revertedAt: input.status === "reverted" ? timestamp : null,
+      },
+    });
+    return mapOfficialAssetPatchBatch(batch);
+  }
+
+  async getPatchBatch(worldId: string, batchId: string) {
+    const batch = await this.prisma.worldAssetPatchBatch.findFirst({ where: { worldId, id: batchId } });
+    return batch ? mapOfficialAssetPatchBatch(batch) : null;
+  }
+
+  async updatePatchBatchStatus(
+    worldId: string,
+    batchId: string,
+    status: OfficialAssetPatchBatchRecord["status"],
+  ) {
+    const timestamp = new Date();
+    const updated = await this.prisma.worldAssetPatchBatch.updateMany({
+      where: { worldId, id: batchId },
+      data: {
+        status,
+        appliedAt: status === "applied" ? timestamp : undefined,
+        revertedAt: status === "reverted" ? timestamp : undefined,
+      },
+    });
+    if (updated.count === 0) return null;
+    return this.getPatchBatch(worldId, batchId);
   }
 
   async updateAsset(
@@ -222,6 +263,7 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
         data: {
           worldId: input.worldId,
           assetId: input.assetId,
+          batchId: input.batchId ?? null,
           beforeRevisionId: input.expectedBeforeRevisionId,
           afterRevisionId: revision.id,
           beforeMarkdown: input.beforeMarkdown,
@@ -246,6 +288,14 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
     const patches = await this.prisma.worldAssetPatch.findMany({
       where: { worldId, assetId },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+    return patches.map(mapOfficialAssetPatch);
+  }
+
+  async listPatchesByBatch(worldId: string, batchId: string): Promise<OfficialAssetPatchRecord[]> {
+    const patches = await this.prisma.worldAssetPatch.findMany({
+      where: { worldId, batchId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return patches.map(mapOfficialAssetPatch);
   }
@@ -442,6 +492,33 @@ function mapOfficialAssetIndex(index: {
     metadata: isRecord(index.metadata) ? index.metadata : {},
     createdAt: index.createdAt,
     updatedAt: index.updatedAt,
+  };
+}
+
+function mapOfficialAssetPatchBatch(batch: {
+  id: string;
+  worldId: string;
+  sessionId: string;
+  issueId: string | null;
+  status: string;
+  metadata: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  appliedAt: Date | null;
+  revertedAt: Date | null;
+}): OfficialAssetPatchBatchRecord {
+  const status = batch.status === "applied" || batch.status === "reverted" ? batch.status : "applying";
+  return {
+    id: batch.id,
+    worldId: batch.worldId,
+    sessionId: batch.sessionId,
+    issueId: batch.issueId,
+    status,
+    metadata: isRecord(batch.metadata) ? batch.metadata : {},
+    createdAt: batch.createdAt,
+    updatedAt: batch.updatedAt,
+    appliedAt: batch.appliedAt,
+    revertedAt: batch.revertedAt,
   };
 }
 

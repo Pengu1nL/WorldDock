@@ -56,6 +56,17 @@ describe("describeWorldTools session policies", () => {
     });
   });
 
+  it("describes resolve_consistency_issue with batch patch inputs", () => {
+    const tool = describeWorldTools({ kind: "consistency_repair" }).find((item) => item.name === "resolve_consistency_issue");
+
+    expect(tool).toMatchObject({
+      inputSchema: {
+        type: "object",
+        required: ["worldId", "issueId", "sessionId", "patches"],
+      },
+    });
+  });
+
   it("limits asset deposition tools to read tools and create_world_asset", () => {
     const names = describeWorldTools({ kind: "world_exploration", intent: "asset_deposition" }).map((tool) => tool.name);
 
@@ -98,6 +109,39 @@ describe("apply_world_asset_patch tool handler", () => {
       sessionId: "session_1",
       afterMarkdown,
       reason: "补充续期规则",
+    });
+  });
+});
+
+describe("resolve_consistency_issue tool handler", () => {
+  it("calls the consistency batch path and preserves markdown whitespace", async () => {
+    const applyPatchBatch = vi.fn(async (input) => ({
+      id: "batch_1",
+      ...input,
+    }));
+    const registry = createWorldToolRegistry({} as never, undefined, undefined, { applyPatchBatch } as never);
+    const afterMarkdown = "\n# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。\n";
+
+    await registry.execute("resolve_consistency_issue", {
+      worldId: "world_1",
+      issueId: "issue_1",
+      sessionId: "session_1",
+      patches: [{
+        assetId: "asset_2",
+        afterMarkdown,
+        reason: "统一登记口径",
+      }],
+    });
+
+    expect(applyPatchBatch).toHaveBeenCalledWith({
+      worldId: "world_1",
+      issueId: "issue_1",
+      sessionId: "session_1",
+      patches: [{
+        assetId: "asset_2",
+        afterMarkdown,
+        reason: "统一登记口径",
+      }],
     });
   });
 });

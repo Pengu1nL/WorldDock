@@ -3,20 +3,31 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type INestApplication } from "@nestjs/common";
 import { type ConsistencyIssueStatus } from "@worlddock/contract/consistency";
+import { AGENT_SESSIONS_REPOSITORY } from "../src/modules/agent-sessions/agent-sessions.repository";
+import { AgentSessionsService } from "../src/modules/agent-sessions/agent-sessions.service";
 import { LocalStorageService } from "../src/modules/local-storage/local-storage.service";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
+  OfficialAssetPatchAlreadyRevertedError,
+  OfficialAssetPatchConflictError,
+  type ApplyOfficialAssetPatchRecordInput,
   type CreateOfficialAssetRecordInput,
+  type CreateOfficialAssetPatchBatchRecordInput,
   type ListOfficialAssetsQuery,
   type OfficialAssetDetailRecord,
+  type OfficialAssetPatchBatchRecord,
+  type OfficialAssetPatchesRepository,
+  type OfficialAssetPatchRecord,
   type OfficialAssetRecord,
   type OfficialAssetRevisionRecord,
   type OfficialAssetsRepository,
   type OfficialAssetSectionIndexRecord,
+  type RevertOfficialAssetPatchRecordInput,
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
 import { OfficialAssetLockService } from "../src/modules/official-assets/official-asset-lock.service";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
+import { WorldAssetPatchesService } from "../src/modules/official-assets/world-asset-patches.service";
 import { ConsistencyChecker } from "../src/modules/consistency/consistency-checker";
 import { ConsistencyController } from "../src/modules/consistency/consistency.controller";
 import {
@@ -36,6 +47,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   createHttpTestApp,
+  createInMemoryAgentSessions,
   createInMemoryWorlds,
   type InMemoryWorlds,
 } from "./local-api-test-helpers";
@@ -194,6 +206,135 @@ describe("consistency issues local endpoints", () => {
       .get(`/v1/worlds/${setup.world.id}/consistency-issues/missing_issue`)
       .expect(404);
   });
+
+  it("creates a repair session and applies a patch batch", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+
+    expect(sessionResponse.body.session).toMatchObject({
+      kind: "consistency_repair",
+      current: false,
+    });
+    expect(sessionResponse.body.subjects).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        subjectKind: "consistency_issue",
+        subjectId: issue.id,
+        role: "primary",
+      }),
+    ]));
+    expect(sessionResponse.body.contextItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "asset_document", targetId: "official_asset_1" }),
+      expect.objectContaining({ kind: "asset_document", targetId: "official_asset_2" }),
+    ]));
+
+    const batch = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [{
+          assetId: "official_asset_2",
+          afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+          reason: "统一登记口径",
+        }],
+      })
+      .expect(201);
+
+    expect(batch.body.batch).toMatchObject({
+      issueId: issue.id,
+      status: "applied",
+      patchIds: [expect.any(String)],
+    });
+
+    const listedPatches = await setup.officialAssets.listPatches(setup.world.id, "official_asset_2");
+    expect(listedPatches[0]).toMatchObject({
+      id: batch.body.batch.patchIds[0],
+      batchId: batch.body.batch.id,
+      status: "applied",
+    });
+    const resolved = await setup.consistencyIssues.getIssue(setup.world.id, issue.id);
+    expect(resolved?.status).toBe("resolved");
+  });
+
+  it("reverts a patch batch and reopens the issue", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const { issue, asset2Markdown } = await setup.createOpenConsistencyIssue();
+
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+    const batch = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [{
+          assetId: "official_asset_2",
+          afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+          reason: "统一登记口径",
+        }],
+      })
+      .expect(201);
+
+    const reverted = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches/${batch.body.batch.id}/revert`)
+      .expect(200);
+
+    expect(reverted.body.batch).toMatchObject({
+      id: batch.body.batch.id,
+      status: "reverted",
+      patchIds: batch.body.batch.patchIds,
+    });
+    const reopened = await setup.consistencyIssues.getIssue(setup.world.id, issue.id);
+    expect(reopened?.status).toBe("open");
+    const asset = await setup.officialAssets.getAsset(setup.world.id, "official_asset_2");
+    expect(asset?.revisions[0]?.markdown).toBe(asset2Markdown);
+  });
+
+  it("rejects patch batches with the wrong session kind or issue binding", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+    const assetEditSession = await app.get(AgentSessionsService).createSession(setup.world.id, {
+      kind: "asset_edit",
+      subjectAssetId: "official_asset_2",
+      title: "错误会话",
+    });
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: assetEditSession.id,
+        patches: [{
+          assetId: "official_asset_2",
+          afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+        }],
+      })
+      .expect(400);
+
+    const otherIssue = await setup.seedIssue("另一条冲突", "other");
+    const repairSession = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${otherIssue.id}/repair-sessions`)
+      .send({ title: "另一条修复" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: repairSession.body.session.id,
+        patches: [{
+          assetId: "official_asset_2",
+          afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+        }],
+      })
+      .expect(400);
+  });
 });
 
 async function createConsistencyTestSetup() {
@@ -207,16 +348,21 @@ async function createConsistencyTestSetup() {
     maturity: 12,
   });
   const consistencyIssues = createInMemoryConsistencyIssues();
+  const agentSessions = createInMemoryAgentSessions();
+  const officialAssets = createInMemoryOfficialAssets();
   const app = await createHttpTestApp({
     controllers: [ConsistencyController],
     providers: [
+      AgentSessionsService,
       ConsistencyService,
       ConsistencyChecker,
       OfficialAssetsService,
       OfficialAssetLockService,
+      WorldAssetPatchesService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
-      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: createInMemoryOfficialAssets() },
+      { provide: AGENT_SESSIONS_REPOSITORY, useValue: agentSessions },
+      { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: officialAssets },
       { provide: CONSISTENCY_REPOSITORY, useValue: consistencyIssues },
     ],
   });
@@ -225,14 +371,47 @@ async function createConsistencyTestSetup() {
     app,
     world,
     consistencyIssues,
+    officialAssets,
     async createOfficialAssetWithMarkdown(type: "rule" | "event", name: string, markdown: string) {
-      await app.get(OfficialAssetsService).createAsset(world.id, {
+      return app.get(OfficialAssetsService).createAsset(world.id, {
         type,
         name,
         summary: markdown,
         markdown,
         tags: [],
       });
+    },
+    async createOpenConsistencyIssue() {
+      const asset1Markdown = "# 记忆交易许可\n\n## 概括\n\n所有记忆交易必须登记。";
+      const asset2Markdown = "# 自由交易日\n\n## 概括\n\n自由交易日当天记忆交易无需登记。";
+      await app.get(OfficialAssetsService).createAsset(world.id, {
+        type: "rule",
+        name: "记忆交易许可",
+        summary: asset1Markdown,
+        markdown: asset1Markdown,
+        tags: [],
+      });
+      await app.get(OfficialAssetsService).createAsset(world.id, {
+        type: "event",
+        name: "自由交易日",
+        summary: asset2Markdown,
+        markdown: asset2Markdown,
+        tags: [],
+      });
+      const issue = await consistencyIssues.createIssueIfOpenDedupeKeyAbsent({
+        worldId: world.id,
+        title: "记忆交易许可冲突",
+        description: "记忆交易许可冲突 描述",
+        involves: ["official_asset_1", "official_asset_2"],
+        severity: "normal",
+        subjectAssetIds: ["official_asset_1", "official_asset_2"],
+        evidence: [
+          { assetId: "official_asset_1", quote: "所有记忆交易必须登记。", confidence: 1 },
+          { assetId: "official_asset_2", quote: "记忆交易无需登记。", confidence: 1 },
+        ],
+        metadata: { source: "test" },
+      }, "memory-trade");
+      return { issue, asset1Markdown, asset2Markdown };
     },
     async seedIssue(title: string, dedupeKey: string) {
       return consistencyIssues.createIssueIfOpenDedupeKeyAbsent({
@@ -252,14 +431,56 @@ async function createConsistencyTestSetup() {
   };
 }
 
-function createInMemoryOfficialAssets(): OfficialAssetsRepository {
+type InMemoryOfficialAssets = OfficialAssetsRepository & OfficialAssetPatchesRepository;
+
+function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
   const assets = new Map<string, OfficialAssetRecord>();
   const revisions = new Map<string, OfficialAssetRevisionRecord[]>();
   const indexes = new Map<string, OfficialAssetSectionIndexRecord[]>();
+  const patches = new Map<string, OfficialAssetPatchRecord[]>();
+  const batches = new Map<string, OfficialAssetPatchBatchRecord>();
   let assetCount = 1;
   let revisionCount = 1;
+  let indexCount = 1;
+  let patchCount = 1;
+  let batchCount = 1;
 
   return {
+    async createPatchBatch(input: CreateOfficialAssetPatchBatchRecordInput) {
+      const timestamp = new Date();
+      const batch: OfficialAssetPatchBatchRecord = {
+        id: `world_asset_patch_batch_${batchCount++}`,
+        worldId: input.worldId,
+        sessionId: input.sessionId,
+        issueId: input.issueId ?? null,
+        status: input.status ?? "applying",
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        appliedAt: input.status === "applied" ? timestamp : null,
+        revertedAt: input.status === "reverted" ? timestamp : null,
+      };
+      batches.set(batch.id, batch);
+      return batch;
+    },
+    async getPatchBatch(worldId: string, batchId: string) {
+      const batch = batches.get(batchId);
+      return batch?.worldId === worldId ? batch : null;
+    },
+    async updatePatchBatchStatus(worldId: string, batchId: string, status: OfficialAssetPatchBatchRecord["status"]) {
+      const batch = batches.get(batchId);
+      if (!batch || batch.worldId !== worldId) return null;
+      const timestamp = new Date();
+      const updated: OfficialAssetPatchBatchRecord = {
+        ...batch,
+        status,
+        updatedAt: timestamp,
+        appliedAt: status === "applied" ? timestamp : batch.appliedAt,
+        revertedAt: status === "reverted" ? timestamp : batch.revertedAt,
+      };
+      batches.set(batch.id, updated);
+      return updated;
+    },
     async createAsset(input: CreateOfficialAssetRecordInput) {
       const timestamp = new Date();
       const asset: OfficialAssetRecord = {
@@ -291,6 +512,7 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
       assets.set(asset.id, asset);
       revisions.set(asset.id, [revision]);
       indexes.set(asset.id, []);
+      patches.set(asset.id, []);
       return { asset, revisions: [revision], indexes: [] };
     },
     async updateAsset(
@@ -326,6 +548,147 @@ function createInMemoryOfficialAssets(): OfficialAssetsRepository {
         revisions: revisions.get(asset.id) ?? [],
         indexes: indexes.get(asset.id) ?? [],
       };
+    },
+    async applyPatch(input: ApplyOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null> {
+      const asset = assets.get(input.assetId);
+      if (!asset || asset.worldId !== input.worldId) return null;
+      const existingRevisions = revisions.get(asset.id) ?? [];
+      if (
+        asset.version !== input.expectedVersion ||
+        (existingRevisions[0]?.id ?? null) !== input.expectedBeforeRevisionId
+      ) {
+        throw new OfficialAssetPatchConflictError();
+      }
+
+      const timestamp = new Date();
+      const versionTo = input.expectedVersion + 1;
+      const revision: OfficialAssetRevisionRecord = {
+        id: `official_asset_revision_${revisionCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        version: versionTo,
+        markdown: input.afterMarkdown,
+        summary: input.summary,
+        metadata: { sessionId: input.sessionId, source: "patch" },
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const sectionIndexes = input.indexes.map((section) => ({
+        id: `official_asset_index_${indexCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        title: section.title,
+        summary: section.summary ?? null,
+        metadata: section.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }));
+      const patch: OfficialAssetPatchRecord = {
+        id: `world_asset_patch_${patchCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        sessionId: input.sessionId,
+        batchId: input.batchId ?? null,
+        beforeRevisionId: input.expectedBeforeRevisionId,
+        afterRevisionId: revision.id,
+        beforeMarkdown: input.beforeMarkdown,
+        afterMarkdown: input.afterMarkdown,
+        diff: input.diff,
+        assetVersionFrom: input.expectedVersion,
+        assetVersionTo: versionTo,
+        status: "applied",
+        metadata: { ...(input.metadata ?? {}), sessionId: input.sessionId },
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        appliedAt: timestamp,
+        revertedAt: null,
+      };
+
+      assets.set(asset.id, {
+        ...asset,
+        summary: input.summary,
+        version: versionTo,
+        updatedAt: timestamp,
+      });
+      revisions.set(asset.id, [revision, ...existingRevisions]);
+      indexes.set(asset.id, sectionIndexes);
+      patches.set(asset.id, [patch, ...(patches.get(asset.id) ?? [])]);
+      return patch;
+    },
+    async listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]> {
+      const asset = assets.get(assetId);
+      if (!asset || asset.worldId !== worldId) return [];
+      return patches.get(assetId) ?? [];
+    },
+    async listPatchesByBatch(worldId: string, batchId: string): Promise<OfficialAssetPatchRecord[]> {
+      return [...patches.values()]
+        .flat()
+        .filter((patch) => patch.worldId === worldId && patch.batchId === batchId)
+        .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id));
+    },
+    async getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null> {
+      const asset = assets.get(assetId);
+      if (!asset || asset.worldId !== worldId) return null;
+      return (patches.get(assetId) ?? []).find((patch) => patch.id === patchId) ?? null;
+    },
+    async revertPatch(input: RevertOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null> {
+      const asset = assets.get(input.assetId);
+      if (!asset || asset.worldId !== input.worldId) return null;
+      const patchList = patches.get(asset.id) ?? [];
+      const patchIndex = patchList.findIndex((patch) => patch.id === input.patchId);
+      if (patchIndex === -1) return null;
+      const patch = patchList[patchIndex];
+      if (patch.status !== "applied") throw new OfficialAssetPatchAlreadyRevertedError();
+      const existingRevisions = revisions.get(asset.id) ?? [];
+      if (
+        asset.version !== input.expectedVersion ||
+        (existingRevisions[0]?.id ?? null) !== input.expectedLatestRevisionId ||
+        asset.version !== patch.assetVersionTo ||
+        (existingRevisions[0]?.id ?? null) !== patch.afterRevisionId
+      ) {
+        throw new OfficialAssetPatchConflictError();
+      }
+
+      const timestamp = new Date();
+      const versionTo = input.expectedVersion + 1;
+      const revision: OfficialAssetRevisionRecord = {
+        id: `official_asset_revision_${revisionCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        version: versionTo,
+        markdown: input.markdown,
+        summary: input.summary,
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const sectionIndexes = input.indexes.map((section) => ({
+        id: `official_asset_index_${indexCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        title: section.title,
+        summary: section.summary ?? null,
+        metadata: section.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }));
+      const reverted: OfficialAssetPatchRecord = {
+        ...patch,
+        status: "reverted",
+        updatedAt: timestamp,
+        revertedAt: timestamp,
+      };
+      patchList[patchIndex] = reverted;
+      assets.set(asset.id, {
+        ...asset,
+        summary: input.summary,
+        version: versionTo,
+        updatedAt: timestamp,
+      });
+      revisions.set(asset.id, [revision, ...existingRevisions]);
+      indexes.set(asset.id, sectionIndexes);
+      patches.set(asset.id, patchList);
+      return reverted;
     },
   };
 }

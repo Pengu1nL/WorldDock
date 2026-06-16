@@ -1,5 +1,7 @@
 import { forwardRef, Module } from "@nestjs/common";
 import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
+import { ConsistencyModule } from "../consistency/consistency.module";
+import { ConsistencyService } from "../consistency/consistency.service";
 import { OfficialAssetsModule } from "../official-assets/official-assets.module";
 import { OfficialAssetsService } from "../official-assets/official-assets.service";
 import { WorldAssetPatchesService } from "../official-assets/world-asset-patches.service";
@@ -18,7 +20,7 @@ import { createWorldToolRegistry } from "./pi/world-tools";
 import { PrismaAgentRepository } from "./prisma-agent.repository";
 
 @Module({
-  imports: [WorldsModule, AgentSessionsModule, OfficialAssetsModule, forwardRef(() => PotentialAssetsModule)],
+  imports: [WorldsModule, AgentSessionsModule, OfficialAssetsModule, ConsistencyModule, forwardRef(() => PotentialAssetsModule)],
   controllers: [AgentController],
   providers: [
     AgentService,
@@ -33,6 +35,7 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
         worlds: WorldRepository,
         officialAssets: OfficialAssetsService,
         assetPatches: WorldAssetPatchesService,
+        consistency: ConsistencyService,
       ) => {
         const adapter = createPiAgentCoreAdapter({
           modelProvider: process.env.PI_MODEL_PROVIDER,
@@ -42,12 +45,12 @@ import { PrismaAgentRepository } from "./prisma-agent.repository";
         return new PiAgentProvider(
           new PiSessionRunner(
             new PiAgentCoreRuntimeClient(adapter),
-            createWorldToolRegistry(worlds, officialAssets, assetPatches),
+            createWorldToolRegistry(worlds, officialAssets, assetPatches, consistency),
             new SafetyGate(),
           ),
         );
       },
-      inject: [WORLD_REPOSITORY, OfficialAssetsService, WorldAssetPatchesService],
+      inject: [WORLD_REPOSITORY, OfficialAssetsService, WorldAssetPatchesService, ConsistencyService],
     },
   ],
   exports: [AgentService, AGENT_REPOSITORY, AGENT_PROVIDER],
