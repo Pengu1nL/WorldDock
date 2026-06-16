@@ -919,7 +919,7 @@ async function streamSseEvents<TEvent extends AgentEventBase>(response: Response
     if (done) break;
   }
 
-  const trailing = parseSseBlock(buffer);
+  const trailing = parseSseBlock<TEvent>(buffer);
   if (trailing) onEvent(trailing);
 }
 
