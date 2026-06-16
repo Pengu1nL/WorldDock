@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canUseFixtures,
+  createAgentSession,
+  createAgentSessionRun,
+  getOfficialAsset,
+  listAgentSessions,
+  listConsistencyIssues,
+  listOfficialAssets,
+  listPotentialAssetsForSession,
   createAgentRun,
   createArchiveEntry,
   createConflict,
@@ -199,6 +206,61 @@ describe("worlddock local API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-runs", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/agent-runs/run_1/events", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/agent-suggestions/ags_1/save", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("uses agent session, potential asset, official asset, and consistency endpoints", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "session_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ sessions: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ run: { id: "run_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ potentialAssets: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ assets: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ asset: { id: "asset_1" }, markdown: "", indexes: [], revisions: [] }))
+      .mockResolvedValueOnce(jsonResponse({ issues: [], nextCursor: null }));
+
+    await createAgentSession(
+      "world_1",
+      { kind: "world_exploration", title: "记忆交易推演", current: true },
+      { fetcher },
+    );
+    await listAgentSessions("world_1", { kind: "world_exploration", fetcher });
+    await createAgentSessionRun("world_1", "session_1", { prompt: "继续推演" }, { fetcher });
+    await listPotentialAssetsForSession("world_1", "session_1", { fetcher });
+    await listOfficialAssets("world_1", { type: "rule", fetcher });
+    await getOfficialAsset("world_1", "asset_1", { fetcher });
+    await listConsistencyIssues("world_1", { fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "world_exploration", title: "记忆交易推演", current: true }),
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/worlds/world_1/agent-sessions?kind=world_exploration", {
+      method: "GET",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/worlds/world_1/agent-sessions/session_1/runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "继续推演" }),
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/worlds/world_1/agent-sessions/session_1/potential-assets", {
+      method: "GET",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(5, "http://localhost:4000/v1/worlds/world_1/official-assets?type=rule", {
+      method: "GET",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(6, "http://localhost:4000/v1/worlds/world_1/official-assets/asset_1", {
+      method: "GET",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(7, "http://localhost:4000/v1/worlds/world_1/consistency-issues", {
+      method: "GET",
+      headers: {},
+    });
   });
 
   it("streams agent SSE events as chunks arrive", async () => {

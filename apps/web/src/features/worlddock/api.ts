@@ -3,6 +3,36 @@ import type {
   WorldAssetKind,
   WorldPackage,
 } from "@worlddock/domain";
+import type {
+  AgentSession,
+  AgentSessionContextItem,
+  AgentSessionKind,
+  AgentSessionMessage,
+  AgentSessionStatus,
+  AgentSessionSubject,
+  ConsistencyIssue,
+  ConsistencyIssueStatus,
+  OfficialWorldAsset,
+  OfficialWorldAssetStatus,
+  OfficialWorldAssetType,
+  PotentialAsset,
+  PotentialAssetStatus,
+  WorldAssetDetail,
+  WorldAssetPatch,
+  WorldAssetPatchBatch,
+} from "@worlddock/contract";
+
+export type {
+  AgentSession,
+  AgentSessionContextItem,
+  AgentSessionMessage,
+  ConsistencyIssue,
+  OfficialWorldAsset,
+  PotentialAsset,
+  WorldAssetDetail,
+  WorldAssetPatch,
+  WorldAssetPatchBatch,
+} from "@worlddock/contract";
 
 type FixtureEnvironment = {
   NODE_ENV?: string;
@@ -191,6 +221,101 @@ export type PushWorldReleaseResponse = {
     version: string;
     url: string;
   };
+};
+
+export type AgentSessionDetail = {
+  session: AgentSession;
+  subjects: AgentSessionSubject[];
+  contextItems: AgentSessionContextItem[];
+  messages: AgentSessionMessage[];
+};
+
+export type CreateAgentSessionInput = {
+  kind: AgentSessionKind;
+  title?: string;
+  current?: boolean;
+  metadata?: Record<string, unknown>;
+  subjectAssetId?: string;
+  issueId?: string;
+};
+
+export type ListAgentSessionsOptions = ApiClientOptions & {
+  kind?: AgentSessionKind;
+  status?: AgentSessionStatus;
+  current?: boolean;
+  includeArchived?: boolean;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export type AgentSessionRun = {
+  id: string;
+  [key: string]: unknown;
+};
+
+export type ListPotentialAssetsOptions = ApiClientOptions & {
+  status?: PotentialAssetStatus;
+  type?: OfficialWorldAssetType;
+  cursor?: string;
+  limit?: number;
+};
+
+export type PromotePotentialAssetInput = {
+  name?: string;
+  markdown?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type PromotePotentialAssetResponse = WorldAssetDetail & {
+  potentialAsset: PotentialAsset;
+  depositionRun: AgentSessionRun;
+};
+
+export type ListOfficialAssetsOptions = ApiClientOptions & {
+  type?: OfficialWorldAssetType;
+  q?: string;
+  cursor?: string;
+  limit?: number;
+};
+
+export type CreateOfficialAssetInput = {
+  type: OfficialWorldAssetType;
+  name: string;
+  summary: string;
+  markdown?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type UpdateOfficialAssetInput = {
+  name?: string;
+  summary?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  status?: OfficialWorldAssetStatus;
+};
+
+export type ApplyOfficialAssetPatchInput = {
+  sessionId: string;
+  afterMarkdown: string;
+  reason?: string;
+};
+
+export type ListConsistencyIssuesOptions = ApiClientOptions & {
+  status?: ConsistencyIssueStatus;
+  cursor?: string;
+  limit?: number;
+};
+
+export type ApplyConsistencyPatchBatchInput = {
+  sessionId: string;
+  patches: Array<{
+    assetId: string;
+    afterMarkdown: string;
+    reason?: string;
+  }>;
 };
 
 export async function listWorlds(options: ApiClientOptions = {}) {
@@ -448,6 +573,294 @@ export async function createAgentRun(
   });
 }
 
+export async function createAgentSession(
+  worldId: string,
+  input: CreateAgentSessionInput,
+  options: ApiClientOptions = {},
+): Promise<{ session: AgentSession }> {
+  return requestJson(`/v1/worlds/${worldId}/agent-sessions`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function listAgentSessions(
+  worldId: string,
+  options: ListAgentSessionsOptions = {},
+): Promise<{ sessions: AgentSession[]; nextCursor: string | null }> {
+  return requestJson(withQueryParams(`/v1/worlds/${worldId}/agent-sessions`, {
+    kind: options.kind,
+    status: options.status,
+    current: options.current,
+    includeArchived: options.includeArchived,
+    q: options.q,
+    cursor: options.cursor,
+    limit: options.limit,
+  }), {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function getAgentSession(
+  worldId: string,
+  sessionId: string,
+  options: ApiClientOptions = {},
+): Promise<AgentSessionDetail> {
+  return requestJson(`/v1/worlds/${worldId}/agent-sessions/${sessionId}`, {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function archiveAgentSession(
+  worldId: string,
+  sessionId: string,
+  options: ApiClientOptions = {},
+): Promise<{ session: AgentSession }> {
+  return requestJson(`/v1/worlds/${worldId}/agent-sessions/${sessionId}/archive`, {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function setCurrentAgentSession(
+  worldId: string,
+  sessionId: string,
+  options: ApiClientOptions = {},
+): Promise<{ session: AgentSession }> {
+  return requestJson(`/v1/worlds/${worldId}/agent-sessions/${sessionId}/current`, {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function createAgentSessionRun(
+  worldId: string,
+  sessionId: string,
+  input: { prompt: string },
+  options: ApiClientOptions = {},
+): Promise<{ run: AgentSessionRun }> {
+  return requestJson(`/v1/worlds/${worldId}/agent-sessions/${sessionId}/runs`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function listPotentialAssets(
+  worldId: string,
+  options: ListPotentialAssetsOptions = {},
+): Promise<{ potentialAssets: PotentialAsset[]; nextCursor: string | null }> {
+  return requestJson(withQueryParams(`/v1/worlds/${worldId}/potential-assets`, {
+    status: options.status,
+    type: options.type,
+    cursor: options.cursor,
+    limit: options.limit,
+  }), {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function listPotentialAssetsForSession(
+  worldId: string,
+  sessionId: string,
+  options: ApiClientOptions = {},
+): Promise<{ potentialAssets: PotentialAsset[]; nextCursor: string | null }> {
+  return requestJson(`/v1/worlds/${worldId}/agent-sessions/${sessionId}/potential-assets`, {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function dismissPotentialAsset(
+  worldId: string,
+  potentialAssetId: string,
+  options: ApiClientOptions = {},
+): Promise<{ potentialAsset: PotentialAsset }> {
+  return requestJson(`/v1/worlds/${worldId}/potential-assets/${potentialAssetId}/dismiss`, {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function promotePotentialAsset(
+  worldId: string,
+  potentialAssetId: string,
+  input: PromotePotentialAssetInput = {},
+  options: ApiClientOptions = {},
+): Promise<PromotePotentialAssetResponse> {
+  return requestJson(`/v1/worlds/${worldId}/potential-assets/${potentialAssetId}/promote`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function listOfficialAssets(
+  worldId: string,
+  options: ListOfficialAssetsOptions = {},
+): Promise<{ assets: OfficialWorldAsset[]; nextCursor: string | null }> {
+  return requestJson(withQueryParams(`/v1/worlds/${worldId}/official-assets`, {
+    type: options.type,
+    q: options.q,
+    cursor: options.cursor,
+    limit: options.limit,
+  }), {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function getOfficialAsset(
+  worldId: string,
+  assetId: string,
+  options: ApiClientOptions = {},
+): Promise<WorldAssetDetail> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}`, {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function createOfficialAsset(
+  worldId: string,
+  input: CreateOfficialAssetInput,
+  options: ApiClientOptions = {},
+): Promise<WorldAssetDetail> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function updateOfficialAsset(
+  worldId: string,
+  assetId: string,
+  input: UpdateOfficialAssetInput,
+  options: ApiClientOptions = {},
+): Promise<WorldAssetDetail> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}`, {
+    method: "PATCH",
+    body: input,
+    ...options,
+  });
+}
+
+export async function createAssetEditSession(
+  worldId: string,
+  assetId: string,
+  input: { title?: string } = {},
+  options: ApiClientOptions = {},
+): Promise<AgentSessionDetail> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}/edit-sessions`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function applyOfficialAssetPatch(
+  worldId: string,
+  assetId: string,
+  input: ApplyOfficialAssetPatchInput,
+  options: ApiClientOptions = {},
+): Promise<{ patch: WorldAssetPatch }> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}/patches`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function revertOfficialAssetPatch(
+  worldId: string,
+  assetId: string,
+  patchId: string,
+  options: ApiClientOptions = {},
+): Promise<{ patch: WorldAssetPatch }> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}/patches/${patchId}/revert`, {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function runConsistencyCheck(
+  worldId: string,
+  options: ApiClientOptions = {},
+): Promise<{ issues: ConsistencyIssue[] }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/check`, {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function listConsistencyIssues(
+  worldId: string,
+  options: ListConsistencyIssuesOptions = {},
+): Promise<{ issues: ConsistencyIssue[]; nextCursor: string | null }> {
+  return requestJson(withQueryParams(`/v1/worlds/${worldId}/consistency-issues`, {
+    status: options.status,
+    cursor: options.cursor,
+    limit: options.limit,
+  }), {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function getConsistencyIssue(
+  worldId: string,
+  issueId: string,
+  options: ApiClientOptions = {},
+): Promise<{ issue: ConsistencyIssue }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}`, {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function createConsistencyRepairSession(
+  worldId: string,
+  issueId: string,
+  input: { title?: string } = {},
+  options: ApiClientOptions = {},
+): Promise<AgentSessionDetail> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/repair-sessions`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function applyConsistencyPatchBatch(
+  worldId: string,
+  issueId: string,
+  input: ApplyConsistencyPatchBatchInput,
+  options: ApiClientOptions = {},
+): Promise<{ batch: WorldAssetPatchBatch }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/patch-batches`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function revertConsistencyPatchBatch(
+  worldId: string,
+  issueId: string,
+  batchId: string,
+  options: ApiClientOptions = {},
+): Promise<{ batch: WorldAssetPatchBatch }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/patch-batches/${batchId}/revert`, {
+    method: "POST",
+    ...options,
+  });
+}
+
 export async function fetchAgentEvents(runId: string, options: ApiClientOptions = {}): Promise<AgentEvent[]> {
   const response = await openAgentEventResponse(runId, options);
   const text = await response.text();
@@ -460,7 +873,19 @@ export async function streamAgentEvents(
   onEvent: (event: AgentEvent) => void,
 ): Promise<void> {
   const response = await openAgentEventResponse(runId, options);
+  await streamSseEvents(response, onEvent);
+}
 
+export async function streamAgentSessionRunEvents(
+  runId: string,
+  options: ApiClientOptions,
+  onEvent: (event: AgentEvent) => void,
+): Promise<void> {
+  const response = await openAgentSessionRunEventResponse(runId, options);
+  await streamSseEvents(response, onEvent);
+}
+
+async function streamSseEvents(response: Response, onEvent: (event: AgentEvent) => void): Promise<void> {
   if (!response.body) {
     for (const event of parseSseEvents(await response.text())) onEvent(event);
     return;
@@ -536,6 +961,21 @@ async function openAgentEventResponse(runId: string, options: ApiClientOptions):
   return response;
 }
 
+async function openAgentSessionRunEventResponse(runId: string, options: ApiClientOptions): Promise<Response> {
+  const fetcher = options.fetcher ?? fetch;
+  const response = await fetcher(`${options.baseUrl ?? getApiBaseUrl()}/v1/agent-session-runs/${runId}/events`, {
+    method: "GET",
+    headers: buildHeaders(options),
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Agent session run event stream failed with ${response.status}`);
+  }
+
+  return response;
+}
+
 function parseSseBlock(block: string): AgentEvent | null {
   const data = block
     .split(/\r?\n/)
@@ -556,6 +996,15 @@ function findSseBoundary(text: string) {
 
 function getBoundaryLength(text: string, boundary: number) {
   return text.startsWith("\r\n\r\n", boundary) ? 4 : 2;
+}
+
+function withQueryParams(path: string, params: Record<string, string | number | boolean | undefined>) {
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) searchParams.set(key, String(value));
+  }
+  const query = searchParams.toString();
+  return query ? `${path}?${query}` : path;
 }
 
 async function requestJson<T>(
