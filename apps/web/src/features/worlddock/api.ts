@@ -849,18 +849,6 @@ export async function applyConsistencyPatchBatch(
   });
 }
 
-export async function revertConsistencyPatchBatch(
-  worldId: string,
-  issueId: string,
-  batchId: string,
-  options: ApiClientOptions = {},
-): Promise<{ batch: WorldAssetPatchBatch }> {
-  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/patch-batches/${batchId}/revert`, {
-    method: "POST",
-    ...options,
-  });
-}
-
 export async function fetchAgentEvents(runId: string, options: ApiClientOptions = {}): Promise<AgentEvent[]> {
   const response = await openAgentEventResponse(runId, options);
   const text = await response.text();
