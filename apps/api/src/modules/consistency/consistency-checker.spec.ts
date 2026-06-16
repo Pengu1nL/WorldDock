@@ -29,4 +29,42 @@ describe("ConsistencyChecker", () => {
       }),
     ]);
   });
+
+  it("emits one issue for each shared keyword in the same asset pair", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "复合规则",
+        summary: "alpha 必须登记。beta 需要批准。",
+        markdown: "alpha 必须登记。beta 需要批准。",
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "复合例外",
+        summary: "alpha 无需登记。beta 例外放行。",
+        markdown: "alpha 无需登记。beta 例外放行。",
+      },
+    ]);
+
+    expect(issues).toHaveLength(2);
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: expect.stringContaining("alpha"),
+          keyword: "alpha",
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+        expect.objectContaining({
+          title: expect.stringContaining("beta"),
+          keyword: "beta",
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+      ]),
+    );
+  });
 });

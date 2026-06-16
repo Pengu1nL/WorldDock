@@ -44,11 +44,7 @@ export class ConsistencyChecker {
       for (let rightIndex = leftIndex + 1; rightIndex < index.length; rightIndex += 1) {
         const left = index[leftIndex];
         const right = index[rightIndex];
-        const keyword = this.findSharedKeyword(left.keywords, right.keywords);
-
-        if (!keyword) {
-          continue;
-        }
+        const keywords = this.findSharedKeywords(left.keywords, right.keywords);
 
         const evidence = this.findContradictingEvidence(left, right);
 
@@ -56,19 +52,21 @@ export class ConsistencyChecker {
           continue;
         }
 
-        const issueKey = `${left.asset.assetId}:${right.asset.assetId}:${keyword}`;
-        if (emitted.has(issueKey)) {
-          continue;
-        }
+        for (const keyword of keywords) {
+          const issueKey = `${left.asset.assetId}:${right.asset.assetId}:${keyword}`;
+          if (emitted.has(issueKey)) {
+            continue;
+          }
 
-        emitted.add(issueKey);
-        issues.push({
-          title: `「${keyword}」存在潜在一致性冲突`,
-          severity: "normal",
-          subjectAssetIds: [left.asset.assetId, right.asset.assetId],
-          keyword,
-          evidence,
-        });
+          emitted.add(issueKey);
+          issues.push({
+            title: `「${keyword}」存在潜在一致性冲突`,
+            severity: "normal",
+            subjectAssetIds: [left.asset.assetId, right.asset.assetId],
+            keyword,
+            evidence,
+          });
+        }
       }
     }
 
@@ -122,11 +120,11 @@ export class ConsistencyChecker {
     ].filter((field) => field.text.trim().length > 0);
   }
 
-  private findSharedKeyword(left: Set<string>, right: Set<string>): string | null {
+  private findSharedKeywords(left: Set<string>, right: Set<string>): string[] {
     const shared = [...left].filter((keyword) => right.has(keyword));
     shared.sort((a, b) => b.length - a.length || a.localeCompare(b, "zh-Hans-CN"));
 
-    return shared[0] ?? null;
+    return shared;
   }
 
   private findContradictingEvidence(
@@ -164,7 +162,7 @@ function extractKeywords(text: string): string[] {
 
   const chineseSegments = normalizedText
     .split(/[^\u3400-\u9fffA-Za-z0-9_]+/u)
-    .flatMap((segment) => splitByMarkers(segment))
+    .flatMap((segment) => extractChineseKeywordSegments(segment))
     .map((segment) => segment.trim())
     .filter((segment) => /[\u3400-\u9fff]/u.test(segment));
 
@@ -175,9 +173,16 @@ function extractKeywords(text: string): string[] {
   return [...keywords].filter((keyword) => keyword.length > 1);
 }
 
-function splitByMarkers(text: string): string[] {
-  const markerPattern = new RegExp(CONTRADICTION_MARKERS.join("|"), "u");
-  return text.split(markerPattern).filter(Boolean);
+function extractChineseKeywordSegments(text: string): string[] {
+  const markerPositions = CONTRADICTION_MARKERS.map((marker) => text.indexOf(marker))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b);
+
+  if (markerPositions.length === 0) {
+    return [text];
+  }
+
+  return [text.slice(0, markerPositions[0])].filter(Boolean);
 }
 
 function containsAny(text: string, markers: readonly string[]): boolean {
