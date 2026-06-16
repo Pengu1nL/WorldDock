@@ -118,11 +118,16 @@ export class ConsistencyChecker {
     field: ConsistencyEvidence["field"];
     text: string;
   }> {
-    return [
+    const fields: Array<{
+      field: ConsistencyEvidence["field"];
+      text: string;
+    }> = [
       { field: "name", text: asset.name },
       { field: "summary", text: asset.summary ?? "" },
       { field: "markdown", text: asset.markdown ?? "" },
-    ].filter((field) => field.text.trim().length > 0);
+    ];
+
+    return fields.filter((field) => field.text.trim().length > 0);
   }
 
   private findSharedKeywords(left: Set<string>, right: Set<string>): string[] {
