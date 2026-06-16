@@ -78,13 +78,18 @@ export class ConsistencyChecker {
     const keywords = new Set<string>();
     const restrictiveEvidence: ConsistencyEvidence[] = [];
     const permissiveEvidence: ConsistencyEvidence[] = [];
+    const assetName = asset.name.trim();
+
+    if (assetName) {
+      keywords.add(assetName);
+    }
 
     for (const field of fields) {
       for (const keyword of extractKeywords(field.text)) {
         keywords.add(keyword);
       }
 
-      if (containsAny(field.text, RESTRICTIVE_MARKERS)) {
+      if (hasRestrictiveMarker(field.text)) {
         restrictiveEvidence.push({
           assetId: asset.assetId,
           quote: field.text,
@@ -124,7 +129,12 @@ export class ConsistencyChecker {
     const shared = [...left].filter((keyword) => right.has(keyword));
     shared.sort((a, b) => b.length - a.length || a.localeCompare(b, "zh-Hans-CN"));
 
-    return shared;
+    return shared.filter(
+      (keyword, index) =>
+        !shared
+          .slice(0, index)
+          .some((longerKeyword) => containsKeyword(longerKeyword, keyword)),
+    );
   }
 
   private findContradictingEvidence(
@@ -178,13 +188,38 @@ function extractChineseKeywordSegments(text: string): string[] {
     .filter((index) => index >= 0)
     .sort((a, b) => a - b);
 
-  if (markerPositions.length === 0) {
-    return [text];
-  }
+  const segment = markerPositions.length === 0 ? text : text.slice(0, markerPositions[0]);
 
-  return [text.slice(0, markerPositions[0])].filter(Boolean);
+  return createChineseSuffixes(segment);
 }
 
 function containsAny(text: string, markers: readonly string[]): boolean {
   return markers.some((marker) => text.includes(marker));
+}
+
+function hasRestrictiveMarker(text: string): boolean {
+  const textWithoutPermissiveMarkers = PERMISSIVE_MARKERS.reduce(
+    (currentText, marker) => currentText.split(marker).join(""),
+    text,
+  );
+
+  return containsAny(textWithoutPermissiveMarkers, RESTRICTIVE_MARKERS);
+}
+
+function createChineseSuffixes(text: string): string[] {
+  const normalizedText = text.trim();
+  const suffixes: string[] = [];
+
+  for (let index = 0; index < normalizedText.length; index += 1) {
+    const suffix = normalizedText.slice(index);
+    if (suffix.length >= 4 || suffix.length === normalizedText.length) {
+      suffixes.push(suffix);
+    }
+  }
+
+  return suffixes;
+}
+
+function containsKeyword(longerKeyword: string, keyword: string): boolean {
+  return longerKeyword !== keyword && longerKeyword.toLowerCase().includes(keyword.toLowerCase());
 }
