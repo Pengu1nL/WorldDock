@@ -8,7 +8,7 @@ import {
   TweaksPanel,
   useTweaks,
 } from "../tweaks-panel";
-import { WorldDockRuntime } from "../world-dock-app";
+import { WorldDockRuntime } from "./world-dock-runtime";
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "mode": "local",

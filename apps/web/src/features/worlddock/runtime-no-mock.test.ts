@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 
 const runtimeFiles = [
   join(__dirname, "world-dock-app.tsx"),
+  join(__dirname, "shell/world-dock-shell.tsx"),
+  join(__dirname, "shell/world-dock-runtime.tsx"),
+  join(__dirname, "shell/world-workspace.tsx"),
   join(__dirname, "view-worlds.tsx"),
   join(__dirname, "view-settings.tsx"),
 ];
