@@ -226,4 +226,66 @@ describe("ConsistencyChecker", () => {
       }),
     );
   });
+
+  it("does not let a complete English asset name suppress a shorter evidence keyword", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "alpha beta",
+        summary: "alpha 必须登记。",
+        markdown: "alpha 必须登记。",
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "alpha beta",
+        summary: "alpha 无需登记。",
+        markdown: "alpha 无需登记。",
+      },
+    ]);
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          keyword: "alpha",
+          title: expect.stringContaining("alpha"),
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+      ]),
+    );
+  });
+
+  it("does not let a complete Chinese asset name suppress a shorter evidence keyword", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "记忆交易规则",
+        summary: "记忆交易必须登记。",
+        markdown: "记忆交易必须登记。",
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "记忆交易规则",
+        summary: "记忆交易无需登记。",
+        markdown: "记忆交易无需登记。",
+      },
+    ]);
+
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          keyword: "记忆交易",
+          title: expect.stringContaining("记忆交易"),
+          severity: "normal",
+          subjectAssetIds: ["asset_1", "asset_2"],
+        }),
+      ]),
+    );
+  });
 });

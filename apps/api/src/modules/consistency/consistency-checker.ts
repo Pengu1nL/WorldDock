@@ -58,6 +58,10 @@ export class ConsistencyChecker {
             continue;
           }
 
+          if (this.hasBroaderIssue(issues, left.asset.assetId, right.asset.assetId, keyword, evidence)) {
+            continue;
+          }
+
           emitted.add(issueKey);
           issues.push({
             title: `「${keyword}」存在潜在一致性冲突`,
@@ -134,12 +138,7 @@ export class ConsistencyChecker {
     const shared = [...left].filter((keyword) => right.has(keyword));
     shared.sort((a, b) => b.length - a.length || a.localeCompare(b, "zh-Hans-CN"));
 
-    return shared.filter(
-      (keyword, index) =>
-        !shared
-          .slice(0, index)
-          .some((longerKeyword) => containsKeyword(longerKeyword, keyword)),
-    );
+    return shared;
   }
 
   private findContradictingEvidence(
@@ -168,6 +167,22 @@ export class ConsistencyChecker {
     evidence: ConsistencyEvidence[],
   ): ConsistencyEvidence | undefined {
     return evidence.find((entry) => containsKeyword(entry.quote, keyword));
+  }
+
+  private hasBroaderIssue(
+    issues: ConsistencyIssue[],
+    leftAssetId: string,
+    rightAssetId: string,
+    keyword: string,
+    evidence: [ConsistencyEvidence, ConsistencyEvidence],
+  ): boolean {
+    return issues.some(
+      (issue) =>
+        issue.subjectAssetIds[0] === leftAssetId &&
+        issue.subjectAssetIds[1] === rightAssetId &&
+        containsKeyword(issue.keyword, keyword) &&
+        sameEvidence(issue.evidence, evidence),
+    );
   }
 }
 
@@ -235,4 +250,18 @@ function createChineseSuffixes(text: string): string[] {
 
 function containsKeyword(longerKeyword: string, keyword: string): boolean {
   return longerKeyword !== keyword && longerKeyword.toLowerCase().includes(keyword.toLowerCase());
+}
+
+function sameEvidence(
+  left: [ConsistencyEvidence, ConsistencyEvidence],
+  right: [ConsistencyEvidence, ConsistencyEvidence],
+): boolean {
+  return (
+    left[0].assetId === right[0].assetId &&
+    left[0].field === right[0].field &&
+    left[0].quote === right[0].quote &&
+    left[1].assetId === right[1].assetId &&
+    left[1].field === right[1].field &&
+    left[1].quote === right[1].quote
+  );
 }
