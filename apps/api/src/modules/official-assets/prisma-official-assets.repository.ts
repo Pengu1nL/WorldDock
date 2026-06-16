@@ -5,6 +5,7 @@ import {
   decodeOfficialAssetListCursor,
   encodeOfficialAssetListCursor,
   normalizeOfficialAssetListLimit,
+  OfficialAssetPatchAlreadyRevertedError,
   OfficialAssetPatchConflictError,
   type OfficialAssetPatchRecord,
   type OfficialAssetPatchesRepository,
@@ -254,6 +255,98 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
       where: { worldId, assetId, id: patchId },
     });
     return patch ? mapOfficialAssetPatch(patch) : null;
+  }
+
+  async revertPatch(input: Parameters<OfficialAssetPatchesRepository["revertPatch"]>[0]): Promise<OfficialAssetPatchRecord | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const current = await tx.officialWorldAsset.findFirst({
+        where: { worldId: input.worldId, id: input.assetId },
+        include: {
+          revisions: { orderBy: [{ version: "desc" }, { createdAt: "desc" }], take: 1 },
+        },
+      });
+      if (!current) return null;
+
+      const patch = await tx.worldAssetPatch.findFirst({
+        where: { worldId: input.worldId, assetId: input.assetId, id: input.patchId },
+      });
+      if (!patch) return null;
+      if (patch.status !== "applied") throw new OfficialAssetPatchAlreadyRevertedError();
+
+      const latestRevision = current.revisions[0] ?? null;
+      if (
+        current.version !== input.expectedVersion ||
+        (latestRevision?.id ?? null) !== input.expectedLatestRevisionId
+      ) {
+        throw new OfficialAssetPatchConflictError();
+      }
+
+      const versionTo = input.expectedVersion + 1;
+      const updated = await tx.officialWorldAsset.updateMany({
+        where: {
+          id: current.id,
+          worldId: input.worldId,
+          version: input.expectedVersion,
+        },
+        data: {
+          summary: input.summary,
+          version: versionTo,
+        },
+      });
+      if (updated.count !== 1) throw new OfficialAssetPatchConflictError();
+
+      await tx.officialWorldAssetRevision.create({
+        data: {
+          worldId: input.worldId,
+          assetId: input.assetId,
+          version: versionTo,
+          markdown: input.markdown,
+          summary: input.summary,
+          metadata: (input.metadata ?? {}) as never,
+        },
+      });
+
+      await tx.officialWorldAssetIndex.deleteMany({
+        where: { worldId: input.worldId, assetId: input.assetId },
+      });
+      for (const section of input.indexes) {
+        await tx.officialWorldAssetIndex.create({
+          data: {
+            worldId: input.worldId,
+            assetId: input.assetId,
+            title: section.title,
+            summary: section.summary,
+            metadata: (section.metadata ?? {}) as never,
+          },
+        });
+      }
+
+      const revertedAt = new Date();
+      const reverted = await tx.worldAssetPatch.updateMany({
+        where: {
+          id: patch.id,
+          worldId: input.worldId,
+          assetId: input.assetId,
+          status: "applied",
+        },
+        data: {
+          status: "reverted",
+          revertedAt,
+        },
+      });
+      if (reverted.count !== 1) {
+        const latestPatch = await tx.worldAssetPatch.findFirst({
+          where: { worldId: input.worldId, assetId: input.assetId, id: input.patchId },
+        });
+        if (latestPatch?.status === "reverted") throw new OfficialAssetPatchAlreadyRevertedError();
+        throw new OfficialAssetPatchConflictError();
+      }
+
+      const revertedPatch = await tx.worldAssetPatch.findFirst({
+        where: { worldId: input.worldId, assetId: input.assetId, id: input.patchId },
+      });
+      return revertedPatch ? mapOfficialAssetPatch(revertedPatch) : null;
+    });
   }
 
   async onModuleDestroy() {

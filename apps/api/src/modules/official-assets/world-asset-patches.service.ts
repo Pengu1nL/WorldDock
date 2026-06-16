@@ -6,6 +6,7 @@ import { createLineDiff, parseLineDiff, type LineDiffOperation } from "./asset-d
 import { extractAssetSummary, indexMarkdownSections } from "./asset-markdown";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
+  OfficialAssetPatchAlreadyRevertedError,
   OfficialAssetPatchConflictError,
   type OfficialAssetPatchRecord,
   type OfficialAssetPatchesRepository,
@@ -59,14 +60,7 @@ export class WorldAssetPatchesService {
       throw this.badRequest("Patch markdown must include a non-empty 概括 section.");
     }
     const diff = createLineDiff(beforeMarkdown, afterMarkdown);
-    const indexes = indexMarkdownSections(afterMarkdown).map((section, order) => ({
-      title: section.heading,
-      summary: section.summary,
-      metadata: {
-        level: section.level,
-        order,
-      },
-    }));
+    const indexes = this.buildIndexes(afterMarkdown);
 
     await this.localStorage.saveObject({
       key: detail.asset.documentKey,
@@ -118,6 +112,61 @@ export class WorldAssetPatchesService {
     await this.requireAsset(worldId, assetId);
     const patch = await this.patchRepository().getPatch(worldId, assetId, patchId);
     if (!patch) throw this.notFound();
+    return this.toPatchView(patch);
+  }
+
+  async revertPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchView> {
+    await this.requireWorld(worldId);
+    const detail = await this.officialAssets.getAsset(worldId, assetId);
+    if (!detail) throw this.notFound();
+    const repository = this.patchRepository();
+    const existingPatch = await repository.getPatch(worldId, assetId, patchId);
+    if (!existingPatch) throw this.notFound();
+    if (existingPatch.status !== "applied") throw this.patchAlreadyReverted();
+
+    const markdown = existingPatch.beforeMarkdown;
+    this.assertMarkdownWithinBounds(markdown, "Patch revert markdown");
+    const summary = extractAssetSummary(markdown);
+    if (!summary) {
+      throw this.badRequest("Patch beforeMarkdown must include a non-empty 概括 section.");
+    }
+    const indexes = this.buildIndexes(markdown);
+    const reason = `Revert patch ${patchId}`;
+
+    await this.saveMarkdown(detail.asset.documentKey, markdown);
+
+    let patch: OfficialAssetPatchRecord | null;
+    try {
+      patch = await repository.revertPatch({
+        worldId,
+        assetId,
+        patchId,
+        expectedVersion: detail.asset.version,
+        expectedLatestRevisionId: detail.revisions[0]?.id ?? null,
+        markdown,
+        summary,
+        metadata: {
+          source: "patch_revert",
+          patchId,
+          reason,
+        },
+        indexes,
+      });
+      if (!patch) throw this.notFound();
+    } catch (error) {
+      await this.restoreLatestRevisionMarkdown(worldId, assetId, detail.asset.documentKey, markdown);
+      if (error instanceof OfficialAssetPatchAlreadyRevertedError) {
+        throw this.patchAlreadyReverted();
+      }
+      if (error instanceof OfficialAssetPatchConflictError) {
+        throw new ConflictException({
+          code: "PATCH_CONFLICT",
+          message: "Official asset changed while reverting patch.",
+        });
+      }
+      throw error;
+    }
+
     return this.toPatchView(patch);
   }
 
@@ -192,7 +241,7 @@ export class WorldAssetPatchesService {
 
   private patchRepository(): OfficialAssetPatchesRepository {
     const repository = this.officialAssets;
-    if (!repository.applyPatch || !repository.listPatches || !repository.getPatch) {
+    if (!repository.applyPatch || !repository.listPatches || !repository.getPatch || !repository.revertPatch) {
       throw new Error("Official asset patch repository is not configured.");
     }
     return repository as OfficialAssetPatchesRepository;
@@ -203,6 +252,17 @@ export class WorldAssetPatchesService {
       ...patch,
       diff: parseLineDiff(patch.diff),
     };
+  }
+
+  private buildIndexes(markdown: string) {
+    return indexMarkdownSections(markdown).map((section, order) => ({
+      title: section.heading,
+      summary: section.summary,
+      metadata: {
+        level: section.level,
+        order,
+      },
+    }));
   }
 
   private notFound() {
@@ -216,6 +276,13 @@ export class WorldAssetPatchesService {
     return new BadRequestException({
       code: "BAD_REQUEST",
       message,
+    });
+  }
+
+  private patchAlreadyReverted() {
+    return new ConflictException({
+      code: "PATCH_ALREADY_REVERTED",
+      message: "World asset patch has already been reverted.",
     });
   }
 

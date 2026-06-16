@@ -11,6 +11,7 @@ import { LocalStorageService } from "../src/modules/local-storage/local-storage.
 import { OfficialAssetsController } from "../src/modules/official-assets/official-assets.controller";
 import {
   OFFICIAL_ASSETS_REPOSITORY,
+  OfficialAssetPatchAlreadyRevertedError,
   OfficialAssetPatchConflictError,
   type ApplyOfficialAssetPatchRecordInput,
   type CreateOfficialAssetRecordInput,
@@ -22,6 +23,7 @@ import {
   type OfficialAssetRevisionRecord,
   type OfficialAssetsRepository,
   type OfficialAssetSectionIndexRecord,
+  type RevertOfficialAssetPatchRecordInput,
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
@@ -110,24 +112,19 @@ describe("asset edit local endpoints", () => {
   it("applies a markdown patch and creates revision", async () => {
     const asset = await createOfficialAsset("rule", "记忆交易许可");
     const session = await createAssetEditSession(asset.id);
+    const patch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。", {
+      sessionId: session.id,
+      reason: "补充续期规则",
+    });
 
-    const applied = await request(app?.getHttpServer())
-      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
-      .send({
-        sessionId: session.id,
-        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。",
-        reason: "补充续期规则",
-      })
-      .expect(201);
-
-    expect(applied.body.patch).toMatchObject({
+    expect(patch).toMatchObject({
       assetId: asset.id,
       sessionId: session.id,
       status: "applied",
       assetVersionFrom: 1,
       assetVersionTo: 2,
     });
-    expect(applied.body.patch.diff).toEqual(expect.arrayContaining([
+    expect(patch.diff).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "add", text: expect.stringContaining("续期") }),
     ]));
 
@@ -140,6 +137,90 @@ describe("asset edit local endpoints", () => {
       version: 2,
       summary: "登记许可必须每年续期。",
     });
+  });
+
+  it("reverts an applied patch", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const patch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。");
+
+    const reverted = await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${patch.id}/revert`)
+      .expect(200);
+
+    expect(reverted.body.patch).toMatchObject({ id: patch.id, status: "reverted" });
+    expect(reverted.body.patch.revertedAt).toEqual(expect.any(String));
+
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(3);
+    expect(detail.asset.summary).toBe("所有记忆交易都需要登记。");
+    expect(detail.markdown).not.toContain("每年续期");
+    expect(detail.markdown).toBe("# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。");
+    expect(detail.revisions).toHaveLength(3);
+    expect(detail.revisions[0]).toMatchObject({
+      version: 3,
+      summary: "所有记忆交易都需要登记。",
+      metadata: expect.objectContaining({
+        source: "patch_revert",
+        patchId: patch.id,
+        reason: `Revert patch ${patch.id}`,
+      }),
+    });
+    expect(detail.indexes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        title: "概括",
+        summary: "所有记忆交易都需要登记。",
+      }),
+    ]));
+  });
+
+  it("returns 409 when reverting a patch twice without changing the asset again", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const patch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。");
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${patch.id}/revert`)
+      .expect(200);
+    const afterFirstRevert = await getOfficialAsset(asset.id);
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${patch.id}/revert`)
+      .expect(409)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          code: "PATCH_ALREADY_REVERTED",
+          message: "World asset patch has already been reverted.",
+        });
+      });
+
+    const afterSecondRevert = await getOfficialAsset(asset.id);
+    expect(afterSecondRevert.asset.version).toBe(afterFirstRevert.asset.version);
+    expect(afterSecondRevert.markdown).toBe(afterFirstRevert.markdown);
+    expect(afterSecondRevert.revisions).toHaveLength(afterFirstRevert.revisions.length);
+  });
+
+  it("does not expose patch revert across worlds or assets", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const otherAsset = await createOfficialAsset("rule", "白塔许可");
+    const patch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。");
+    const otherWorld = await worlds.createWorld({
+      name: "白塔城",
+      type: "奇幻",
+      summary: "白塔管理整座城市的记忆。",
+      tags: ["白塔"],
+      mode: "local",
+      maturity: 12,
+    });
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${otherAsset.id}/patches/${patch.id}/revert`)
+      .expect(404);
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${otherWorld.id}/official-assets/${asset.id}/patches/${patch.id}/revert`)
+      .expect(404);
+
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(2);
+    expect(detail.markdown).toContain("每年续期");
   });
 
   it("rejects patches from non asset edit sessions without changing the asset", async () => {
@@ -429,6 +510,24 @@ describe("asset edit local endpoints", () => {
     return created.body.session as { id: string };
   }
 
+  async function applyPatch(
+    assetId: string,
+    afterMarkdown: string,
+    options: { sessionId?: string; reason?: string } = {},
+  ) {
+    const sessionId = options.sessionId ?? (await createAssetEditSession(assetId)).id;
+    const applied = await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${assetId}/patches`)
+      .send({
+        sessionId,
+        afterMarkdown,
+        reason: options.reason,
+      })
+      .expect(201);
+
+    return applied.body.patch as OfficialAssetPatchRecord & { diff: unknown };
+  }
+
   async function getOfficialAsset(assetId: string) {
     const detail = await request(app?.getHttpServer())
       .get(`/v1/worlds/${world.id}/official-assets/${assetId}`)
@@ -437,7 +536,13 @@ describe("asset edit local endpoints", () => {
     return detail.body as {
       asset: OfficialAssetRecord;
       markdown: string;
-      revisions: Array<{ version: number; markdown: string; summary: string | null }>;
+      indexes: Array<{ title: string; summary: string | null; metadata: Record<string, unknown> }>;
+      revisions: Array<{
+        version: number;
+        markdown: string;
+        summary: string | null;
+        metadata: Record<string, unknown>;
+      }>;
     };
   }
 
@@ -699,6 +804,68 @@ function createInMemoryOfficialAssets(options: InMemoryOfficialAssetsOptions = {
       const asset = assets.get(assetId);
       if (!asset || asset.worldId !== worldId) return null;
       return (patches.get(assetId) ?? []).find((patch) => patch.id === patchId) ?? null;
+    },
+    async revertPatch(input: RevertOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null> {
+      const asset = assets.get(input.assetId);
+      if (!asset || asset.worldId !== input.worldId) return null;
+      const patchList = patches.get(asset.id) ?? [];
+      const patchIndex = patchList.findIndex((patch) => patch.id === input.patchId);
+      if (patchIndex === -1) return null;
+      const patch = patchList[patchIndex];
+      if (patch.status !== "applied") throw new OfficialAssetPatchAlreadyRevertedError();
+      const existingRevisions = revisions.get(asset.id) ?? [];
+      if (
+        asset.version !== input.expectedVersion ||
+        (existingRevisions[0]?.id ?? null) !== input.expectedLatestRevisionId
+      ) {
+        throw new OfficialAssetPatchConflictError();
+      }
+
+      const timestamp = new Date();
+      const versionTo = input.expectedVersion + 1;
+      const updated: OfficialAssetRecord = {
+        ...asset,
+        summary: input.summary,
+        version: versionTo,
+        updatedAt: timestamp,
+      };
+      const revision: OfficialAssetRevisionRecord = {
+        id: `official_asset_revision_${revisionCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        version: versionTo,
+        markdown: input.markdown,
+        summary: input.summary,
+        metadata: input.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      const sectionIndexes = input.indexes.map((section) => ({
+        id: `official_asset_index_${indexCount++}`,
+        worldId: input.worldId,
+        assetId: asset.id,
+        title: section.title,
+        summary: section.summary ?? null,
+        metadata: section.metadata ?? {},
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }));
+      const revertedPatch: OfficialAssetPatchRecord = {
+        ...patch,
+        status: "reverted",
+        updatedAt: timestamp,
+        revertedAt: timestamp,
+      };
+
+      assets.set(asset.id, updated);
+      revisions.set(asset.id, [revision, ...existingRevisions]);
+      indexes.set(asset.id, sectionIndexes);
+      patches.set(asset.id, [
+        ...patchList.slice(0, patchIndex),
+        revertedPatch,
+        ...patchList.slice(patchIndex + 1),
+      ]);
+      return revertedPatch;
     },
   };
 }

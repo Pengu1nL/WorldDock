@@ -119,6 +119,22 @@ export type ApplyOfficialAssetPatchRecordInput = {
   }>;
 };
 
+export type RevertOfficialAssetPatchRecordInput = {
+  worldId: string;
+  assetId: string;
+  patchId: string;
+  expectedVersion: number;
+  expectedLatestRevisionId: string | null;
+  markdown: string;
+  summary: string;
+  metadata?: Record<string, unknown>;
+  indexes: Array<{
+    title: string;
+    summary: string | null;
+    metadata?: Record<string, unknown>;
+  }>;
+};
+
 export type ListOfficialAssetsQuery = {
   type?: OfficialWorldAssetType;
   q?: string;
@@ -144,12 +160,20 @@ export type OfficialAssetPatchesRepository = {
   applyPatch(input: ApplyOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null>;
   listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchRecord[]>;
   getPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchRecord | null>;
+  revertPatch(input: RevertOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null>;
 };
 
 export class OfficialAssetPatchConflictError extends Error {
   constructor() {
     super("Official asset changed while applying patch.");
     this.name = "OfficialAssetPatchConflictError";
+  }
+}
+
+export class OfficialAssetPatchAlreadyRevertedError extends Error {
+  constructor() {
+    super("World asset patch has already been reverted.");
+    this.name = "OfficialAssetPatchAlreadyRevertedError";
   }
 }
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Inject, Param, Patch, Post, Query } from "@nestjs/common";
 import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
 import { z } from "zod";
 import type {
@@ -147,6 +147,18 @@ export class OfficialAssetsController {
   ) {
     return {
       patch: serializeOfficialAssetPatch(await this.assetPatches.getPatch(worldId, assetId, patchId)),
+    };
+  }
+
+  @Post(":assetId/patches/:patchId/revert")
+  @HttpCode(200)
+  async revertPatch(
+    @Param("worldId") worldId: string,
+    @Param("assetId") assetId: string,
+    @Param("patchId") patchId: string,
+  ) {
+    return {
+      patch: serializeOfficialAssetPatch(await this.assetPatches.revertPatch(worldId, assetId, patchId)),
     };
   }
 
