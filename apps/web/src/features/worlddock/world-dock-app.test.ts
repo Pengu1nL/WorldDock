@@ -1,5 +1,18 @@
+// @vitest-environment jsdom
+
+import "@testing-library/jest-dom/vitest";
+import { createElement } from "react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { buildCreateWorldInput } from "./world-dock-app";
+import { buildCreateWorldInput, WorldDockApp } from "./world-dock-app";
+
+describe("WorldDockApp shell", () => {
+  it("renders the world dock shell", () => {
+    render(createElement(WorldDockApp));
+
+    expect(screen.getByText("WorldDock")).toBeInTheDocument();
+  });
+});
 
 describe("buildCreateWorldInput", () => {
   it("stores the LLM short summary instead of the full draft notes", () => {

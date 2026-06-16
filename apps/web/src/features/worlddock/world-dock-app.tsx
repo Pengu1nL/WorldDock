@@ -3,7 +3,7 @@
 // world-dock-app.tsx — Main app shell, routing, real agent runtime
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   cancelAgentRun,
   createAgentRun,
@@ -29,35 +29,22 @@ import { AgentRunPanel } from "../agent/agent-run-panel";
 import { ContextInspector } from "../agent/context-inspector";
 import { AssetEditor } from "../world-assets/asset-editor";
 import { AssetSearch } from "../world-assets/asset-search";
-import { Drawer, Icon, Rail, StatusBar, Toasts } from "./components";
+import { Drawer, Rail, StatusBar, Toasts } from "./components";
+import { WorldDockShell } from "./shell/world-dock-shell";
 import {
-  TweakRadio,
-  TweakSection,
-  TweaksPanel,
-  useTweaks,
-} from "./tweaks-panel";
-import { ArchiveView, ConflictsView, SeedsView } from "./view-archive";
+  WorldWorkspace,
+  type WorldDockActions,
+  type WorldDockRuntimeState,
+  type WorldDockView,
+} from "./shell/world-workspace";
 import {
-  Composer,
   IssuesDrawer,
-  Message,
   PendingDrawer,
   SuggestionDetail,
 } from "./view-workbench";
-import { PublishView } from "./view-publish";
-import { SettingsView } from "./view-settings";
 import { getSuggestionKey, normalizeSuggestionForSave } from "./suggestion-utils";
 import { CreateView, WorldsView } from "./view-worlds";
 import { getWorldStoredSummary } from "./world-summary";
-
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "mode": "local",
-  "density": "regular",
-  "titleFont": "serif",
-  "appTheme": "light"
-}/*EDITMODE-END*/;
-
-const worldDockQueryClient = new QueryClient();
 
 type AgentToolEvent = {
   id: string;
@@ -75,24 +62,14 @@ type AgentContextSnapshot = {
 };
 
 export function WorldDockApp() {
-  return (
-    <QueryClientProvider client={worldDockQueryClient}>
-      <WorldDockRuntime />
-    </QueryClientProvider>
-  );
+  return <WorldDockShell />;
 }
 
-function WorldDockRuntime() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-
-  // Apply density / font tweaks
-  useEffect(() => { document.documentElement.dataset.direction = "obs"; }, []);
-  useEffect(() => { document.documentElement.dataset.density = t.density; }, [t.density]);
-  useEffect(() => { document.documentElement.dataset.titleFont = t.titleFont; }, [t.titleFont]);
-  useEffect(() => { document.documentElement.dataset.appTheme = t.appTheme; }, [t.appTheme]);
+export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?: React.ReactNode }) {
+  const t = tweaks;
 
   // ────────── App state ──────────
-  const [view, setView] = useState<any>("worlds");  // worlds | create | workbench | archive | seeds | conflicts | publish | settings
+  const [view, setView] = useState<WorldDockView>("worlds");
   const [currentWorld, setCurrentWorld] = useState<any>(null);
   const [worlds, setWorlds] = useState<any[]>([]);
   const [createInspiration, setCreateInspiration] = useState("");
@@ -542,7 +519,7 @@ function WorldDockRuntime() {
         if (returnedAsset) savedItem = fromWorldAsset(returnedAsset);
         else appendSavedItem = false;
         if (currentWorld?.id) {
-          void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+          void assetsQuery.refetch();
         }
       } catch {
         pushToast({ kind: "warn", text: "保存失败 · 请检查本地 API 服务" });
@@ -552,7 +529,7 @@ function WorldDockRuntime() {
       try {
         const created = await createWorldAsset(currentWorld.id, toWorldAssetInput(normalizedItem));
         savedItem = fromWorldAsset(created.asset);
-        void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+        void assetsQuery.refetch();
       } catch {
         pushToast({ kind: "warn", text: "资产保存失败 · 请检查本地 API 服务" });
         return;
@@ -626,7 +603,7 @@ function WorldDockRuntime() {
       const saved = draft.id
         ? await updateWorldAsset(currentWorld.id, draft.id, toWorldAssetUpdateInput(draft))
         : await createWorldAsset(currentWorld.id, toWorldAssetInput(draft));
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+      void assetsQuery.refetch();
       setDrawerOpen(null);
       pushToast({ kind: "save", text: `已保存资产 · ${saved.asset.title}` });
     } catch {
@@ -648,7 +625,7 @@ function WorldDockRuntime() {
     setAssetSaving(true);
     try {
       await deleteWorldAsset(currentWorld.id, asset.id);
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+      void assetsQuery.refetch();
       setDrawerOpen(null);
       pushToast({ kind: "warn", text: `已删除资产 · ${asset.title}` });
     } catch {
@@ -669,7 +646,7 @@ function WorldDockRuntime() {
     }
     try {
       await reorderWorldAssets(currentWorld.id, assetIds);
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+      void assetsQuery.refetch();
     } catch {
       pushToast({ kind: "warn", text: "资产排序失败 · 请检查本地 API 服务" });
     }
@@ -706,7 +683,7 @@ function WorldDockRuntime() {
       setSavedConflicts((prev: any[]) => prev.map((asset: any) =>
         asset.id === sourceAsset.id ? applyLocalRelationLabels(asset, [relationLabel], [relationTarget]) : asset,
       ));
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+      void assetsQuery.refetch();
       pushToast({ kind: "save", text: `已关联资产 · ${relationLabel}` });
       return true;
     } catch {
@@ -752,7 +729,7 @@ function WorldDockRuntime() {
           ? { ...prev, item: removeLocalRelationLabels(prev.item, [relationLabel], [targetAssetId]) }
           : prev
       ));
-      void worldDockQueryClient.invalidateQueries({ queryKey: ["world-assets", currentWorld.id] });
+      void assetsQuery.refetch();
       pushToast({ kind: "save", text: `已解除关联 · ${relationLabel}` });
       return true;
     } catch {
@@ -825,7 +802,7 @@ function WorldDockRuntime() {
           onNav={(v: any) => {
             if (v === "worlds") setView("worlds");
             else if (v === "settings") setView("settings");
-            else if (currentWorld) setView(v);
+            else if (currentWorld) setView(v as WorldDockView);
             else setView("worlds");
           }}
           world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
@@ -853,79 +830,34 @@ function WorldDockRuntime() {
             <CreateView initialInspiration={createInspiration}
               onConfirm={handleCreateWorld} onCancel={() => setView("worlds")}/>
           )}
-          {view === "workbench" && currentWorld && (
-            <Workbench
-              world={currentWorld}
-              messages={messages}
-              agentBusy={agentBusy}
-              savedIds={savedIds}
-              pendingCount={pendingItems.length}
-              contextRefs={(() => {
-                // Last completed agent message's contextRefs
-                for (let i = messages.length - 1; i >= 0; i--) {
-                  const m: any = messages[i];
-                  if (m.role === "agent" && !m.streaming && m.contextRefs) return m.contextRefs;
-                }
-                return 0;
-              })()}
-              onSend={(text: string) => {
-                setMessages((prev: any[]) => [...prev, { id: "u_" + Date.now(), role: "user", text }]);
-                setTimeout(() => startAgentRun(text), 200);
-              }}
-              onStop={stopAgent}
-              onSave={handleSave}
-              onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s })}
-              onOpenContext={(snapshot?: AgentContextSnapshot) => setDrawerOpen({ kind: "context", snapshot })}
-              onOpenSuggestions={() => setDrawerOpen({ kind: "pending" })}
-            />
-          )}
-          {view === "archive" && currentWorld && (
-            <ArchiveView world={currentWorld} savedSettings={savedSettings} savedIssues={savedIssues}
-              onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-              onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
-              onCreateAsset={openAssetEditor}
-              onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-              onDeleteAsset={removeEditedAsset}
-              onReorderAssets={reorderAssets}
-              onRelateAssets={openAssetRelation}
-              onBackToWorkbench={() => setView("workbench")}/>
-          )}
-          {view === "seeds" && currentWorld && (
-            <SeedsView world={currentWorld} savedSeeds={savedSeeds} savedConflicts={savedConflicts}
-              onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-              onJumpToConflict={(c: any) => { setDrawerOpen(null); setView("conflicts"); setTimeout(() => setDrawerOpen({ kind: "detail", item: c, readonly: true }), 50); }}
-              onCreateAsset={openAssetEditor}
-              onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-              onDeleteAsset={removeEditedAsset}
-              onReorderAssets={reorderAssets}
-              onRelateAssets={openAssetRelation}
-              onBackToWorkbench={() => setView("workbench")}/>
-          )}
-          {view === "conflicts" && currentWorld && (
-            <ConflictsView world={currentWorld} savedConflicts={savedConflicts} savedSeeds={savedSeeds}
-              onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-              onCreateAsset={openAssetEditor}
-              onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-              onDeleteAsset={removeEditedAsset}
-              onReorderAssets={reorderAssets}
-              onRelateAssets={openAssetRelation}
-              onBackToWorkbench={() => setView("workbench")}/>
-          )}
-          {view === "publish" && currentWorld && (
-            <PublishView
-              currentWorld={currentWorld}
-              assets={allSavedAssets}
-              onToast={pushToast}
-              onBack={() => setView("workbench")}
-            />
-          )}
-          {view === "settings" && (
-            <SettingsView
-              onBack={() => setView("worlds")}
-              onToast={pushToast}
-              currentWorld={currentWorld}
-            />
-          )}
+          <WorldWorkspace
+            view={view}
+            currentWorld={currentWorld}
+            worldState={{
+              messages,
+              agentBusy,
+              savedIds,
+              pendingItems,
+              savedSettings,
+              savedSeeds,
+              savedConflicts,
+              savedIssues,
+              allSavedAssets,
+            } satisfies WorldDockRuntimeState}
+            actions={{
+              setMessages,
+              startAgentRun,
+              stopAgent,
+              handleSave,
+              setDrawerOpen,
+              setView,
+              openAssetEditor,
+              removeEditedAsset,
+              reorderAssets,
+              openAssetRelation,
+              pushToast,
+            } satisfies WorldDockActions}
+          />
 
           {/* Drawer */}
           <Drawer
@@ -1021,7 +953,7 @@ function WorldDockRuntime() {
                   const targetView = targetItem.kind === "seed" ? "seeds" :
                                      targetItem.kind === "conflict" ? "conflicts" : "archive";
                   setDrawerOpen(null);
-                  setView(targetView);
+                  setView(targetView as WorldDockView);
                   setTimeout(() => setDrawerOpen({ kind: "detail", item: targetItem, readonly: true }), 50);
                 }}
               />
@@ -1057,14 +989,7 @@ function WorldDockRuntime() {
 
       <Toasts toasts={toasts}/>
 
-      {/* Tweaks panel */}
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="排版 · TYPOGRAPHY"/>
-        <TweakRadio label="对话密度" value={t.density} options={["compact", "regular", "comfy"]} onChange={(v: any) => setTweak("density", v)}/>
-        <TweakRadio label="标题字体" value={t.titleFont} options={["sans", "serif"]} onChange={(v: any) => setTweak("titleFont", v)}/>
-        <TweakSection label="主题 · THEME"/>
-        <TweakRadio label="深浅" value={t.appTheme} options={["light", "dark"]} onChange={(v: any) => setTweak("appTheme", v)}/>
-      </TweaksPanel>
+      {children}
     </div>
   );
 }
@@ -1085,81 +1010,6 @@ const AgentContextDrawer = ({ snapshot }: { snapshot: AgentContextSnapshot }) =>
       </div>
     </AgentRunPanel>
     <ContextInspector refs={snapshot.refs} />
-  </div>
-);
-
-// ────────── Workbench (composes Message + Composer) ──────────
-const Workbench = ({
-  world, messages, agentBusy, savedIds, pendingCount,
-  onSend, onStop, onSave, onOpenDetail,
-  onOpenContext, onOpenSuggestions, contextRefs,
-}: any) => {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  // Auto-scroll on new content
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  const isEmpty = messages.length === 0;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, position: "relative" }}>
-      <div ref={scrollRef} className="scroll" style={{ flex: 1, minHeight: 0, paddingBottom: 0 }}>
-        {isEmpty ? (
-          <WorkbenchEmpty world={world}/>
-        ) : (
-          <>
-            <div style={{ padding: "20px 0 0", textAlign: "center" }}>
-              <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
-                推演开始 · {world.name}
-              </span>
-            </div>
-            {messages.map((m: any) => (
-              <Message key={m.id} msg={m} savedIds={getMessageSavedSuggestionIds(m, savedIds)}
-                onSave={onSave}
-                onOpenDetail={onOpenDetail}
-                onOpenContext={() => onOpenContext(m.contextSnapshot)}
-              />
-            ))}
-          </>
-        )}
-      </div>
-      <Composer
-        onSend={onSend}
-        busy={agentBusy}
-        onStop={onStop}
-        pendingCount={pendingCount}
-        contextRefs={contextRefs}
-        onOpenSuggestions={onOpenSuggestions}
-        onOpenContext={() => onOpenContext()}
-      />
-    </div>
-  );
-};
-
-const WorkbenchEmpty = ({ world }: any) => (
-  <div style={{
-    maxWidth: 560, margin: "10vh auto 0", padding: "0 24px",
-    textAlign: "center",
-  }}>
-    <div className="title-font" style={{
-      fontSize: "var(--t-28)", color: "var(--fg)", marginBottom: 12, letterSpacing: 0,
-    }}>{world.name}</div>
-    <p style={{ fontSize: "var(--t-14)", color: "var(--fg-2)", lineHeight: 1.7, marginBottom: 30 }}>
-      这是一个会继续长出故事的世界。<br/>
-      用对话推演它，把值得保存的部分变成档案。
-    </p>
-    <div className="card" style={{ padding: 16, textAlign: "left" }}>
-      <div className="row gap-2" style={{ marginBottom: 8 }}>
-        <Icon name="spark" size={12} style={{ color: "var(--sage)" }}/>
-        <span className="mono" style={{ fontSize: 11, color: "var(--fg-2)" }}>下一步</span>
-      </div>
-      <p style={{ fontSize: "var(--t-13)", color: "var(--fg-1)", lineHeight: 1.6 }}>
-        在下方输入一个推演方向。Agent 会围绕当前世界继续推演，并把值得保留的内容整理成待确认建议。
-      </p>
-    </div>
   </div>
 );
 
@@ -1212,13 +1062,6 @@ function isAbortError(error: unknown) {
 
 function getAssetRelationOverlayKey(worldId: string, assetId: string) {
   return `${worldId}:${assetId}`;
-}
-
-function getMessageSavedSuggestionIds(message: any, savedSuggestionKeys: any[]) {
-  if (!message.suggestions) return [];
-  return message.suggestions
-    .filter((suggestion: any) => savedSuggestionKeys.includes(getSuggestionKey(suggestion)))
-    .map((suggestion: any) => getSuggestionKey(suggestion));
 }
 
 const MAX_WORLD_ASSET_PAGES = 100;
