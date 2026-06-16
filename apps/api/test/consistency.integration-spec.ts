@@ -335,9 +335,219 @@ describe("consistency issues local endpoints", () => {
       })
       .expect(400);
   });
+
+  it("rejects assets outside the issue subject assets before creating a patch batch", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+    const outside = await setup.createOfficialAssetWithMarkdown(
+      "event",
+      "场外资产",
+      "# 场外资产\n\n## 概括\n\n这不是本次冲突的主体资产。",
+    );
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [{
+          assetId: outside.asset.id,
+          afterMarkdown: "# 场外资产\n\n## 概括\n\n场外资产不应被本次修复修改。",
+        }],
+      })
+      .expect(400);
+
+    expect(setup.officialAssets.listPatchBatches()).toHaveLength(0);
+    expect(await setup.officialAssets.listPatchesByBatch(setup.world.id, "missing_batch")).toHaveLength(0);
+  });
+
+  it("rejects invalid service patch input before creating a batch", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+
+    await expect(app.get(ConsistencyService).applyPatchBatch({
+      worldId: setup.world.id,
+      issueId: issue.id,
+      sessionId: sessionResponse.body.session.id,
+      patches: [{ assetId: "", afterMarkdown: "" }],
+    })).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "BAD_REQUEST" }),
+    });
+
+    expect(setup.officialAssets.listPatchBatches()).toHaveLength(0);
+  });
+
+  it("reverts the applied patches and marks the batch reverted when a later apply fails", async () => {
+    const setup = await createConsistencyTestSetup({
+      failNextApplyAssetIds: new Set(["official_asset_2"]),
+    });
+    app = setup.app;
+    const { issue, asset1Markdown } = await setup.createOpenConsistencyIssue();
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [
+          {
+            assetId: "official_asset_1",
+            afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易必须登记，登记费用为零。",
+          },
+          {
+            assetId: "official_asset_2",
+            afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+          },
+        ],
+      })
+      .expect(409);
+
+    const [batch] = setup.officialAssets.listPatchBatches();
+    expect(batch).toMatchObject({ status: "reverted" });
+    const [patch] = await setup.officialAssets.listPatches(setup.world.id, "official_asset_1");
+    expect(patch).toMatchObject({ status: "reverted", batchId: batch.id });
+    const asset = await setup.officialAssets.getAsset(setup.world.id, "official_asset_1");
+    expect(asset?.revisions[0]?.markdown).toBe(asset1Markdown);
+  });
+
+  it("keeps the batch recoverable when apply compensation fails", async () => {
+    const setup = await createConsistencyTestSetup({
+      failNextApplyAssetIds: new Set(["official_asset_2"]),
+      failNextRevertAssetIds: new Set(["official_asset_1"]),
+    });
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [
+          {
+            assetId: "official_asset_1",
+            afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易必须登记，登记费用为零。",
+          },
+          {
+            assetId: "official_asset_2",
+            afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+          },
+        ],
+      })
+      .expect(409);
+
+    const [batch] = setup.officialAssets.listPatchBatches();
+    expect(batch).toMatchObject({ status: "applying" });
+    const [patch] = await setup.officialAssets.listPatches(setup.world.id, "official_asset_1");
+    expect(patch).toMatchObject({ status: "applied", batchId: batch.id });
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches/${batch.id}/revert`)
+      .expect(200);
+    expect(setup.officialAssets.listPatchBatches()[0]).toMatchObject({ status: "reverted" });
+  });
+
+  it("retries batch revert after a partial failure and skips already reverted patches", async () => {
+    const setup = await createConsistencyTestSetup({
+      failNextRevertAssetIds: new Set(["official_asset_1"]),
+    });
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+    const batch = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [
+          {
+            assetId: "official_asset_1",
+            afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n所有记忆交易必须登记，登记费用为零。",
+          },
+          {
+            assetId: "official_asset_2",
+            afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+          },
+        ],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches/${batch.body.batch.id}/revert`)
+      .expect(409);
+
+    expect(setup.officialAssets.listPatchBatches()[0]).toMatchObject({ status: "applied" });
+    expect((await setup.consistencyIssues.getIssue(setup.world.id, issue.id))?.status).toBe("resolved");
+    expect(await patchStatusByAsset(setup.officialAssets, setup.world.id)).toMatchObject({
+      official_asset_1: "applied",
+      official_asset_2: "reverted",
+    });
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches/${batch.body.batch.id}/revert`)
+      .expect(200);
+
+    expect(setup.officialAssets.listPatchBatches()[0]).toMatchObject({ status: "reverted" });
+    expect((await setup.consistencyIssues.getIssue(setup.world.id, issue.id))?.status).toBe("open");
+    expect(await patchStatusByAsset(setup.officialAssets, setup.world.id)).toMatchObject({
+      official_asset_1: "reverted",
+      official_asset_2: "reverted",
+    });
+  });
+
+  it("rejects reverting an already reverted patch batch", async () => {
+    const setup = await createConsistencyTestSetup();
+    app = setup.app;
+    const { issue } = await setup.createOpenConsistencyIssue();
+    const sessionResponse = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/repair-sessions`)
+      .send({ title: "修复登记口径冲突" })
+      .expect(201);
+    const batch = await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches`)
+      .send({
+        sessionId: sessionResponse.body.session.id,
+        patches: [{
+          assetId: "official_asset_2",
+          afterMarkdown: "# 自由交易日\n\n## 概括\n\n自由交易日当天仍需登记，但费用为零。",
+        }],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches/${batch.body.batch.id}/revert`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${setup.world.id}/consistency-issues/${issue.id}/patch-batches/${batch.body.batch.id}/revert`)
+      .expect(400);
+  });
 });
 
-async function createConsistencyTestSetup() {
+async function patchStatusByAsset(officialAssets: InMemoryOfficialAssets, worldId: string) {
+  return Object.fromEntries((await Promise.all([
+    officialAssets.listPatches(worldId, "official_asset_1"),
+    officialAssets.listPatches(worldId, "official_asset_2"),
+  ])).flat().map((patch) => [patch.assetId, patch.status]));
+}
+
+async function createConsistencyTestSetup(options: InMemoryOfficialAssetsOptions = {}) {
   const worlds = createInMemoryWorlds();
   const world = await worlds.createWorld({
     name: "回忆所",
@@ -349,7 +559,7 @@ async function createConsistencyTestSetup() {
   });
   const consistencyIssues = createInMemoryConsistencyIssues();
   const agentSessions = createInMemoryAgentSessions();
-  const officialAssets = createInMemoryOfficialAssets();
+  const officialAssets = createInMemoryOfficialAssets(options);
   const app = await createHttpTestApp({
     controllers: [ConsistencyController],
     providers: [
@@ -431,9 +641,19 @@ async function createConsistencyTestSetup() {
   };
 }
 
-type InMemoryOfficialAssets = OfficialAssetsRepository & OfficialAssetPatchesRepository;
+type InMemoryOfficialAssets = OfficialAssetsRepository & OfficialAssetPatchesRepository & Required<Pick<
+  OfficialAssetPatchesRepository,
+  "createPatchBatch" | "getPatchBatch" | "updatePatchBatchStatus" | "listPatchesByBatch"
+>> & {
+  listPatchBatches(): OfficialAssetPatchBatchRecord[];
+};
 
-function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
+type InMemoryOfficialAssetsOptions = {
+  failNextApplyAssetIds?: Set<string>;
+  failNextRevertAssetIds?: Set<string>;
+};
+
+function createInMemoryOfficialAssets(options: InMemoryOfficialAssetsOptions = {}): InMemoryOfficialAssets {
   const assets = new Map<string, OfficialAssetRecord>();
   const revisions = new Map<string, OfficialAssetRevisionRecord[]>();
   const indexes = new Map<string, OfficialAssetSectionIndexRecord[]>();
@@ -446,6 +666,9 @@ function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
   let batchCount = 1;
 
   return {
+    listPatchBatches() {
+      return [...batches.values()];
+    },
     async createPatchBatch(input: CreateOfficialAssetPatchBatchRecordInput) {
       const timestamp = new Date();
       const batch: OfficialAssetPatchBatchRecord = {
@@ -552,6 +775,9 @@ function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
     async applyPatch(input: ApplyOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null> {
       const asset = assets.get(input.assetId);
       if (!asset || asset.worldId !== input.worldId) return null;
+      if (options.failNextApplyAssetIds?.delete(input.assetId)) {
+        throw new OfficialAssetPatchConflictError();
+      }
       const existingRevisions = revisions.get(asset.id) ?? [];
       if (
         asset.version !== input.expectedVersion ||
@@ -634,6 +860,9 @@ function createInMemoryOfficialAssets(): InMemoryOfficialAssets {
     async revertPatch(input: RevertOfficialAssetPatchRecordInput): Promise<OfficialAssetPatchRecord | null> {
       const asset = assets.get(input.assetId);
       if (!asset || asset.worldId !== input.worldId) return null;
+      if (options.failNextRevertAssetIds?.delete(input.assetId)) {
+        throw new OfficialAssetPatchConflictError();
+      }
       const patchList = patches.get(asset.id) ?? [];
       const patchIndex = patchList.findIndex((patch) => patch.id === input.patchId);
       if (patchIndex === -1) return null;

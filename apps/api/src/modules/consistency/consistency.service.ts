@@ -139,9 +139,9 @@ export class ConsistencyService {
     }>;
   }): Promise<OfficialAssetPatchBatchView> {
     await this.requireWorld(input.worldId);
-    if (!input.patches.length) throw this.badRequest("Patch batch must include at least one patch.");
     const issue = await this.consistencyIssues.getIssue(input.worldId, input.issueId);
     if (!issue) throw this.notFound();
+    const patches = this.validatePatchBatchInput(input.patches, issue.subjectAssetIds);
 
     const batch = await this.assetPatches.createPatchBatch({
       worldId: input.worldId,
@@ -151,7 +151,7 @@ export class ConsistencyService {
     const applied: Array<{ assetId: string; patchId: string }> = [];
 
     try {
-      for (const patch of input.patches) {
+      for (const patch of patches) {
         const appliedPatch = await this.assetPatches.applyConsistencyRepairPatch({
           worldId: input.worldId,
           issueId: input.issueId,
@@ -165,20 +165,24 @@ export class ConsistencyService {
         applied.push({ assetId: patch.assetId, patchId: appliedPatch.id });
       }
       const appliedBatch = await this.assetPatches.markPatchBatchApplied(input.worldId, batch.id);
-      await this.consistencyIssues.updateIssueStatus(input.worldId, input.issueId, "resolved");
+      const resolvedIssue = await this.consistencyIssues.updateIssueStatus(input.worldId, input.issueId, "resolved");
+      if (!resolvedIssue) throw this.notFound();
       return appliedBatch;
     } catch (error) {
+      let compensated = true;
       for (const patch of [...applied].reverse()) {
         try {
           await this.assetPatches.revertPatch(input.worldId, patch.assetId, patch.patchId);
         } catch {
-          // Surface the original apply error; best-effort compensation may fail under concurrent edits.
+          compensated = false;
         }
       }
-      try {
-        await this.assetPatches.markPatchBatchReverted(input.worldId, batch.id);
-      } catch {
-        // Keep the original error.
+      if (compensated) {
+        try {
+          await this.assetPatches.markPatchBatchReverted(input.worldId, batch.id);
+        } catch {
+          // Keep the original error.
+        }
       }
       throw error;
     }
@@ -192,17 +196,26 @@ export class ConsistencyService {
     if (batch.issueId !== issueId) {
       throw this.badRequest("Patch batch does not belong to the consistency issue.");
     }
-    if (batch.status !== "applied") {
+    if (batch.status === "reverted") {
+      throw this.badRequest("Patch batch has already been reverted.");
+    }
+    if (batch.status !== "applied" && batch.status !== "applying") {
       throw this.badRequest("Only applied patch batches can be reverted.");
     }
 
     const patches = await this.assetPatches.listPatchesByBatch(worldId, batchId);
     for (const patch of [...patches].reverse()) {
+      if (patch.status === "reverted") continue;
       await this.assetPatches.revertPatch(worldId, patch.assetId, patch.id);
     }
 
+    const currentPatches = await this.assetPatches.listPatchesByBatch(worldId, batchId);
+    if (currentPatches.some((patch) => patch.status !== "reverted")) {
+      throw this.badRequest("Patch batch still has applied patches.");
+    }
     const reverted = await this.assetPatches.markPatchBatchReverted(worldId, batchId);
-    await this.consistencyIssues.updateIssueStatus(worldId, issueId, "open");
+    const reopenedIssue = await this.consistencyIssues.updateIssueStatus(worldId, issueId, "open");
+    if (!reopenedIssue) throw this.notFound();
     return reverted;
   }
 
@@ -237,6 +250,31 @@ export class ConsistencyService {
       if (detail) assets.push(detail.asset);
     }
     return assets;
+  }
+
+  private validatePatchBatchInput(
+    patches: Array<{
+      assetId: string;
+      afterMarkdown: string;
+      reason?: string;
+    }>,
+    subjectAssetIds: string[],
+  ) {
+    if (!patches.length) throw this.badRequest("Patch batch must include at least one patch.");
+    return patches.map((patch) => {
+      const assetId = patch.assetId.trim();
+      if (!assetId || patch.afterMarkdown.trim().length === 0) {
+        throw this.badRequest("Patch assetId and afterMarkdown are required.");
+      }
+      if (!subjectAssetIds.includes(assetId)) {
+        throw this.badRequest("Patch asset must be one of the consistency issue subject assets.");
+      }
+      return {
+        assetId,
+        afterMarkdown: patch.afterMarkdown,
+        reason: patch.reason?.trim() ? patch.reason.trim() : undefined,
+      };
+    });
   }
 
   private async requireWorld(worldId: string) {

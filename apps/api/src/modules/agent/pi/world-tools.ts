@@ -185,14 +185,22 @@ function readToolMarkdown(...values: unknown[]) {
 }
 
 function readToolPatches(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(isRecord)
-    .map((patch) => ({
-      assetId: readToolText(patch.assetId),
-      afterMarkdown: readToolMarkdown(patch.afterMarkdown, patch.markdown),
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error("resolve_consistency_issue requires at least one patch.");
+  }
+  return value.map((patch) => {
+    if (!isRecord(patch)) throw new Error("resolve_consistency_issue patches must be objects.");
+    const assetId = readToolText(patch.assetId);
+    const afterMarkdown = readToolMarkdown(patch.afterMarkdown, patch.markdown);
+    if (!assetId || !afterMarkdown.trim()) {
+      throw new Error("resolve_consistency_issue patch assetId and afterMarkdown are required.");
+    }
+    return {
+      assetId,
+      afterMarkdown,
       reason: readToolText(patch.reason) || undefined,
-    }));
+    };
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

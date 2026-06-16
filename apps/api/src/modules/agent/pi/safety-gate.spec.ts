@@ -144,4 +144,17 @@ describe("resolve_consistency_issue tool handler", () => {
       }],
     });
   });
+
+  it("rejects blank patches before calling the consistency service", async () => {
+    const applyPatchBatch = vi.fn();
+    const registry = createWorldToolRegistry({} as never, undefined, undefined, { applyPatchBatch } as never);
+
+    await expect(registry.execute("resolve_consistency_issue", {
+      worldId: "world_1",
+      issueId: "issue_1",
+      sessionId: "session_1",
+      patches: [{ assetId: "", afterMarkdown: "" }],
+    })).rejects.toThrow(/assetId and afterMarkdown/);
+    expect(applyPatchBatch).not.toHaveBeenCalled();
+  });
 });
