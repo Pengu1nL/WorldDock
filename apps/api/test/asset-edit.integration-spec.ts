@@ -235,6 +235,42 @@ describe("asset edit local endpoints", () => {
       });
   });
 
+  it("rejects oversized markdown patches before diffing or writing records", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const session = await createAssetEditSession(asset.id);
+    const oversizedMarkdown = [
+      "# 记忆交易许可",
+      "",
+      "## 概括",
+      "",
+      "这份补丁正文过长。",
+      ...Array.from({ length: 1000 }, (_, index) => `- 第 ${index + 1} 条超限内容`),
+    ].join("\n");
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: session.id,
+        afterMarkdown: oversizedMarkdown,
+      })
+      .expect(400)
+      .expect(({ body }) => {
+        expect(body.message).toContain("line limit");
+      });
+
+    const storedMarkdown = await readStoredMarkdown(asset.documentKey);
+    expect(storedMarkdown).toBe("# 记忆交易许可\n\n## 概括\n\n所有记忆交易都需要登记。");
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(1);
+    expect(detail.revisions).toHaveLength(1);
+    await request(app?.getHttpServer())
+      .get(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.patches).toEqual([]);
+      });
+  });
+
   it("returns 409 on patch conflicts and restores storage to the latest database revision", async () => {
     const latestMarkdown = "# 记忆交易许可\n\n## 概括\n\n另一个补丁已经成功写入。";
     await app?.close();

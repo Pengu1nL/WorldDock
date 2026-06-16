@@ -24,6 +24,10 @@ export type OfficialAssetPatchView = Omit<OfficialAssetPatchRecord, "diff"> & {
   diff: LineDiffOperation[] | null;
 };
 
+const MAX_PATCH_MARKDOWN_BYTES = 256 * 1024;
+const MAX_PATCH_MARKDOWN_LINES = 1000;
+const MAX_PATCH_DIFF_CELLS = 1_000_000;
+
 @Injectable()
 export class WorldAssetPatchesService {
   constructor(
@@ -40,6 +44,7 @@ export class WorldAssetPatchesService {
     if (afterMarkdown.trim().length === 0 || !sessionId) {
       throw this.badRequest("Patch sessionId and afterMarkdown are required.");
     }
+    this.assertMarkdownWithinBounds(afterMarkdown, "Patch markdown");
 
     await this.requireWorld(input.worldId);
     const detail = await this.officialAssets.getAsset(input.worldId, input.assetId);
@@ -47,11 +52,13 @@ export class WorldAssetPatchesService {
     await this.requireAssetEditSession(input.worldId, input.assetId, sessionId);
 
     const beforeMarkdown = await this.readMarkdown(detail.asset.documentKey);
-    const diff = createLineDiff(beforeMarkdown, afterMarkdown);
+    this.assertMarkdownWithinBounds(beforeMarkdown, "Current asset markdown");
+    this.assertDiffWithinBounds(beforeMarkdown, afterMarkdown);
     const summary = extractAssetSummary(afterMarkdown);
     if (!summary) {
       throw this.badRequest("Patch markdown must include a non-empty 概括 section.");
     }
+    const diff = createLineDiff(beforeMarkdown, afterMarkdown);
     const indexes = indexMarkdownSections(afterMarkdown).map((section, order) => ({
       title: section.heading,
       summary: section.summary,
@@ -211,4 +218,32 @@ export class WorldAssetPatchesService {
       message,
     });
   }
+
+  private assertMarkdownWithinBounds(markdown: string, label: string) {
+    const byteLength = new TextEncoder().encode(markdown).byteLength;
+    if (byteLength > MAX_PATCH_MARKDOWN_BYTES) {
+      throw this.badRequest(`${label} exceeds the ${MAX_PATCH_MARKDOWN_BYTES} byte limit.`);
+    }
+    const lineCount = countLines(markdown);
+    if (lineCount > MAX_PATCH_MARKDOWN_LINES) {
+      throw this.badRequest(`${label} exceeds the ${MAX_PATCH_MARKDOWN_LINES} line limit.`);
+    }
+  }
+
+  private assertDiffWithinBounds(beforeMarkdown: string, afterMarkdown: string) {
+    const beforeLines = countLines(beforeMarkdown);
+    const afterLines = countLines(afterMarkdown);
+    if (beforeLines * afterLines > MAX_PATCH_DIFF_CELLS) {
+      throw this.badRequest("Patch markdown is too large to diff.");
+    }
+  }
+}
+
+function countLines(markdown: string) {
+  if (markdown.length === 0) return 1;
+  let lines = 1;
+  for (let index = 0; index < markdown.length; index += 1) {
+    if (markdown[index] === "\n") lines += 1;
+  }
+  return lines;
 }
