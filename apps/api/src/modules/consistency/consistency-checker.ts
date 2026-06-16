@@ -1,0 +1,185 @@
+export type ConsistencyAssetInput = {
+  assetId: string;
+  type: string;
+  name: string;
+  summary?: string | null;
+  markdown?: string | null;
+};
+
+export type ConsistencyEvidence = {
+  assetId: string;
+  quote: string;
+  field: "name" | "summary" | "markdown";
+};
+
+export type ConsistencyIssue = {
+  title: string;
+  severity: "normal";
+  subjectAssetIds: [string, string];
+  keyword: string;
+  evidence: [ConsistencyEvidence, ConsistencyEvidence];
+};
+
+type AssetIndexEntry = {
+  asset: ConsistencyAssetInput;
+  keywords: Set<string>;
+  restrictiveEvidence: ConsistencyEvidence[];
+  permissiveEvidence: ConsistencyEvidence[];
+};
+
+const RESTRICTIVE_MARKERS = ["必须", "需要", "只能", "禁止"] as const;
+const PERMISSIVE_MARKERS = ["无需", "不需要", "可以不", "例外"] as const;
+const CONTRADICTION_MARKERS = [
+  ...RESTRICTIVE_MARKERS,
+  ...PERMISSIVE_MARKERS,
+];
+
+export class ConsistencyChecker {
+  check(assets: ConsistencyAssetInput[]): ConsistencyIssue[] {
+    const index = assets.map((asset) => this.indexAsset(asset));
+    const issues: ConsistencyIssue[] = [];
+    const emitted = new Set<string>();
+
+    for (let leftIndex = 0; leftIndex < index.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < index.length; rightIndex += 1) {
+        const left = index[leftIndex];
+        const right = index[rightIndex];
+        const keyword = this.findSharedKeyword(left.keywords, right.keywords);
+
+        if (!keyword) {
+          continue;
+        }
+
+        const evidence = this.findContradictingEvidence(left, right);
+
+        if (!evidence) {
+          continue;
+        }
+
+        const issueKey = `${left.asset.assetId}:${right.asset.assetId}:${keyword}`;
+        if (emitted.has(issueKey)) {
+          continue;
+        }
+
+        emitted.add(issueKey);
+        issues.push({
+          title: `「${keyword}」存在潜在一致性冲突`,
+          severity: "normal",
+          subjectAssetIds: [left.asset.assetId, right.asset.assetId],
+          keyword,
+          evidence,
+        });
+      }
+    }
+
+    return issues;
+  }
+
+  private indexAsset(asset: ConsistencyAssetInput): AssetIndexEntry {
+    const fields = this.assetFields(asset);
+    const keywords = new Set<string>();
+    const restrictiveEvidence: ConsistencyEvidence[] = [];
+    const permissiveEvidence: ConsistencyEvidence[] = [];
+
+    for (const field of fields) {
+      for (const keyword of extractKeywords(field.text)) {
+        keywords.add(keyword);
+      }
+
+      if (containsAny(field.text, RESTRICTIVE_MARKERS)) {
+        restrictiveEvidence.push({
+          assetId: asset.assetId,
+          quote: field.text,
+          field: field.field,
+        });
+      }
+
+      if (containsAny(field.text, PERMISSIVE_MARKERS)) {
+        permissiveEvidence.push({
+          assetId: asset.assetId,
+          quote: field.text,
+          field: field.field,
+        });
+      }
+    }
+
+    return {
+      asset,
+      keywords,
+      restrictiveEvidence,
+      permissiveEvidence,
+    };
+  }
+
+  private assetFields(asset: ConsistencyAssetInput): Array<{
+    field: ConsistencyEvidence["field"];
+    text: string;
+  }> {
+    return [
+      { field: "name", text: asset.name },
+      { field: "summary", text: asset.summary ?? "" },
+      { field: "markdown", text: asset.markdown ?? "" },
+    ].filter((field) => field.text.trim().length > 0);
+  }
+
+  private findSharedKeyword(left: Set<string>, right: Set<string>): string | null {
+    const shared = [...left].filter((keyword) => right.has(keyword));
+    shared.sort((a, b) => b.length - a.length || a.localeCompare(b, "zh-Hans-CN"));
+
+    return shared[0] ?? null;
+  }
+
+  private findContradictingEvidence(
+    left: AssetIndexEntry,
+    right: AssetIndexEntry,
+  ): [ConsistencyEvidence, ConsistencyEvidence] | null {
+    const leftRestrictive = left.restrictiveEvidence[0];
+    const leftPermissive = left.permissiveEvidence[0];
+    const rightRestrictive = right.restrictiveEvidence[0];
+    const rightPermissive = right.permissiveEvidence[0];
+
+    if (leftRestrictive && rightPermissive) {
+      return [leftRestrictive, rightPermissive];
+    }
+
+    if (leftPermissive && rightRestrictive) {
+      return [leftPermissive, rightRestrictive];
+    }
+
+    return null;
+  }
+}
+
+function extractKeywords(text: string): string[] {
+  const normalizedText = text.trim();
+  if (!normalizedText) {
+    return [];
+  }
+
+  const keywords = new Set<string>();
+  const englishTokens = normalizedText.match(/[A-Za-z0-9_]+/g) ?? [];
+  for (const token of englishTokens) {
+    keywords.add(token.toLowerCase());
+  }
+
+  const chineseSegments = normalizedText
+    .split(/[^\u3400-\u9fffA-Za-z0-9_]+/u)
+    .flatMap((segment) => splitByMarkers(segment))
+    .map((segment) => segment.trim())
+    .filter((segment) => /[\u3400-\u9fff]/u.test(segment));
+
+  for (const segment of chineseSegments) {
+    keywords.add(segment);
+  }
+
+  return [...keywords].filter((keyword) => keyword.length > 1);
+}
+
+function splitByMarkers(text: string): string[] {
+  const markerPattern = new RegExp(CONTRADICTION_MARKERS.join("|"), "u");
+  return text.split(markerPattern).filter(Boolean);
+}
+
+function containsAny(text: string, markers: readonly string[]): boolean {
+  return markers.some((marker) => text.includes(marker));
+}
