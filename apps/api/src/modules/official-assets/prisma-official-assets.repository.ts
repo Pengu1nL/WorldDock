@@ -276,7 +276,9 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
       const latestRevision = current.revisions[0] ?? null;
       if (
         current.version !== input.expectedVersion ||
-        (latestRevision?.id ?? null) !== input.expectedLatestRevisionId
+        (latestRevision?.id ?? null) !== input.expectedLatestRevisionId ||
+        current.version !== patch.assetVersionTo ||
+        (latestRevision?.id ?? null) !== patch.afterRevisionId
       ) {
         throw new OfficialAssetPatchConflictError();
       }

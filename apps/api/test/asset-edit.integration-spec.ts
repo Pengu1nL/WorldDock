@@ -198,6 +198,42 @@ describe("asset edit local endpoints", () => {
     expect(afterSecondRevert.revisions).toHaveLength(afterFirstRevert.revisions.length);
   });
 
+  it("rejects reverting an older patch after a newer patch is applied", async () => {
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const firstPatch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。");
+    const secondPatch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每季度复核。");
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${firstPatch.id}/revert`)
+      .expect(409)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          code: "PATCH_CONFLICT",
+          message: "Official asset changed while reverting patch.",
+        });
+      });
+
+    const afterRejectedRevert = await getOfficialAsset(asset.id);
+    expect(afterRejectedRevert.asset.version).toBe(3);
+    expect(afterRejectedRevert.markdown).toContain("每季度复核");
+    expect(afterRejectedRevert.markdown).not.toContain("所有记忆交易都需要登记。");
+    await request(app?.getHttpServer())
+      .get(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${firstPatch.id}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.patch.status).toBe("applied");
+      });
+
+    await request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${secondPatch.id}/revert`)
+      .expect(200);
+
+    const afterRevertingLatest = await getOfficialAsset(asset.id);
+    expect(afterRevertingLatest.asset.version).toBe(4);
+    expect(afterRevertingLatest.markdown).toContain("每年续期");
+    expect(afterRevertingLatest.markdown).not.toContain("每季度复核");
+  });
+
   it("does not expose patch revert across worlds or assets", async () => {
     const asset = await createOfficialAsset("rule", "记忆交易许可");
     const otherAsset = await createOfficialAsset("rule", "白塔许可");
@@ -816,7 +852,9 @@ function createInMemoryOfficialAssets(options: InMemoryOfficialAssetsOptions = {
       const existingRevisions = revisions.get(asset.id) ?? [];
       if (
         asset.version !== input.expectedVersion ||
-        (existingRevisions[0]?.id ?? null) !== input.expectedLatestRevisionId
+        (existingRevisions[0]?.id ?? null) !== input.expectedLatestRevisionId ||
+        asset.version !== patch.assetVersionTo ||
+        (existingRevisions[0]?.id ?? null) !== patch.afterRevisionId
       ) {
         throw new OfficialAssetPatchConflictError();
       }
