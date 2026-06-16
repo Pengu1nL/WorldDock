@@ -46,13 +46,13 @@ export class ConsistencyChecker {
         const right = index[rightIndex];
         const keywords = this.findSharedKeywords(left.keywords, right.keywords);
 
-        const evidence = this.findContradictingEvidence(left, right);
-
-        if (!evidence) {
-          continue;
-        }
-
         for (const keyword of keywords) {
+          const evidence = this.findContradictingEvidence(keyword, left, right);
+
+          if (!evidence) {
+            continue;
+          }
+
           const issueKey = `${left.asset.assetId}:${right.asset.assetId}:${keyword}`;
           if (emitted.has(issueKey)) {
             continue;
@@ -143,13 +143,14 @@ export class ConsistencyChecker {
   }
 
   private findContradictingEvidence(
+    keyword: string,
     left: AssetIndexEntry,
     right: AssetIndexEntry,
   ): [ConsistencyEvidence, ConsistencyEvidence] | null {
-    const leftRestrictive = left.restrictiveEvidence[0];
-    const leftPermissive = left.permissiveEvidence[0];
-    const rightRestrictive = right.restrictiveEvidence[0];
-    const rightPermissive = right.permissiveEvidence[0];
+    const leftRestrictive = this.findEvidenceForKeyword(keyword, left.restrictiveEvidence);
+    const leftPermissive = this.findEvidenceForKeyword(keyword, left.permissiveEvidence);
+    const rightRestrictive = this.findEvidenceForKeyword(keyword, right.restrictiveEvidence);
+    const rightPermissive = this.findEvidenceForKeyword(keyword, right.permissiveEvidence);
 
     if (leftRestrictive && rightPermissive) {
       return [leftRestrictive, rightPermissive];
@@ -160,6 +161,13 @@ export class ConsistencyChecker {
     }
 
     return null;
+  }
+
+  private findEvidenceForKeyword(
+    keyword: string,
+    evidence: ConsistencyEvidence[],
+  ): ConsistencyEvidence | undefined {
+    return evidence.find((entry) => containsKeyword(entry.quote, keyword));
   }
 }
 

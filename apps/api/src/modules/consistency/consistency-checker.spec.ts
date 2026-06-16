@@ -126,15 +126,15 @@ describe("ConsistencyChecker", () => {
         assetId: "asset_1",
         type: "rule",
         name: "Memory Market A",
-        summary: "必须登记。",
-        markdown: "必须登记。",
+        summary: "Memory Market A 必须登记。",
+        markdown: "Memory Market A 必须登记。",
       },
       {
         assetId: "asset_2",
         type: "event",
         name: "Memory Market A",
-        summary: "无需登记。",
-        markdown: "无需登记。",
+        summary: "Memory Market A 无需登记。",
+        markdown: "Memory Market A 无需登记。",
       },
     ]);
 
@@ -144,6 +144,10 @@ describe("ConsistencyChecker", () => {
         keyword: "Memory Market A",
         severity: "normal",
         subjectAssetIds: ["asset_1", "asset_2"],
+        evidence: [
+          expect.objectContaining({ quote: expect.stringContaining("Memory Market A") }),
+          expect.objectContaining({ quote: expect.stringContaining("Memory Market A") }),
+        ],
       }),
     ]);
   });
@@ -168,5 +172,58 @@ describe("ConsistencyChecker", () => {
     ]);
 
     expect(issues.filter((issue) => issue.keyword === "记忆交易")).toHaveLength(1);
+  });
+
+  it("does not report a shared asset name when contradiction evidence omits that keyword", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "共享资产",
+        summary: "alpha 必须登记。",
+        markdown: "alpha 必须登记。",
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "共享资产",
+        summary: "beta 无需登记。",
+        markdown: "beta 无需登记。",
+      },
+    ]);
+
+    expect(issues).toEqual([]);
+  });
+
+  it("only reports issues when the evidence text contains the current keyword", () => {
+    const checker = new ConsistencyChecker();
+    const issues = checker.check([
+      {
+        assetId: "asset_1",
+        type: "rule",
+        name: "alpha",
+        summary: "alpha 必须登记。",
+        markdown: "beta 必须备案。",
+      },
+      {
+        assetId: "asset_2",
+        type: "event",
+        name: "alpha",
+        summary: "alpha 无需登记。",
+        markdown: "beta 无需备案。",
+      },
+    ]);
+    const alphaIssue = issues.find((issue) => issue.keyword === "alpha");
+
+    expect(alphaIssue).toEqual(
+      expect.objectContaining({
+        keyword: "alpha",
+        evidence: [
+          expect.objectContaining({ quote: expect.stringContaining("alpha") }),
+          expect.objectContaining({ quote: expect.stringContaining("alpha") }),
+        ],
+      }),
+    );
   });
 });
