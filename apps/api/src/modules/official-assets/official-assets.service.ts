@@ -4,6 +4,7 @@ import type { OfficialWorldAssetStatus, OfficialWorldAssetType } from "@worlddoc
 import { LocalStorageService } from "../local-storage/local-storage.service";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
 import { buildInitialAssetMarkdown, extractAssetSummary, indexMarkdownSections } from "./asset-markdown";
+import { OfficialAssetLockService } from "./official-asset-lock.service";
 import {
   InvalidOfficialAssetListCursorError,
   OFFICIAL_ASSETS_REPOSITORY,
@@ -36,6 +37,7 @@ export class OfficialAssetsService {
     @Inject(OFFICIAL_ASSETS_REPOSITORY) private readonly officialAssets: OfficialAssetsRepository,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     private readonly localStorage: LocalStorageService,
+    private readonly assetLocks: OfficialAssetLockService,
   ) {}
 
   async createAsset(worldId: string, input: CreateOfficialAssetInput): Promise<OfficialAssetDetailRecord & { markdown: string }> {
@@ -90,13 +92,15 @@ export class OfficialAssetsService {
     input: UpdateOfficialAssetInput,
   ): Promise<OfficialAssetDetailRecord & { markdown: string }> {
     await this.requireWorld(worldId);
-    const detail = await this.officialAssets.updateAsset(worldId, assetId, input);
-    if (!detail) throw this.notFound();
+    return this.assetLocks.withAssetLock(worldId, assetId, async () => {
+      const detail = await this.officialAssets.updateAsset(worldId, assetId, input);
+      if (!detail) throw this.notFound();
 
-    return {
-      ...detail,
-      markdown: await this.readMarkdown(detail.asset.documentKey),
-    };
+      return {
+        ...detail,
+        markdown: await this.readMarkdown(detail.asset.documentKey),
+      };
+    });
   }
 
   async listAssets(worldId: string, query?: ListOfficialAssetsQuery) {
@@ -111,13 +115,15 @@ export class OfficialAssetsService {
 
   async getAsset(worldId: string, assetId: string): Promise<OfficialAssetDetailRecord & { markdown: string }> {
     await this.requireWorld(worldId);
-    const detail = await this.officialAssets.getAsset(worldId, assetId);
-    if (!detail) throw this.notFound();
+    return this.assetLocks.withAssetLock(worldId, assetId, async () => {
+      const detail = await this.officialAssets.getAsset(worldId, assetId);
+      if (!detail) throw this.notFound();
 
-    return {
-      ...detail,
-      markdown: await this.readMarkdown(detail.asset.documentKey),
-    };
+      return {
+        ...detail,
+        markdown: await this.readMarkdown(detail.asset.documentKey),
+      };
+    });
   }
 
   private buildSectionIndexInputs(markdown: string) {

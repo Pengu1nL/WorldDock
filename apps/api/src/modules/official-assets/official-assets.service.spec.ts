@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { OfficialAssetLockService } from "./official-asset-lock.service";
 import { OfficialAssetsService } from "./official-assets.service";
 
 describe("OfficialAssetsService", () => {
@@ -30,7 +31,12 @@ describe("OfficialAssetsService", () => {
       saveObject: vi.fn(async () => ({ key: "unused", filePath: "unused", sizeBytes: 1 })),
       deleteObject: vi.fn(async () => undefined),
     };
-    const service = new OfficialAssetsService(repository as never, worlds as never, localStorage as never);
+    const service = new OfficialAssetsService(
+      repository as never,
+      worlds as never,
+      localStorage as never,
+      new OfficialAssetLockService(),
+    );
 
     await expect(service.createAsset("world_1", {
       type: "rule",

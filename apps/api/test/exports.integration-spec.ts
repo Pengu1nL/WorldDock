@@ -18,6 +18,7 @@ import {
   type OfficialAssetSectionIndexRecord,
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
+import { OfficialAssetLockService } from "../src/modules/official-assets/official-asset-lock.service";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
 import { createHttpTestApp, createInMemoryWorlds, type InMemoryWorlds } from "./local-api-test-helpers";
@@ -299,6 +300,7 @@ async function createExportsApp(
     providers: [
       ExportsService,
       OfficialAssetsService,
+      OfficialAssetLockService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: OFFICIAL_ASSETS_REPOSITORY, useValue: options.officialAssets ?? createInMemoryOfficialAssets() },

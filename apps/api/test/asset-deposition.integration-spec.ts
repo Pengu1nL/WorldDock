@@ -21,6 +21,7 @@ import {
   type OfficialAssetsRepository,
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
+import { OfficialAssetLockService } from "../src/modules/official-assets/official-asset-lock.service";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
 import { PotentialAssetsAnalyzer } from "../src/modules/potential-assets/potential-assets.analyzer";
 import { PotentialAssetsController } from "../src/modules/potential-assets/potential-assets.controller";
@@ -277,6 +278,7 @@ async function createAssetDepositionApp(
       PotentialAssetsAnalyzer,
       PotentialAssetsService,
       OfficialAssetsService,
+      OfficialAssetLockService,
       LocalStorageService,
       { provide: WORLD_REPOSITORY, useValue: worlds },
       { provide: AGENT_REPOSITORY, useValue: agents },

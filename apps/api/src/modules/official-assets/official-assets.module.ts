@@ -3,6 +3,7 @@ import { AgentSessionsModule } from "../agent-sessions/agent-sessions.module";
 import { LocalStorageModule } from "../local-storage/local-storage.module";
 import { WorldsModule } from "../worlds/worlds.module";
 import { OFFICIAL_ASSETS_REPOSITORY } from "./official-assets.repository";
+import { OfficialAssetLockService } from "./official-asset-lock.service";
 import { OfficialAssetsController } from "./official-assets.controller";
 import { OfficialAssetsService } from "./official-assets.service";
 import { PrismaOfficialAssetsRepository } from "./prisma-official-assets.repository";
@@ -13,6 +14,7 @@ import { WorldAssetPatchesService } from "./world-asset-patches.service";
   controllers: [OfficialAssetsController],
   providers: [
     OfficialAssetsService,
+    OfficialAssetLockService,
     WorldAssetPatchesService,
     PrismaOfficialAssetsRepository,
     {

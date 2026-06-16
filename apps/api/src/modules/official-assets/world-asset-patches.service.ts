@@ -12,6 +12,7 @@ import {
   type OfficialAssetPatchesRepository,
   type OfficialAssetsRepository,
 } from "./official-assets.repository";
+import { OfficialAssetLockService } from "./official-asset-lock.service";
 
 export type ApplyWorldAssetPatchInput = {
   worldId: string;
@@ -37,6 +38,7 @@ export class WorldAssetPatchesService {
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
     private readonly localStorage: LocalStorageService,
     private readonly agentSessions: AgentSessionsService,
+    private readonly assetLocks: OfficialAssetLockService,
   ) {}
 
   async applyPatch(input: ApplyWorldAssetPatchInput): Promise<OfficialAssetPatchView> {
@@ -47,57 +49,59 @@ export class WorldAssetPatchesService {
     }
     this.assertMarkdownWithinBounds(afterMarkdown, "Patch markdown");
 
-    await this.requireWorld(input.worldId);
-    const detail = await this.officialAssets.getAsset(input.worldId, input.assetId);
-    if (!detail) throw this.notFound();
-    await this.requireAssetEditSession(input.worldId, input.assetId, sessionId);
+    return this.assetLocks.withAssetLock(input.worldId, input.assetId, async () => {
+      await this.requireWorld(input.worldId);
+      const detail = await this.officialAssets.getAsset(input.worldId, input.assetId);
+      if (!detail) throw this.notFound();
+      await this.requireAssetEditSession(input.worldId, input.assetId, sessionId);
 
-    const beforeMarkdown = await this.readMarkdown(detail.asset.documentKey);
-    this.assertMarkdownWithinBounds(beforeMarkdown, "Current asset markdown");
-    this.assertDiffWithinBounds(beforeMarkdown, afterMarkdown);
-    const summary = extractAssetSummary(afterMarkdown);
-    if (!summary) {
-      throw this.badRequest("Patch markdown must include a non-empty 概括 section.");
-    }
-    const diff = createLineDiff(beforeMarkdown, afterMarkdown);
-    const indexes = this.buildIndexes(afterMarkdown);
+      const beforeMarkdown = await this.readMarkdown(detail.asset.documentKey);
+      this.assertMarkdownWithinBounds(beforeMarkdown, "Current asset markdown");
+      this.assertDiffWithinBounds(beforeMarkdown, afterMarkdown);
+      const summary = extractAssetSummary(afterMarkdown);
+      if (!summary) {
+        throw this.badRequest("Patch markdown must include a non-empty 概括 section.");
+      }
+      const diff = createLineDiff(beforeMarkdown, afterMarkdown);
+      const indexes = this.buildIndexes(afterMarkdown);
 
-    await this.localStorage.saveObject({
-      key: detail.asset.documentKey,
-      contentType: "text/markdown; charset=utf-8",
-      body: new TextEncoder().encode(afterMarkdown),
-    });
-
-    let patch: OfficialAssetPatchRecord | null;
-    try {
-      patch = await this.patchRepository().applyPatch({
-        worldId: input.worldId,
-        assetId: input.assetId,
-        sessionId,
-        expectedVersion: detail.asset.version,
-        expectedBeforeRevisionId: detail.revisions[0]?.id ?? null,
-        beforeMarkdown,
-        afterMarkdown,
-        diff: JSON.stringify(diff),
-        summary,
-        metadata: input.reason?.trim() ? { reason: input.reason.trim() } : {},
-        indexes,
+      await this.localStorage.saveObject({
+        key: detail.asset.documentKey,
+        contentType: "text/markdown; charset=utf-8",
+        body: new TextEncoder().encode(afterMarkdown),
       });
-      if (!patch) throw this.notFound();
-    } catch (error) {
-      if (error instanceof OfficialAssetPatchConflictError) {
-        await this.restoreLatestRevisionMarkdown(input.worldId, input.assetId, detail.asset.documentKey, afterMarkdown);
-        throw new ConflictException({
-          code: "PATCH_CONFLICT",
-          message: "Official asset changed while applying patch.",
+
+      let patch: OfficialAssetPatchRecord | null;
+      try {
+        patch = await this.patchRepository().applyPatch({
+          worldId: input.worldId,
+          assetId: input.assetId,
+          sessionId,
+          expectedVersion: detail.asset.version,
+          expectedBeforeRevisionId: detail.revisions[0]?.id ?? null,
+          beforeMarkdown,
+          afterMarkdown,
+          diff: JSON.stringify(diff),
+          summary,
+          metadata: input.reason?.trim() ? { reason: input.reason.trim() } : {},
+          indexes,
         });
+        if (!patch) throw this.notFound();
+      } catch (error) {
+        if (error instanceof OfficialAssetPatchConflictError) {
+          await this.restoreLatestRevisionMarkdown(input.worldId, input.assetId, detail.asset.documentKey, afterMarkdown);
+          throw new ConflictException({
+            code: "PATCH_CONFLICT",
+            message: "Official asset changed while applying patch.",
+          });
+        }
+
+        await this.restoreBeforeMarkdownIfUnchanged(detail.asset.documentKey, beforeMarkdown, afterMarkdown);
+        throw error;
       }
 
-      await this.restoreBeforeMarkdownIfUnchanged(detail.asset.documentKey, beforeMarkdown, afterMarkdown);
-      throw error;
-    }
-
-    return this.toPatchView(patch);
+      return this.toPatchView(patch);
+    });
   }
 
   async listPatches(worldId: string, assetId: string): Promise<OfficialAssetPatchView[]> {
@@ -116,58 +120,60 @@ export class WorldAssetPatchesService {
   }
 
   async revertPatch(worldId: string, assetId: string, patchId: string): Promise<OfficialAssetPatchView> {
-    await this.requireWorld(worldId);
-    const detail = await this.officialAssets.getAsset(worldId, assetId);
-    if (!detail) throw this.notFound();
-    const repository = this.patchRepository();
-    const existingPatch = await repository.getPatch(worldId, assetId, patchId);
-    if (!existingPatch) throw this.notFound();
-    if (existingPatch.status !== "applied") throw this.patchAlreadyReverted();
+    return this.assetLocks.withAssetLock(worldId, assetId, async () => {
+      await this.requireWorld(worldId);
+      const detail = await this.officialAssets.getAsset(worldId, assetId);
+      if (!detail) throw this.notFound();
+      const repository = this.patchRepository();
+      const existingPatch = await repository.getPatch(worldId, assetId, patchId);
+      if (!existingPatch) throw this.notFound();
+      if (existingPatch.status !== "applied") throw this.patchAlreadyReverted();
 
-    const markdown = existingPatch.beforeMarkdown;
-    this.assertMarkdownWithinBounds(markdown, "Patch revert markdown");
-    const summary = extractAssetSummary(markdown);
-    if (!summary) {
-      throw this.badRequest("Patch beforeMarkdown must include a non-empty 概括 section.");
-    }
-    const indexes = this.buildIndexes(markdown);
-    const reason = `Revert patch ${patchId}`;
+      const markdown = existingPatch.beforeMarkdown;
+      this.assertMarkdownWithinBounds(markdown, "Patch revert markdown");
+      const summary = extractAssetSummary(markdown);
+      if (!summary) {
+        throw this.badRequest("Patch beforeMarkdown must include a non-empty 概括 section.");
+      }
+      const indexes = this.buildIndexes(markdown);
+      const reason = `Revert patch ${patchId}`;
 
-    await this.saveMarkdown(detail.asset.documentKey, markdown);
+      await this.saveMarkdown(detail.asset.documentKey, markdown);
 
-    let patch: OfficialAssetPatchRecord | null;
-    try {
-      patch = await repository.revertPatch({
-        worldId,
-        assetId,
-        patchId,
-        expectedVersion: detail.asset.version,
-        expectedLatestRevisionId: detail.revisions[0]?.id ?? null,
-        markdown,
-        summary,
-        metadata: {
-          source: "patch_revert",
+      let patch: OfficialAssetPatchRecord | null;
+      try {
+        patch = await repository.revertPatch({
+          worldId,
+          assetId,
           patchId,
-          reason,
-        },
-        indexes,
-      });
-      if (!patch) throw this.notFound();
-    } catch (error) {
-      await this.restoreLatestRevisionMarkdown(worldId, assetId, detail.asset.documentKey, markdown);
-      if (error instanceof OfficialAssetPatchAlreadyRevertedError) {
-        throw this.patchAlreadyReverted();
-      }
-      if (error instanceof OfficialAssetPatchConflictError) {
-        throw new ConflictException({
-          code: "PATCH_CONFLICT",
-          message: "Official asset changed while reverting patch.",
+          expectedVersion: detail.asset.version,
+          expectedLatestRevisionId: detail.revisions[0]?.id ?? null,
+          markdown,
+          summary,
+          metadata: {
+            source: "patch_revert",
+            patchId,
+            reason,
+          },
+          indexes,
         });
+        if (!patch) throw this.notFound();
+      } catch (error) {
+        await this.restoreLatestRevisionMarkdown(worldId, assetId, detail.asset.documentKey, markdown);
+        if (error instanceof OfficialAssetPatchAlreadyRevertedError) {
+          throw this.patchAlreadyReverted();
+        }
+        if (error instanceof OfficialAssetPatchConflictError) {
+          throw new ConflictException({
+            code: "PATCH_CONFLICT",
+            message: "Official asset changed while reverting patch.",
+          });
+        }
+        throw error;
       }
-      throw error;
-    }
 
-    return this.toPatchView(patch);
+      return this.toPatchView(patch);
+    });
   }
 
   private async requireAssetEditSession(worldId: string, assetId: string, sessionId: string) {

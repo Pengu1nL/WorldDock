@@ -26,6 +26,7 @@ import {
   type RevertOfficialAssetPatchRecordInput,
   type UpdateOfficialAssetRecordInput,
 } from "../src/modules/official-assets/official-assets.repository";
+import { OfficialAssetLockService } from "../src/modules/official-assets/official-asset-lock.service";
 import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
 import { WorldAssetPatchesService } from "../src/modules/official-assets/world-asset-patches.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
@@ -232,6 +233,61 @@ describe("asset edit local endpoints", () => {
     expect(afterRevertingLatest.asset.version).toBe(4);
     expect(afterRevertingLatest.markdown).toContain("每年续期");
     expect(afterRevertingLatest.markdown).not.toContain("每季度复核");
+  });
+
+  it("serializes stale revert compensation before another patch reads markdown", async () => {
+    let releaseStaleRevert: () => void = () => undefined;
+    let staleRevertReached: () => void = () => undefined;
+    const releaseStaleRevertPromise = new Promise<void>((resolve) => {
+      releaseStaleRevert = resolve;
+    });
+    const staleRevertReachedPromise = new Promise<void>((resolve) => {
+      staleRevertReached = resolve;
+    });
+    await app?.close();
+    officialAssets = createInMemoryOfficialAssets({
+      onBeforeRevertConflict: async () => {
+        staleRevertReached();
+        await releaseStaleRevertPromise;
+      },
+    });
+    app = await createAssetEditApp(worlds, agentSessions, officialAssets);
+    const asset = await createOfficialAsset("rule", "记忆交易许可");
+    const firstPatch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每年续期。");
+    const secondPatch = await applyPatch(asset.id, "# 记忆交易许可\n\n## 概括\n\n登记许可必须每季度复核。");
+    const concurrentSession = await createAssetEditSession(asset.id);
+
+    const staleRevertPromise = request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches/${firstPatch.id}/revert`)
+      .expect(409)
+      .then((response) => response);
+    await staleRevertReachedPromise;
+
+    let concurrentPatchSettled = false;
+    const concurrentPatchPromise = request(app?.getHttpServer())
+      .post(`/v1/worlds/${world.id}/official-assets/${asset.id}/patches`)
+      .send({
+        sessionId: concurrentSession.id,
+        afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n登记许可必须每月抽查。",
+      })
+      .expect(201)
+      .then((response) => {
+        concurrentPatchSettled = true;
+        return response;
+      });
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(concurrentPatchSettled).toBe(false);
+
+    releaseStaleRevert();
+    await staleRevertPromise;
+    const concurrentPatch = await concurrentPatchPromise;
+
+    expect(concurrentPatch.body.patch.beforeMarkdown).toBe(secondPatch.afterMarkdown);
+    expect(concurrentPatch.body.patch.beforeMarkdown).not.toBe(firstPatch.beforeMarkdown);
+    const detail = await getOfficialAsset(asset.id);
+    expect(detail.asset.version).toBe(4);
+    expect(detail.markdown).toContain("每月抽查");
   });
 
   it("does not expose patch revert across worlds or assets", async () => {
@@ -600,6 +656,7 @@ async function createAssetEditApp(
     providers: [
       AgentSessionsService,
       OfficialAssetsService,
+      OfficialAssetLockService,
       WorldAssetPatchesService,
       { provide: LocalStorageService, useValue: localStorage },
       { provide: WORLD_REPOSITORY, useValue: worlds },
@@ -650,6 +707,7 @@ type InMemoryOfficialAssetsOptions = {
   conflictOnApply?: {
     markdown: string;
   };
+  onBeforeRevertConflict?: () => Promise<void>;
 };
 
 function createInMemoryOfficialAssets(options: InMemoryOfficialAssetsOptions = {}): InMemoryOfficialAssets {
@@ -856,6 +914,7 @@ function createInMemoryOfficialAssets(options: InMemoryOfficialAssetsOptions = {
         asset.version !== patch.assetVersionTo ||
         (existingRevisions[0]?.id ?? null) !== patch.afterRevisionId
       ) {
+        await options.onBeforeRevertConflict?.();
         throw new OfficialAssetPatchConflictError();
       }
 
