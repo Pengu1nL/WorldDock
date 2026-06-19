@@ -7,7 +7,6 @@ import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel"
 import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawer";
 import { SessionPage } from "../../agent-sessions/session-page";
 import { OfficialAssetLibraryPage } from "../../world-assets/official-asset-library-page";
-import type { OfficialAssetType } from "../../world-assets/official-asset-card";
 import {
   EXPLORATION_HISTORY_QUERY,
   agentSessionKeys,
@@ -617,14 +616,6 @@ const AssetLibraryWorkspace = ({
   return (
     <OfficialAssetLibraryPage
       world={world}
-      onCreateAsset={(type: OfficialAssetType) => openAssetEditor("setting", {
-        kind: "setting",
-        title: "",
-        category: officialAssetTypeToLegacyCategory(type),
-        summary: "",
-        body: "",
-        payload: { officialAssetType: type },
-      })}
       onLoadError={() => setOfficialAssetsUnavailable(true)}
       onOpenAsset={(assetId: string) => setDrawerOpen({
         kind: "detail",
@@ -642,18 +633,6 @@ const AssetLibraryWorkspace = ({
     />
   );
 };
-
-function officialAssetTypeToLegacyCategory(type: OfficialAssetType) {
-  const categoryByType: Record<OfficialAssetType, string> = {
-    character: "角色",
-    organization: "组织",
-    location: "地点",
-    event: "事件",
-    rule: "世界规则",
-  };
-
-  return categoryByType[type];
-}
 
 const Workbench = ({
   world, messages, agentBusy, savedIds, pendingCount,

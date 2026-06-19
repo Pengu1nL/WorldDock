@@ -160,17 +160,18 @@ function OfficialAssetLibraryContent({
             {loading ? "正在载入官方资产" : `${assets.length} 项官方资产`}
           </div>
         </div>
-        <div className="row gap-2">
-          <button
-            className="btn"
-            disabled={!onCreateAsset}
-            onClick={() => onCreateAsset?.(createType)}
-            type="button"
-          >
-            <Icon name="plus" size={12} />
-            <span>新建{getOfficialAssetTypeLabel(createType)}</span>
-          </button>
-        </div>
+        {onCreateAsset ? (
+          <div className="row gap-2">
+            <button
+              className="btn"
+              onClick={() => onCreateAsset(createType)}
+              type="button"
+            >
+              <Icon name="plus" size={12} />
+              <span>新建{getOfficialAssetTypeLabel(createType)}</span>
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div
