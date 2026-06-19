@@ -67,6 +67,7 @@ type WorldWorkspaceProps = {
 type PotentialAssetPendingAction = {
   assetId: string;
   action: "dismiss" | "promote";
+  sessionId: string | null;
 } | null;
 
 export function WorldWorkspace({
@@ -428,36 +429,42 @@ const ExplorationWorkspace = ({
   }, [createSession, resetSessionRuntime, sessionQuery, world?.id]);
 
   const handlePromotePotentialAsset = useCallback(async (potentialAssetId: string) => {
-    if (potentialAssetPendingActionRef.current || potentialAssetPendingAction) return;
+    if (potentialAssetPendingActionRef.current) return;
+    const pendingAction = { assetId: potentialAssetId, action: "promote" as const, sessionId: sessionId ?? null };
     setPotentialAssetActionError(null);
-    setPotentialAssetPending({ assetId: potentialAssetId, action: "promote" });
+    setPotentialAssetPending(pendingAction);
     try {
       await promotePotentialAsset.mutateAsync(potentialAssetId);
+      if (potentialAssetPendingActionRef.current !== pendingAction) return;
       pushToast?.({ kind: "save", text: "潜在资产已沉淀" });
     } catch (error) {
+      if (potentialAssetPendingActionRef.current !== pendingAction) return;
       const message = getActionErrorMessage(error, "沉淀失败，请重试");
       setPotentialAssetActionError(message);
       pushToast?.({ kind: "warn", text: message });
     } finally {
-      setPotentialAssetPending(null);
+      if (potentialAssetPendingActionRef.current === pendingAction) setPotentialAssetPending(null);
     }
-  }, [potentialAssetPendingAction, promotePotentialAsset, pushToast, setPotentialAssetPending]);
+  }, [promotePotentialAsset, pushToast, sessionId, setPotentialAssetPending]);
 
   const handleDismissPotentialAsset = useCallback(async (potentialAssetId: string) => {
-    if (potentialAssetPendingActionRef.current || potentialAssetPendingAction) return;
+    if (potentialAssetPendingActionRef.current) return;
+    const pendingAction = { assetId: potentialAssetId, action: "dismiss" as const, sessionId: sessionId ?? null };
     setPotentialAssetActionError(null);
-    setPotentialAssetPending({ assetId: potentialAssetId, action: "dismiss" });
+    setPotentialAssetPending(pendingAction);
     try {
       await dismissPotentialAsset.mutateAsync(potentialAssetId);
+      if (potentialAssetPendingActionRef.current !== pendingAction) return;
       pushToast?.({ kind: "save", text: "潜在资产已忽略" });
     } catch (error) {
+      if (potentialAssetPendingActionRef.current !== pendingAction) return;
       const message = getActionErrorMessage(error, "忽略失败，请重试");
       setPotentialAssetActionError(message);
       pushToast?.({ kind: "warn", text: message });
     } finally {
-      setPotentialAssetPending(null);
+      if (potentialAssetPendingActionRef.current === pendingAction) setPotentialAssetPending(null);
     }
-  }, [dismissPotentialAsset, potentialAssetPendingAction, pushToast, setPotentialAssetPending]);
+  }, [dismissPotentialAsset, pushToast, sessionId, setPotentialAssetPending]);
 
   if (!sessionsEnabled || forceLegacyFallback) return renderLegacy();
   if (sessionQuery.isPending) return <SessionLoadingState world={world} />;

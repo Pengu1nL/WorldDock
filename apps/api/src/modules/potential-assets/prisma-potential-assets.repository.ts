@@ -134,6 +134,45 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     return asset ? mapPotentialAsset(asset) : null;
   }
 
+  async completePromotion(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    const current = await this.prisma.potentialAsset.findFirst({
+      where: { worldId, id, status: "promoted", promotedAssetId },
+    });
+    if (!current) return null;
+    const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
+    const updated = await this.prisma.potentialAsset.updateMany({
+      where: { worldId, id, status: "promoted", promotedAssetId },
+      data: { metadata: { ...currentMetadata, ...metadata } as never },
+    });
+    if (updated.count === 0) return null;
+    const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
+    return asset ? mapPotentialAsset(asset) : null;
+  }
+
+  async rollbackPromotion(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    const updated = await this.prisma.potentialAsset.updateMany({
+      where: { worldId, id, status: "promoted", promotedAssetId },
+      data: {
+        status: "active",
+        promotedAssetId: null,
+        metadata: metadata as never,
+      },
+    });
+    if (updated.count === 0) return null;
+    const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
+    return asset ? mapPotentialAsset(asset) : null;
+  }
+
   async onModuleDestroy() {
     await this.prisma.$disconnect();
   }

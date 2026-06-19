@@ -53,6 +53,18 @@ export type PotentialAssetsRepository = {
     promotedAssetId: string,
     metadata?: Record<string, unknown>,
   ): Promise<PotentialAssetRecord | null>;
+  completePromotion(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<PotentialAssetRecord | null>;
+  rollbackPromotion(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<PotentialAssetRecord | null>;
 };
 
 export const DEFAULT_POTENTIAL_ASSET_LIST_LIMIT = 20;

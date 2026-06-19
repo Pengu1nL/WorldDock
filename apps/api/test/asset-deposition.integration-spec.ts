@@ -203,6 +203,28 @@ describe("asset deposition local endpoints", () => {
     expect(countDepositionRuns(agents)).toBe(1);
   });
 
+  it("prevents concurrent dismissal while promotion is creating the official asset", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    const createAsset = officialAssets.createAsset.bind(officialAssets);
+    let concurrentDismissStatus: string | null | undefined;
+    officialAssets.createAsset = async (input) => {
+      concurrentDismissStatus = (await potentialAssets.dismiss(world.id, potentialAsset.id))?.status ?? null;
+      return createAsset(input);
+    };
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(201);
+
+    expect(concurrentDismissStatus).toBeNull();
+    expect((await potentialAssets.findById(world.id, potentialAsset.id))?.status).toBe("promoted");
+    expect(officialAssets.stores.assets.size).toBe(1);
+    expect(countDepositionRuns(agents)).toBe(1);
+  });
+
   it("returns 409 when a concurrent promotion already created the deterministic official asset", async () => {
     const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
     const officialAssets = createInMemoryOfficialAssets();

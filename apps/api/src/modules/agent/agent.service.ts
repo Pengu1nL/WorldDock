@@ -173,19 +173,31 @@ export class AgentService {
       },
     };
     let created: Awaited<ReturnType<OfficialAssetsService["createAsset"]>>;
+    const promotionMetadata = {
+      ...sourceMetadata,
+      officialAssetId,
+      promotionStartedAt: new Date().toISOString(),
+    };
+    const claimedPotentialAsset = await potentialAssets.markPromoted(
+      worldId,
+      potentialAsset.id,
+      officialAssetId,
+      promotionMetadata,
+    );
     try {
       created = await officialAssets.createAsset(worldId, createAssetInput);
     } catch (error) {
       if (isUniqueConstraintError(error)) throw this.potentialAssetNotActive();
+      await potentialAssets.rollbackPromotion(worldId, potentialAsset.id, officialAssetId, potentialAsset.metadata);
       throw error;
     }
     const depositionRun = await this.createCompletedAssetDepositionRun(
       worldId,
-      potentialAsset,
+      claimedPotentialAsset,
       created.asset.id,
       createAssetInput,
     );
-    const promotedPotentialAsset = await potentialAssets.markPromoted(worldId, potentialAsset.id, created.asset.id, {
+    const promotedPotentialAsset = await potentialAssets.completePromotion(worldId, potentialAsset.id, created.asset.id, {
       ...sourceMetadata,
       officialAssetId: created.asset.id,
       depositionRunId: depositionRun.id,

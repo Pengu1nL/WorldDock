@@ -141,6 +141,28 @@ export class PotentialAssetsService {
     return asset;
   }
 
+  async completePromotion(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    await this.requireWorld(worldId);
+    const asset = await this.potentialAssets.completePromotion(worldId, id, promotedAssetId, metadata);
+    if (!asset) throw this.promotionConflict();
+    return asset;
+  }
+
+  async rollbackPromotion(
+    worldId: string,
+    id: string,
+    promotedAssetId: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    await this.requireWorld(worldId);
+    return this.potentialAssets.rollbackPromotion(worldId, id, promotedAssetId, metadata);
+  }
+
   private notFound() {
     return new NotFoundException({
       code: "NOT_FOUND",

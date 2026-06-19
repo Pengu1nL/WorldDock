@@ -657,6 +657,34 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       stores.potentialAssets.set(id, updated);
       return updated;
     },
+    async completePromotion(worldId, id, promotedAssetId, metadata = {}) {
+      const asset = stores.potentialAssets.get(id);
+      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== promotedAssetId) {
+        return null;
+      }
+      const updated: PotentialAssetRecord = {
+        ...asset,
+        metadata: { ...asset.metadata, ...metadata },
+        updatedAt: now(),
+      };
+      stores.potentialAssets.set(id, updated);
+      return updated;
+    },
+    async rollbackPromotion(worldId, id, promotedAssetId, metadata = {}) {
+      const asset = stores.potentialAssets.get(id);
+      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== promotedAssetId) {
+        return null;
+      }
+      const updated: PotentialAssetRecord = {
+        ...asset,
+        status: "active",
+        promotedAssetId: null,
+        metadata,
+        updatedAt: now(),
+      };
+      stores.potentialAssets.set(id, updated);
+      return updated;
+    },
   };
 }
 
