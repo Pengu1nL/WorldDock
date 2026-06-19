@@ -4,6 +4,7 @@ import type { AgentSessionMessage } from "@worlddock/contract";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
+import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawer";
 import { SessionPage } from "../../agent-sessions/session-page";
 import {
   EXPLORATION_HISTORY_QUERY,
@@ -14,8 +15,11 @@ import {
   useCreateExplorationSession,
   useCreateSessionRun,
   useCurrentExplorationSession,
+  useDismissPotentialAsset,
   useExplorationSessionList,
+  usePromotePotentialAsset,
   useSetCurrentAgentSession,
+  useSessionPotentialAssets,
   useStreamSessionRun,
 } from "../../agent-sessions/use-agent-session";
 import { cancelAgentRun } from "../api";
@@ -169,10 +173,13 @@ const ExplorationWorkspace = ({
   const sessionId = sessionDetail?.session.id;
   const queryClient = useQueryClient();
   const historyQuery = useExplorationSessionList(sessionsEnabled ? world?.id : null);
+  const potentialAssetsQuery = useSessionPotentialAssets(sessionsEnabled ? world?.id : null, sessionId);
   const setCurrentSession = useSetCurrentAgentSession(world?.id);
   const archiveSession = useArchiveAgentSession(world?.id);
   const createSession = useCreateExplorationSession(sessionsEnabled ? world : null);
   const createRun = useCreateSessionRun(world?.id, sessionId);
+  const promotePotentialAsset = usePromotePotentialAsset(world?.id, sessionId);
+  const dismissPotentialAsset = useDismissPotentialAsset(world?.id, sessionId);
   const streamRun = useStreamSessionRun(null);
   const abortRef = useRef<AbortController | null>(null);
   const activeSessionRunIdRef = useRef<string | null>(null);
@@ -180,6 +187,9 @@ const ExplorationWorkspace = ({
   const [runState, setRunState] = useState<"idle" | "running" | "completed" | "failed">("idle");
   const [tokens, setTokens] = useState(0);
   const [forceLegacyFallback, setForceLegacyFallback] = useState(false);
+  const [potentialAssetDrawerOpen, setPotentialAssetDrawerOpen] = useState(false);
+  const potentialAssets = potentialAssetsQuery.data ?? [];
+  const activePotentialAssetCount = potentialAssets.filter((asset) => asset.status === "active").length;
 
   const cancelActiveSessionRun = useCallback(() => {
     const runId = activeSessionRunIdRef.current;
@@ -274,6 +284,11 @@ const ExplorationWorkspace = ({
                 : message,
             ));
           }
+          if (event.type === "potential_asset.detected") {
+            void queryClient.invalidateQueries({
+              queryKey: agentSessionKeys.potentialAssetsForSession(world.id, sessionId),
+            });
+          }
           if (event.type === "run.completed") {
             terminalStatus = "completed";
             activeSessionRunIdRef.current = null;
@@ -335,6 +350,7 @@ const ExplorationWorkspace = ({
           }),
         }),
         queryClient.invalidateQueries({ queryKey: agentSessionKeys.list(world.id, EXPLORATION_HISTORY_QUERY) }),
+        queryClient.invalidateQueries({ queryKey: agentSessionKeys.potentialAssetsForSession(world.id, sessionId) }),
       ]);
     } catch (error) {
       if (abortRef.current !== abortController) return;
@@ -389,7 +405,7 @@ const ExplorationWorkspace = ({
   const handleCreateSession = useCallback(async () => {
     if (!world?.id) return;
     resetSessionRuntime();
-    await createSession.mutateAsync();
+    await createSession.mutateAsync(undefined);
     await sessionQuery.refetch();
   }, [createSession, resetSessionRuntime, sessionQuery, world?.id]);
 
@@ -407,26 +423,38 @@ const ExplorationWorkspace = ({
   if (!sessionDetail) return <SessionLoadingState world={world} />;
 
   return (
-    <SessionPage
-      session={sessionDetail.session}
-      subjects={sessionDetail.subjects}
-      messages={[...sessionDetail.messages, ...optimisticMessages]}
-      contextItems={sessionDetail.contextItems}
-      runState={{ status: runState, tokens }}
-      onSend={handleSessionSend}
-      onStop={handleSessionStop}
-      rightSlot={(
-        <SessionHistoryPanel
-          sessions={historyQuery.data ?? []}
-          activeSessionId={sessionId}
-          isLoading={historyQuery.isPending}
-          isCreating={createSession.isPending}
-          onCreate={handleCreateSession}
-          onOpen={handleOpenSession}
-          onArchive={handleArchiveSession}
-        />
-      )}
-    />
+    <>
+      <SessionPage
+        session={sessionDetail.session}
+        subjects={sessionDetail.subjects}
+        messages={[...sessionDetail.messages, ...optimisticMessages]}
+        contextItems={sessionDetail.contextItems}
+        runState={{ status: runState, tokens }}
+        onSend={handleSessionSend}
+        onStop={handleSessionStop}
+        potentialAssetCount={potentialAssets.length}
+        activePotentialAssetCount={activePotentialAssetCount}
+        onOpenPotentialAssets={() => setPotentialAssetDrawerOpen(true)}
+        rightSlot={(
+          <SessionHistoryPanel
+            sessions={historyQuery.data ?? []}
+            activeSessionId={sessionId}
+            isLoading={historyQuery.isPending}
+            isCreating={createSession.isPending}
+            onCreate={handleCreateSession}
+            onOpen={handleOpenSession}
+            onArchive={handleArchiveSession}
+          />
+        )}
+      />
+      <PotentialAssetDrawer
+        open={potentialAssetDrawerOpen}
+        potentialAssets={potentialAssets}
+        onClose={() => setPotentialAssetDrawerOpen(false)}
+        onPromote={(potentialAssetId) => promotePotentialAsset.mutate(potentialAssetId)}
+        onDismiss={(potentialAssetId) => dismissPotentialAsset.mutate(potentialAssetId)}
+      />
+    </>
   );
 };
 

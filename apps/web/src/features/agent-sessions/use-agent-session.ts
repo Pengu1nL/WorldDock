@@ -4,8 +4,11 @@ import {
   archiveAgentSession,
   createAgentSession,
   createAgentSessionRun,
+  dismissPotentialAsset,
   getAgentSession,
   listAgentSessions,
+  listPotentialAssetsForSession,
+  promotePotentialAsset,
   setCurrentAgentSession,
   streamAgentSessionRunEvents,
   WorldDockApiError,
@@ -48,6 +51,10 @@ export const agentSessionKeys = {
     worldId,
     query,
   ],
+  potentialAssetsPrefix: (worldId: string | null | undefined) => [
+    "potential-assets",
+    worldId,
+  ],
   potentialAssetsForSession: (worldId: string | null | undefined, sessionId: string | null | undefined) => [
     "potential-assets",
     worldId,
@@ -57,7 +64,7 @@ export const agentSessionKeys = {
 };
 
 export function agentSessionsFeatureEnabled() {
-  return process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS === "1";
+  return process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS !== "0";
 }
 
 export function useAgentSessionDetail(worldId: string | null | undefined, sessionId: string | null | undefined) {
@@ -98,6 +105,19 @@ export function useExplorationSessionList(worldId: string | null | undefined) {
     enabled: Boolean(worldId),
     retry: false,
     select: (result) => result.sessions,
+  });
+}
+
+export function useSessionPotentialAssets(
+  worldId: string | null | undefined,
+  sessionId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: agentSessionKeys.potentialAssetsForSession(worldId, sessionId),
+    queryFn: () => listPotentialAssetsForSession(worldId as string, sessionId as string),
+    enabled: Boolean(worldId && sessionId),
+    retry: false,
+    select: (result) => result.potentialAssets,
   });
 }
 
@@ -146,6 +166,38 @@ export function useCreateSessionRun(worldId: string | null | undefined, sessionI
   });
 }
 
+export function usePromotePotentialAsset(
+  worldId: string | null | undefined,
+  sessionId?: string | null | undefined,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (potentialAssetId: string) => promotePotentialAsset(worldId as string, potentialAssetId),
+    onSuccess: () => {
+      invalidatePotentialAssetQueries(queryClient, worldId, sessionId);
+      if (worldId) {
+        void queryClient.invalidateQueries({ queryKey: ["official-assets", worldId] });
+        void queryClient.invalidateQueries({ queryKey: ["world-assets", worldId] });
+      }
+    },
+  });
+}
+
+export function useDismissPotentialAsset(
+  worldId: string | null | undefined,
+  sessionId?: string | null | undefined,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (potentialAssetId: string) => dismissPotentialAsset(worldId as string, potentialAssetId),
+    onSuccess: () => {
+      invalidatePotentialAssetQueries(queryClient, worldId, sessionId);
+    },
+  });
+}
+
 export function useStreamSessionRun(runId: string | null | undefined) {
   return useMutation({
     mutationFn: ({
@@ -189,6 +241,18 @@ function invalidateExplorationSessionQueries(
   void queryClient.invalidateQueries({ queryKey: agentSessionKeys.detailPrefix(worldId) });
   if (sessionId) {
     void queryClient.invalidateQueries({ queryKey: agentSessionKeys.detail(worldId, sessionId) });
+  }
+}
+
+function invalidatePotentialAssetQueries(
+  queryClient: QueryClient,
+  worldId: string | null | undefined,
+  sessionId?: string | null,
+) {
+  if (!worldId) return;
+  void queryClient.invalidateQueries({ queryKey: agentSessionKeys.potentialAssetsPrefix(worldId) });
+  if (sessionId) {
+    void queryClient.invalidateQueries({ queryKey: agentSessionKeys.potentialAssetsForSession(worldId, sessionId) });
   }
 }
 

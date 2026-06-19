@@ -24,6 +24,9 @@ export type SessionPageProps = {
   onSend: (text: string) => void;
   onStop: () => void;
   rightSlot?: ReactNode;
+  potentialAssetCount?: number;
+  activePotentialAssetCount?: number;
+  onOpenPotentialAssets?: () => void;
 };
 
 export function SessionPage({
@@ -35,8 +38,14 @@ export function SessionPage({
   onSend,
   onStop,
   rightSlot,
+  potentialAssetCount = 0,
+  activePotentialAssetCount,
+  onOpenPotentialAssets,
 }: SessionPageProps) {
   const aside = rightSlot ?? <SessionContextPanel subjects={subjects} contextItems={contextItems} />;
+  const potentialAssetBadgeText = typeof activePotentialAssetCount === "number" && activePotentialAssetCount !== potentialAssetCount
+    ? `${activePotentialAssetCount}/${potentialAssetCount}`
+    : String(potentialAssetCount);
 
   return (
     <div
@@ -74,6 +83,17 @@ export function SessionPage({
               </h1>
               <span className="badge slate">{kindLabel(session.kind)}</span>
               <span className={session.status === "active" ? "badge sage" : "badge"}>{statusLabel(session.status)}</span>
+              {potentialAssetCount > 0 ? (
+                <button
+                  aria-label={`潜在资产 ${potentialAssetCount} 项`}
+                  className="badge amber"
+                  onClick={onOpenPotentialAssets}
+                  style={{ cursor: onOpenPotentialAssets ? "pointer" : "default" }}
+                  type="button"
+                >
+                  潜在资产 {potentialAssetBadgeText}
+                </button>
+              ) : null}
             </div>
           </div>
         </header>

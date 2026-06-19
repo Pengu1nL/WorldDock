@@ -12,8 +12,11 @@ import {
   useArchiveAgentSession,
   useCreateExplorationSession,
   useCurrentExplorationSession,
+  useDismissPotentialAsset,
   useExplorationSessionList,
+  usePromotePotentialAsset,
   useSetCurrentAgentSession,
+  useSessionPotentialAssets,
 } from "./use-agent-session";
 import * as api from "../worlddock/api";
 
@@ -23,8 +26,11 @@ vi.mock("../worlddock/api", async (importOriginal) => {
     ...actual,
     archiveAgentSession: vi.fn(),
     createAgentSession: vi.fn(),
+    dismissPotentialAsset: vi.fn(),
     getAgentSession: vi.fn(),
     listAgentSessions: vi.fn(),
+    listPotentialAssetsForSession: vi.fn(),
+    promotePotentialAsset: vi.fn(),
     setCurrentAgentSession: vi.fn(),
   };
 });
@@ -190,6 +196,75 @@ describe("exploration session helpers", () => {
     expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
     expect(queryClient.getQueryState(currentKey)?.isInvalidated).toBe(true);
   });
+
+  it("lists potential assets for a session", async () => {
+    const potentialAsset = buildPotentialAsset({ id: "pa_1", title: "记忆交易许可" });
+    vi.mocked(api.listPotentialAssetsForSession).mockResolvedValue({
+      potentialAssets: [potentialAsset],
+      nextCursor: null,
+    });
+
+    const { result } = renderHook(
+      () => useSessionPotentialAssets("world_1", "session_1"),
+      { wrapper: createQueryWrapper().Wrapper },
+    );
+
+    await waitFor(() => expect(result.current.data?.[0]?.id).toBe("pa_1"));
+
+    expect(api.listPotentialAssetsForSession).toHaveBeenCalledWith("world_1", "session_1");
+  });
+
+  it("invalidates potential and official asset queries after promotion", async () => {
+    const potentialAsset = buildPotentialAsset({ id: "pa_1", status: "promoted" });
+    vi.mocked(api.promotePotentialAsset).mockResolvedValue({
+      potentialAsset,
+      depositionRun: { id: "run_1" },
+    } as any);
+    const queryWrapper = createQueryWrapper();
+    const { queryClient } = queryWrapper;
+    const sessionPotentialAssetsKey = agentSessionKeys.potentialAssetsForSession("world_1", "session_1");
+    const officialAssetsKey = ["official-assets", "world_1"];
+    const worldAssetsKey = ["world-assets", "world_1"];
+
+    queryClient.setQueryData(sessionPotentialAssetsKey, [buildPotentialAsset()]);
+    queryClient.setQueryData(officialAssetsKey, { assets: [] });
+    queryClient.setQueryData(worldAssetsKey, { assets: [] });
+
+    const { result } = renderHook(
+      () => usePromotePotentialAsset("world_1", "session_1"),
+      { wrapper: queryWrapper.Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync("pa_1");
+    });
+
+    expect(api.promotePotentialAsset).toHaveBeenCalledWith("world_1", "pa_1");
+    expect(queryClient.getQueryState(sessionPotentialAssetsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(officialAssetsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(worldAssetsKey)?.isInvalidated).toBe(true);
+  });
+
+  it("invalidates potential asset queries after dismissal", async () => {
+    vi.mocked(api.dismissPotentialAsset).mockResolvedValue({
+      potentialAsset: buildPotentialAsset({ id: "pa_1", status: "dismissed" }),
+    });
+    const queryWrapper = createQueryWrapper();
+    const sessionPotentialAssetsKey = agentSessionKeys.potentialAssetsForSession("world_1", "session_1");
+    queryWrapper.queryClient.setQueryData(sessionPotentialAssetsKey, [buildPotentialAsset()]);
+
+    const { result } = renderHook(
+      () => useDismissPotentialAsset("world_1", "session_1"),
+      { wrapper: queryWrapper.Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync("pa_1");
+    });
+
+    expect(api.dismissPotentialAsset).toHaveBeenCalledWith("world_1", "pa_1");
+    expect(queryWrapper.queryClient.getQueryState(sessionPotentialAssetsKey)?.isInvalidated).toBe(true);
+  });
 });
 
 describe("isAgentSessionNotFoundError", () => {
@@ -250,4 +325,20 @@ function buildDetail(session: ReturnType<typeof buildSession>) {
     contextItems: [],
     messages: [],
   };
+}
+
+function buildPotentialAsset(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "pa_1",
+    worldId: "world_1",
+    sessionId: "session_1",
+    type: "rule",
+    title: "记忆交易许可",
+    summary: "需要登记。",
+    evidence: [],
+    status: "active",
+    createdAt: "2026-06-14T00:00:00.000Z",
+    updatedAt: "2026-06-14T00:00:00.000Z",
+    ...overrides,
+  } as any;
 }

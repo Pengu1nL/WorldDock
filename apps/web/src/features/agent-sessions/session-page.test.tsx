@@ -63,6 +63,20 @@ describe("SessionPage", () => {
     expect(screen.getByText("浮城税契")).toBeInTheDocument();
   });
 
+  it("opens potential assets from the header badge", () => {
+    const onOpenPotentialAssets = vi.fn();
+    renderSessionPage({
+      potentialAssetCount: 3,
+      activePotentialAssetCount: 1,
+      onOpenPotentialAssets,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "潜在资产 3 项" }));
+
+    expect(screen.getByText("潜在资产 1/3")).toBeInTheDocument();
+    expect(onOpenPotentialAssets).toHaveBeenCalled();
+  });
+
   it("keeps composer disabled for blank text and sends typed text", () => {
     const onSend = vi.fn();
     renderSessionPage({ onSend });
