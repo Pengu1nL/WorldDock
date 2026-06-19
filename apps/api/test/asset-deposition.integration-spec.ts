@@ -123,6 +123,7 @@ describe("asset deposition local endpoints", () => {
       metadata: expect.objectContaining({
         detector: "test",
         officialAssetId: promoted.body.asset.id,
+        promotionToken: expect.stringMatching(/^promotion_/),
         sourcePotentialAssetId: potentialAsset.id,
         depositionRunId: expect.any(String),
       }),
@@ -229,6 +230,34 @@ describe("asset deposition local endpoints", () => {
     expect(countDepositionRuns(agents)).toBe(1);
   });
 
+  it("links the potential asset when deposition logging fails after official asset creation", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    const createRun = agents.createRun.bind(agents);
+    agents.createRun = async (input) => {
+      if (input.prompt.startsWith("Promote potential asset ")) {
+        throw new Error("Deposition run unavailable.");
+      }
+      return createRun(input);
+    };
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(500);
+
+    const linked = await potentialAssets.findById(world.id, potentialAsset.id);
+    expect(linked).toMatchObject({
+      status: "promoted",
+      promotedAssetId: `official_asset_${potentialAsset.id}`,
+      metadata: expect.objectContaining({
+        promotionFinalizationError: "Deposition run unavailable.",
+      }),
+    });
+    expect(officialAssets.stores.assets.size).toBe(1);
+  });
+
   it("returns 409 when a concurrent promotion already created the deterministic official asset", async () => {
     const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
     const officialAssets = createInMemoryOfficialAssets();
@@ -245,6 +274,9 @@ describe("asset deposition local endpoints", () => {
       message: "Potential asset is not active and cannot be promoted.",
     });
     expect((await potentialAssets.findById(world.id, potentialAsset.id))?.status).toBe("active");
+    expect((await potentialAssets.findById(world.id, potentialAsset.id))?.metadata).toMatchObject({
+      detector: "test",
+    });
     expect(officialAssets.stores.assets.size).toBe(1);
     expect([...officialAssets.stores.assets.keys()]).toEqual([`official_asset_${potentialAsset.id}`]);
     expect(countDepositionRuns(agents)).toBe(0);

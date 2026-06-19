@@ -62,12 +62,13 @@ export type PotentialAssetsRepository = {
     worldId: string,
     id: string,
     promotedAssetId: string,
+    promotionToken: string,
     metadata?: Record<string, unknown>,
   ): Promise<PotentialAssetRecord | null>;
   rollbackPromotion(
     worldId: string,
     id: string,
-    promotedAssetId: string,
+    promotionToken: string,
     metadata?: Record<string, unknown>,
   ): Promise<PotentialAssetRecord | null>;
 };

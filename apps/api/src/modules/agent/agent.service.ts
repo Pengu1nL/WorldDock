@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { ConflictException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
 import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, type WorldAsset, type WorldSuggestion } from "@worlddock/domain";
 import {
@@ -173,9 +174,11 @@ export class AgentService {
       },
     };
     let created: Awaited<ReturnType<OfficialAssetsService["createAsset"]>>;
+    const promotionToken = `promotion_${randomUUID()}`;
     const promotionMetadata = {
       ...sourceMetadata,
       officialAssetId,
+      promotionToken,
       promotionStartedAt: new Date().toISOString(),
     };
     const claimedPotentialAsset = await potentialAssets.claimPromotion(
@@ -186,22 +189,34 @@ export class AgentService {
     try {
       created = await officialAssets.createAsset(worldId, createAssetInput);
     } catch (error) {
-      await potentialAssets.rollbackPromotion(worldId, potentialAsset.id, officialAssetId, potentialAsset.metadata);
+      const rolledBack = await potentialAssets.rollbackPromotion(worldId, potentialAsset.id, promotionToken, potentialAsset.metadata);
+      if (!rolledBack || rolledBack.status !== "active") throw new Error("Potential asset promotion rollback failed.");
       if (isUniqueConstraintError(error)) throw this.potentialAssetNotActive();
       throw error;
     }
-    const depositionRun = await this.createCompletedAssetDepositionRun(
-      worldId,
-      claimedPotentialAsset,
-      created.asset.id,
-      createAssetInput,
-    );
-    const promotedPotentialAsset = await potentialAssets.completePromotion(worldId, potentialAsset.id, created.asset.id, {
-      ...sourceMetadata,
-      officialAssetId: created.asset.id,
-      depositionRunId: depositionRun.id,
-      promotedAt: new Date().toISOString(),
-    });
+    let depositionRun: AgentRunRecord | null = null;
+    let promotedPotentialAsset: PotentialAssetRecord;
+    try {
+      depositionRun = await this.createCompletedAssetDepositionRun(
+        worldId,
+        claimedPotentialAsset,
+        created.asset.id,
+        createAssetInput,
+      );
+      promotedPotentialAsset = await potentialAssets.completePromotion(worldId, potentialAsset.id, created.asset.id, promotionToken, {
+        ...sourceMetadata,
+        officialAssetId: created.asset.id,
+        depositionRunId: depositionRun.id,
+        promotedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      await potentialAssets.completePromotion(worldId, potentialAsset.id, created.asset.id, promotionToken, {
+        ...sourceMetadata,
+        officialAssetId: created.asset.id,
+        promotionFinalizationError: getErrorMessage(error),
+      });
+      throw error;
+    }
 
     return {
       ...created,
@@ -991,6 +1006,10 @@ function isUniqueConstraintError(error: unknown) {
     && error !== null
     && "code" in error
     && error.code === "P2002";
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message : "Potential asset promotion finalization failed.";
 }
 
 function buildWorldDraftPrompt(input: CreateWorldDraftInput) {

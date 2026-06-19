@@ -158,6 +158,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     worldId: string,
     id: string,
     promotedAssetId: string,
+    promotionToken: string,
     metadata: Record<string, unknown> = {},
   ) {
     const current = await this.prisma.potentialAsset.findFirst({
@@ -165,6 +166,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     });
     if (!current) return null;
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
+    if (currentMetadata.promotionToken !== promotionToken) return null;
     const updated = await this.prisma.potentialAsset.updateMany({
       where: { worldId, id, status: "promoted", promotedAssetId: null },
       data: {
@@ -180,9 +182,15 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
   async rollbackPromotion(
     worldId: string,
     id: string,
-    promotedAssetId: string,
+    promotionToken: string,
     metadata: Record<string, unknown> = {},
   ) {
+    const current = await this.prisma.potentialAsset.findFirst({
+      where: { worldId, id, status: "promoted", promotedAssetId: null },
+    });
+    if (!current) return null;
+    const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
+    if (currentMetadata.promotionToken !== promotionToken) return null;
     const updated = await this.prisma.potentialAsset.updateMany({
       where: { worldId, id, status: "promoted", promotedAssetId: null },
       data: {

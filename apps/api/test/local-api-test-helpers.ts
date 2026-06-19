@@ -669,11 +669,12 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       stores.potentialAssets.set(id, updated);
       return updated;
     },
-    async completePromotion(worldId, id, promotedAssetId, metadata = {}) {
+    async completePromotion(worldId, id, promotedAssetId, promotionToken, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
       if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== null) {
         return null;
       }
+      if (asset.metadata.promotionToken !== promotionToken) return null;
       const updated: PotentialAssetRecord = {
         ...asset,
         promotedAssetId,
@@ -683,11 +684,12 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       stores.potentialAssets.set(id, updated);
       return updated;
     },
-    async rollbackPromotion(worldId, id, promotedAssetId, metadata = {}) {
+    async rollbackPromotion(worldId, id, promotionToken, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
       if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== null) {
         return null;
       }
+      if (asset.metadata.promotionToken !== promotionToken) return null;
       const updated: PotentialAssetRecord = {
         ...asset,
         status: "active",

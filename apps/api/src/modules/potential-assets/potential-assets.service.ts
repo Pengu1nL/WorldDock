@@ -152,10 +152,11 @@ export class PotentialAssetsService {
     worldId: string,
     id: string,
     promotedAssetId: string,
+    promotionToken: string,
     metadata: Record<string, unknown> = {},
   ) {
     await this.requireWorld(worldId);
-    const asset = await this.potentialAssets.completePromotion(worldId, id, promotedAssetId, metadata);
+    const asset = await this.potentialAssets.completePromotion(worldId, id, promotedAssetId, promotionToken, metadata);
     if (!asset) throw this.promotionConflict();
     return asset;
   }
@@ -163,11 +164,11 @@ export class PotentialAssetsService {
   async rollbackPromotion(
     worldId: string,
     id: string,
-    promotedAssetId: string,
+    promotionToken: string,
     metadata: Record<string, unknown> = {},
   ) {
     await this.requireWorld(worldId);
-    return this.potentialAssets.rollbackPromotion(worldId, id, promotedAssetId, metadata);
+    return this.potentialAssets.rollbackPromotion(worldId, id, promotionToken, metadata);
   }
 
   private notFound() {
