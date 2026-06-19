@@ -306,6 +306,27 @@ describe("potential assets local endpoints", () => {
 
     expect(activeAfterCrossWorldAttempt?.status).toBe("active");
 
+    const promotedAsset = (await potentialAssets.createMany([{
+      worldId: world.id,
+      sessionId: session.id,
+      runId: null,
+      type: "rule",
+      title: "梦境赎回许可",
+      summary: "梦境赎回必须持有许可。",
+      evidence: [{ quote: "梦境赎回必须持有许可。", confidence: 0.9 }],
+    }]))[0];
+    await potentialAssets.markPromoted(world.id, promotedAsset.id, "official_asset_1");
+
+    const lateDismiss = await request(testApp.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${promotedAsset.id}/dismiss`)
+      .expect(409);
+
+    expect(lateDismiss.body).toMatchObject({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: "Potential asset is promoted and cannot be dismissed.",
+    });
+    expect((await potentialAssets.findById(world.id, promotedAsset.id))?.status).toBe("promoted");
+
     await request(testApp.getHttpServer())
       .post(`/v1/worlds/${world.id}/potential-assets/potential_asset_missing/dismiss`)
       .expect(404);

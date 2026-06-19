@@ -37,11 +37,7 @@ export class PotentialAssetsController {
   @Post("worlds/:worldId/potential-assets/:potentialAssetId/dismiss")
   @HttpCode(200)
   async dismiss(@Param("worldId") worldId: string, @Param("potentialAssetId") potentialAssetId: string) {
-    return { potentialAsset: serializePotentialAsset(await this.potentialAssets.updateStatus(
-      worldId,
-      potentialAssetId,
-      "dismissed",
-    )) };
+    return { potentialAsset: serializePotentialAsset(await this.potentialAssets.dismiss(worldId, potentialAssetId)) };
   }
 }
 

@@ -120,6 +120,15 @@ export class PotentialAssetsService {
     return asset;
   }
 
+  async dismiss(worldId: string, id: string) {
+    const asset = await this.potentialAssets.dismiss(worldId, id);
+    if (asset) return asset;
+
+    const current = await this.potentialAssets.findById(worldId, id);
+    if (!current) throw this.notFound();
+    throw this.dismissConflict(current.status);
+  }
+
   async markPromoted(
     worldId: string,
     id: string,
@@ -150,6 +159,15 @@ export class PotentialAssetsService {
     return new ConflictException({
       code: "POTENTIAL_ASSET_NOT_ACTIVE",
       message: "Potential asset is not active and cannot be promoted.",
+    });
+  }
+
+  private dismissConflict(status: PotentialAssetRecord["status"]) {
+    return new ConflictException({
+      code: "POTENTIAL_ASSET_NOT_ACTIVE",
+      message: status === "promoted"
+        ? "Potential asset is promoted and cannot be dismissed."
+        : "Potential asset is not active and cannot be dismissed.",
     });
   }
 

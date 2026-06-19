@@ -22,6 +22,8 @@ test("creator can create a world, continue a run, and save suggestions", async (
   await expect(page.getByText("记忆交易许可")).toBeVisible();
   await page.getByRole("button", { name: "沉淀" }).click();
   await expect.poll(() => sessionMocks.wasPromoted()).toBe(true);
+  await expect(page.getByText("已沉淀")).toBeVisible();
+  await expect(page.getByRole("button", { name: "沉淀" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /资产库/ }).click();
   await expect(page.locator("main").getByText("《记忆交易法》", { exact: true })).toBeVisible();
@@ -46,7 +48,7 @@ async function installSessionMocks(page: Page) {
     }
 
     if (method === "GET" && path === "/v1/worlds/world_created/agent-sessions/session_e2e/potential-assets") {
-      return json(route, { potentialAssets: [potentialAsset], nextCursor: null });
+      return json(route, { potentialAssets: [buildPotentialAsset(promoted)], nextCursor: null });
     }
 
     if (method === "POST" && path === "/v1/worlds/world_created/agent-sessions/session_e2e/runs") {
@@ -65,7 +67,7 @@ async function installSessionMocks(page: Page) {
         sessionSse(1, "message.delta", { text: "亲属记忆交易需要冷静期复核。" }),
         sessionSse(2, "potential_asset.detected", {
           potentialAssetId: "pa_1",
-          potentialAsset,
+          potentialAsset: buildPotentialAsset(promoted),
         }),
         sessionSse(3, "run.completed", {
           tokenUsage: { inputTokens: 80, outputTokens: 40, totalTokens: 120 },
@@ -88,7 +90,7 @@ async function installSessionMocks(page: Page) {
         id: "archive_1",
         title: "《记忆交易法》",
       },
-      potentialAsset: { ...potentialAsset, status: "promoted" },
+      potentialAsset: buildPotentialAsset(promoted),
       depositionRun: { id: "deposition_run_e2e" },
     }, 201);
   });
@@ -133,18 +135,21 @@ function buildSessionDetail(sessionRunCompleted: boolean) {
   };
 }
 
-const potentialAsset = {
-  id: "pa_1",
-  worldId: "world_created",
-  sessionId: "session_e2e",
-  type: "rule",
-  title: "记忆交易许可",
-  summary: "需要登记。",
-  evidence: [],
-  status: "active",
-  createdAt: "2026-05-28T10:00:00.000Z",
-  updatedAt: "2026-05-28T10:00:00.000Z",
-};
+function buildPotentialAsset(promoted: boolean) {
+  return {
+    id: "pa_1",
+    worldId: "world_created",
+    sessionId: "session_e2e",
+    type: "rule",
+    title: "记忆交易许可",
+    summary: "需要登记。",
+    evidence: [],
+    status: promoted ? "promoted" : "active",
+    promotedAssetId: promoted ? "archive_1" : null,
+    createdAt: "2026-05-28T10:00:00.000Z",
+    updatedAt: promoted ? "2026-05-28T10:00:04.000Z" : "2026-05-28T10:00:00.000Z",
+  };
+}
 
 const memoryTradeLawAsset = {
   id: "archive_1",

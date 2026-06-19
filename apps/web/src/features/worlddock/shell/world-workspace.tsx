@@ -219,7 +219,10 @@ const ExplorationWorkspace = ({
     setOptimisticMessages([]);
     setRunState("idle");
     setTokens(0);
-  }, [cancelActiveSessionRun]);
+    setPotentialAssetDrawerOpen(false);
+    setPotentialAssetActionError(null);
+    setPotentialAssetPending(null);
+  }, [cancelActiveSessionRun, setPotentialAssetPending]);
 
   useEffect(() => {
     resetSessionRuntime();

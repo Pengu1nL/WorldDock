@@ -635,6 +635,15 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       stores.potentialAssets.set(id, updated);
       return updated;
     },
+    async dismiss(worldId, id) {
+      const asset = stores.potentialAssets.get(id);
+      if (!asset || asset.worldId !== worldId) return null;
+      if (asset.status === "dismissed") return asset;
+      if (asset.status !== "active") return null;
+      const updated: PotentialAssetRecord = { ...asset, status: "dismissed", updatedAt: now() };
+      stores.potentialAssets.set(id, updated);
+      return updated;
+    },
     async markPromoted(worldId, id, promotedAssetId, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
       if (!asset || asset.worldId !== worldId || asset.status !== "active") return null;

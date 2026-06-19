@@ -98,6 +98,20 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     return asset ? mapPotentialAsset(asset) : null;
   }
 
+  async dismiss(worldId: string, id: string) {
+    const updated = await this.prisma.potentialAsset.updateMany({
+      where: { worldId, id, status: "active" },
+      data: { status: "dismissed" },
+    });
+    if (updated.count > 0) {
+      const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
+      return asset ? mapPotentialAsset(asset) : null;
+    }
+
+    const dismissed = await this.prisma.potentialAsset.findFirst({ where: { worldId, id, status: "dismissed" } });
+    return dismissed ? mapPotentialAsset(dismissed) : null;
+  }
+
   async markPromoted(
     worldId: string,
     id: string,
