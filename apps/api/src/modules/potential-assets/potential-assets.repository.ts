@@ -47,6 +47,11 @@ export type PotentialAssetsRepository = {
     status: PotentialAssetStatus,
   ): Promise<PotentialAssetRecord | null>;
   dismiss(worldId: string, id: string): Promise<PotentialAssetRecord | null>;
+  claimPromotion(
+    worldId: string,
+    id: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<PotentialAssetRecord | null>;
   markPromoted(
     worldId: string,
     id: string,

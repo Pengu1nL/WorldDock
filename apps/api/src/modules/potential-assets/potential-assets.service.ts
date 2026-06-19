@@ -129,6 +129,13 @@ export class PotentialAssetsService {
     throw this.dismissConflict(current.status);
   }
 
+  async claimPromotion(worldId: string, id: string, metadata: Record<string, unknown> = {}) {
+    await this.requireWorld(worldId);
+    const asset = await this.potentialAssets.claimPromotion(worldId, id, metadata);
+    if (!asset) throw this.promotionConflict();
+    return asset;
+  }
+
   async markPromoted(
     worldId: string,
     id: string,

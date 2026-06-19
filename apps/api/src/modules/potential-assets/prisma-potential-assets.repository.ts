@@ -112,6 +112,26 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     return dismissed ? mapPotentialAsset(dismissed) : null;
   }
 
+  async claimPromotion(
+    worldId: string,
+    id: string,
+    metadata: Record<string, unknown> = {},
+  ) {
+    const current = await this.prisma.potentialAsset.findFirst({ where: { worldId, id, status: "active" } });
+    if (!current) return null;
+    const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
+    const updated = await this.prisma.potentialAsset.updateMany({
+      where: { worldId, id, status: "active" },
+      data: {
+        status: "promoted",
+        metadata: { ...currentMetadata, ...metadata } as never,
+      },
+    });
+    if (updated.count === 0) return null;
+    const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
+    return asset ? mapPotentialAsset(asset) : null;
+  }
+
   async markPromoted(
     worldId: string,
     id: string,
@@ -141,13 +161,16 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     metadata: Record<string, unknown> = {},
   ) {
     const current = await this.prisma.potentialAsset.findFirst({
-      where: { worldId, id, status: "promoted", promotedAssetId },
+      where: { worldId, id, status: "promoted", promotedAssetId: null },
     });
     if (!current) return null;
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
     const updated = await this.prisma.potentialAsset.updateMany({
-      where: { worldId, id, status: "promoted", promotedAssetId },
-      data: { metadata: { ...currentMetadata, ...metadata } as never },
+      where: { worldId, id, status: "promoted", promotedAssetId: null },
+      data: {
+        promotedAssetId,
+        metadata: { ...currentMetadata, ...metadata } as never,
+      },
     });
     if (updated.count === 0) return null;
     const asset = await this.prisma.potentialAsset.findUnique({ where: { id } });
@@ -161,7 +184,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     metadata: Record<string, unknown> = {},
   ) {
     const updated = await this.prisma.potentialAsset.updateMany({
-      where: { worldId, id, status: "promoted", promotedAssetId },
+      where: { worldId, id, status: "promoted", promotedAssetId: null },
       data: {
         status: "active",
         promotedAssetId: null,

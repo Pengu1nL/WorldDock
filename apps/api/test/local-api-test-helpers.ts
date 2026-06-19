@@ -644,6 +644,18 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       stores.potentialAssets.set(id, updated);
       return updated;
     },
+    async claimPromotion(worldId, id, metadata = {}) {
+      const asset = stores.potentialAssets.get(id);
+      if (!asset || asset.worldId !== worldId || asset.status !== "active") return null;
+      const updated: PotentialAssetRecord = {
+        ...asset,
+        status: "promoted",
+        metadata: { ...asset.metadata, ...metadata },
+        updatedAt: now(),
+      };
+      stores.potentialAssets.set(id, updated);
+      return updated;
+    },
     async markPromoted(worldId, id, promotedAssetId, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
       if (!asset || asset.worldId !== worldId || asset.status !== "active") return null;
@@ -659,11 +671,12 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
     },
     async completePromotion(worldId, id, promotedAssetId, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
-      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== promotedAssetId) {
+      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== null) {
         return null;
       }
       const updated: PotentialAssetRecord = {
         ...asset,
+        promotedAssetId,
         metadata: { ...asset.metadata, ...metadata },
         updatedAt: now(),
       };
@@ -672,7 +685,7 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
     },
     async rollbackPromotion(worldId, id, promotedAssetId, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
-      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== promotedAssetId) {
+      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== null) {
         return null;
       }
       const updated: PotentialAssetRecord = {

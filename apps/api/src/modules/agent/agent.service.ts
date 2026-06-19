@@ -178,17 +178,16 @@ export class AgentService {
       officialAssetId,
       promotionStartedAt: new Date().toISOString(),
     };
-    const claimedPotentialAsset = await potentialAssets.markPromoted(
+    const claimedPotentialAsset = await potentialAssets.claimPromotion(
       worldId,
       potentialAsset.id,
-      officialAssetId,
       promotionMetadata,
     );
     try {
       created = await officialAssets.createAsset(worldId, createAssetInput);
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw this.potentialAssetNotActive();
       await potentialAssets.rollbackPromotion(worldId, potentialAsset.id, officialAssetId, potentialAsset.metadata);
+      if (isUniqueConstraintError(error)) throw this.potentialAssetNotActive();
       throw error;
     }
     const depositionRun = await this.createCompletedAssetDepositionRun(

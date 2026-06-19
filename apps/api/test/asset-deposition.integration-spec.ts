@@ -208,7 +208,10 @@ describe("asset deposition local endpoints", () => {
     const officialAssets = createInMemoryOfficialAssets();
     const createAsset = officialAssets.createAsset.bind(officialAssets);
     let concurrentDismissStatus: string | null | undefined;
+    let claimedPromotedAssetId: string | null | undefined;
     officialAssets.createAsset = async (input) => {
+      const claimed = await potentialAssets.findById(world.id, potentialAsset.id);
+      claimedPromotedAssetId = claimed?.promotedAssetId;
       concurrentDismissStatus = (await potentialAssets.dismiss(world.id, potentialAsset.id))?.status ?? null;
       return createAsset(input);
     };
@@ -219,6 +222,7 @@ describe("asset deposition local endpoints", () => {
       .send({})
       .expect(201);
 
+    expect(claimedPromotedAssetId).toBeNull();
     expect(concurrentDismissStatus).toBeNull();
     expect((await potentialAssets.findById(world.id, potentialAsset.id))?.status).toBe("promoted");
     expect(officialAssets.stores.assets.size).toBe(1);
@@ -240,6 +244,7 @@ describe("asset deposition local endpoints", () => {
       code: "POTENTIAL_ASSET_NOT_ACTIVE",
       message: "Potential asset is not active and cannot be promoted.",
     });
+    expect((await potentialAssets.findById(world.id, potentialAsset.id))?.status).toBe("active");
     expect(officialAssets.stores.assets.size).toBe(1);
     expect([...officialAssets.stores.assets.keys()]).toEqual([`official_asset_${potentialAsset.id}`]);
     expect(countDepositionRuns(agents)).toBe(0);
