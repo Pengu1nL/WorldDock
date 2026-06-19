@@ -15,6 +15,7 @@ import {
   type AgentSessionDetail,
   type AgentSessionRunEvent,
 } from "../worlddock/api";
+import { officialAssetsQueryKeys } from "../world-assets/use-official-assets";
 
 type WorldLike = string | { id?: string | null; name?: string | null } | null | undefined;
 
@@ -259,7 +260,7 @@ function invalidatePromotedAssetQueries(
 ) {
   invalidatePotentialAssetQueries(queryClient, worldId, sessionId);
   if (!worldId) return;
-  void queryClient.invalidateQueries({ queryKey: ["official-assets", worldId] });
+  void queryClient.invalidateQueries({ queryKey: officialAssetsQueryKeys.world(worldId) });
   void queryClient.invalidateQueries({ queryKey: ["world-assets", worldId] });
 }
 

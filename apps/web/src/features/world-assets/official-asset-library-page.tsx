@@ -185,6 +185,7 @@ function OfficialAssetLibraryContent({
       >
         {OFFICIAL_ASSET_FILTERS.map((filter) => (
           <button
+            aria-pressed={selectedType === filter.id}
             className={"sb-btn " + (selectedType === filter.id ? "primary" : "")}
             key={filter.id}
             onClick={() => onTypeChange(filter.id)}

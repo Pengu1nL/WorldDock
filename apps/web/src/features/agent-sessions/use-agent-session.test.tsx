@@ -20,6 +20,7 @@ import {
   useSessionPotentialAssets,
 } from "./use-agent-session";
 import * as api from "../worlddock/api";
+import { officialAssetsQueryKeys } from "../world-assets/use-official-assets";
 
 vi.mock("../worlddock/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../worlddock/api")>();
@@ -247,7 +248,11 @@ describe("exploration session helpers", () => {
     const queryWrapper = createQueryWrapper();
     const { queryClient } = queryWrapper;
     const sessionPotentialAssetsKey = agentSessionKeys.potentialAssetsForSession("world_1", "session_1");
-    const officialAssetsKey = ["official-assets", "world_1"];
+    const officialAssetsKey = officialAssetsQueryKeys.list("world_1", {
+      type: "rule",
+      q: "  记忆交易许可  ",
+      limit: 20,
+    });
     const worldAssetsKey = ["world-assets", "world_1"];
 
     queryClient.setQueryData(sessionPotentialAssetsKey, [buildPotentialAsset()]);
@@ -274,7 +279,11 @@ describe("exploration session helpers", () => {
     const queryWrapper = createQueryWrapper();
     const { queryClient } = queryWrapper;
     const sessionPotentialAssetsKey = agentSessionKeys.potentialAssetsForSession("world_1", "session_1");
-    const officialAssetsKey = ["official-assets", "world_1"];
+    const officialAssetsKey = officialAssetsQueryKeys.list("world_1", {
+      type: "rule",
+      q: "  记忆交易许可  ",
+      limit: 20,
+    });
     const worldAssetsKey = ["world-assets", "world_1"];
 
     queryClient.setQueryData(sessionPotentialAssetsKey, [buildPotentialAsset()]);

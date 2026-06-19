@@ -10,10 +10,13 @@ export type OfficialAssetsQuery = Pick<ListOfficialAssetsOptions, "type" | "q" |
 
 export const officialAssetsQueryKeys = {
   all: ["official-assets"] as const,
-  lists: (worldId: string | null | undefined) => [
+  world: (worldId: string | null | undefined) => [
     ...officialAssetsQueryKeys.all,
-    "list",
     worldId ?? "",
+  ] as const,
+  lists: (worldId: string | null | undefined) => [
+    ...officialAssetsQueryKeys.world(worldId),
+    "list",
   ] as const,
   list: (worldId: string | null | undefined, query: OfficialAssetsQuery = {}) => [
     ...officialAssetsQueryKeys.lists(worldId),
