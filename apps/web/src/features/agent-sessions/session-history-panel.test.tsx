@@ -28,9 +28,9 @@ describe("SessionHistoryPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("option", { name: /记忆交易推演/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "打开 记忆交易推演" })).toHaveAttribute("aria-current", "true");
 
-    fireEvent.click(screen.getByRole("option", { name: /黑市推演/ }));
+    fireEvent.click(screen.getByRole("button", { name: "打开 黑市推演" }));
 
     expect(onOpen).toHaveBeenCalledWith("s2");
   });
@@ -66,11 +66,41 @@ describe("SessionHistoryPanel", () => {
     fireEvent.change(screen.getByLabelText("搜索推演历史"), { target: { value: "黑市" } });
 
     expect(screen.queryByText("记忆交易推演")).not.toBeInTheDocument();
-    const item = screen.getByRole("option", { name: /黑市推演/ });
+    const item = screen.getByRole("button", { name: "打开 黑市推演" });
     expect(within(item).getByText("已完成")).toBeInTheDocument();
     expect(within(item).getByText("2026/6/13")).toBeInTheDocument();
 
-    fireEvent.click(within(item).getByRole("button", { name: "归档 黑市推演" }));
+    fireEvent.click(screen.getByRole("button", { name: "归档 黑市推演" }));
+
+    expect(onArchive).toHaveBeenCalledWith("s2");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it.each(["Enter", " "])("does not open a session when archive handles %s from the keyboard", (key) => {
+    const onOpen = vi.fn();
+    const onArchive = vi.fn();
+
+    render(
+      <SessionHistoryPanel
+        sessions={[
+          {
+            id: "s2",
+            title: "黑市推演",
+            kind: "world_exploration",
+            status: "completed",
+            updatedAt: "2026-06-13T00:00:00.000Z",
+          },
+        ] as any}
+        activeSessionId="s1"
+        onOpen={onOpen}
+        onArchive={onArchive}
+      />,
+    );
+
+    const archiveButton = screen.getByRole("button", { name: "归档 黑市推演" });
+
+    fireEvent.keyDown(archiveButton, { key });
+    fireEvent.click(archiveButton);
 
     expect(onArchive).toHaveBeenCalledWith("s2");
     expect(onOpen).not.toHaveBeenCalled();

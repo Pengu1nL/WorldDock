@@ -157,6 +157,39 @@ describe("exploration session helpers", () => {
     expect(api.setCurrentAgentSession).toHaveBeenCalledWith("world_1", "session_target");
     expect(api.archiveAgentSession).toHaveBeenCalledWith("world_1", "session_target");
   });
+
+  it("invalidates exploration lists, current detail, and all world session details after setting current", async () => {
+    const session = buildSession({ id: "session_target" });
+    vi.mocked(api.setCurrentAgentSession).mockResolvedValue({ session });
+    const queryWrapper = createQueryWrapper();
+    const { queryClient } = queryWrapper;
+    const targetDetailKey = agentSessionKeys.detail("world_1", "session_target");
+    const staleDetailKey = agentSessionKeys.detail("world_1", "session_old");
+    const otherWorldDetailKey = agentSessionKeys.detail("world_2", "session_other");
+    const historyKey = agentSessionKeys.list("world_1", EXPLORATION_HISTORY_QUERY);
+    const currentKey = agentSessionKeys.currentDetail("world_1", currentExplorationQuery);
+
+    queryClient.setQueryData(targetDetailKey, buildDetail(session));
+    queryClient.setQueryData(staleDetailKey, buildDetail(buildSession({ id: "session_old" })));
+    queryClient.setQueryData(otherWorldDetailKey, buildDetail(buildSession({ id: "session_other", worldId: "world_2" })));
+    queryClient.setQueryData(historyKey, { sessions: [session], nextCursor: null });
+    queryClient.setQueryData(currentKey, buildDetail(session));
+
+    const { result } = renderHook(
+      () => useSetCurrentAgentSession("world_1"),
+      { wrapper: queryWrapper.Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync("session_target");
+    });
+
+    expect(queryClient.getQueryState(targetDetailKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(staleDetailKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(otherWorldDetailKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(historyKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(currentKey)?.isInvalidated).toBe(true);
+  });
 });
 
 describe("isAgentSessionNotFoundError", () => {

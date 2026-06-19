@@ -29,6 +29,10 @@ export const EXPLORATION_HISTORY_QUERY = {
 };
 
 export const agentSessionKeys = {
+  detailPrefix: (worldId: string | null | undefined) => [
+    "agent-session",
+    worldId,
+  ],
   detail: (worldId: string | null | undefined, sessionId: string | null | undefined) => [
     "agent-session",
     worldId,
@@ -182,6 +186,7 @@ function invalidateExplorationSessionQueries(
   if (!worldId) return;
   void queryClient.invalidateQueries({ queryKey: agentSessionKeys.list(worldId, EXPLORATION_HISTORY_QUERY) });
   void queryClient.invalidateQueries({ queryKey: agentSessionKeys.currentDetail(worldId, CURRENT_EXPLORATION_QUERY) });
+  void queryClient.invalidateQueries({ queryKey: agentSessionKeys.detailPrefix(worldId) });
   if (sessionId) {
     void queryClient.invalidateQueries({ queryKey: agentSessionKeys.detail(worldId, sessionId) });
   }

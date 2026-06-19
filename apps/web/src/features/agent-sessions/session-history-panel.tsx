@@ -56,7 +56,7 @@ export function SessionHistoryPanel({
         style={{ height: 32, fontSize: "var(--t-12)" }}
       />
 
-      <div className="col gap-2" role="listbox" aria-label="推演历史列表" style={{ minHeight: 0 }}>
+      <div className="col gap-2" role="list" aria-label="推演历史列表" style={{ minHeight: 0 }}>
         {isLoading && visibleSessions.length === 0 ? (
           <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
             载入中
@@ -71,27 +71,35 @@ export function SessionHistoryPanel({
           const selected = session.id === activeSessionId;
           return (
             <div
-              aria-selected={selected ? "true" : "false"}
               className="col gap-2"
               key={session.id}
-              onClick={() => onOpen(session.id)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return;
-                event.preventDefault();
-                onOpen(session.id);
-              }}
-              role="option"
-              tabIndex={0}
+              role="listitem"
               style={{
                 border: selected ? "1px solid var(--slate)" : "1px solid var(--border)",
                 background: selected ? "var(--surface-2)" : "transparent",
                 borderRadius: 8,
-                cursor: "pointer",
                 padding: "10px 10px 9px",
               }}
             >
               <div className="row gap-2" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
-                <div className="col" style={{ gap: 4, minWidth: 0 }}>
+                <button
+                  aria-current={selected ? "true" : undefined}
+                  aria-label={`打开 ${session.title}`}
+                  className="col"
+                  onClick={() => onOpen(session.id)}
+                  style={{
+                    alignItems: "stretch",
+                    background: "transparent",
+                    border: 0,
+                    cursor: "pointer",
+                    flex: 1,
+                    gap: 4,
+                    minWidth: 0,
+                    padding: 0,
+                    textAlign: "left",
+                  }}
+                  type="button"
+                >
                   <span
                     style={{
                       color: "var(--fg)",
@@ -106,24 +114,19 @@ export function SessionHistoryPanel({
                   <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
                     {formatUpdatedAt(session.updatedAt)}
                   </span>
-                </div>
+                  <span className={session.status === "active" ? "badge sage" : "badge"} style={{ alignSelf: "flex-start" }}>
+                    {statusLabel(session.status ?? "active")}
+                  </span>
+                </button>
                 <button
                   aria-label={`归档 ${session.title}`}
                   className="btn ghost sm"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onArchive(session.id);
-                  }}
+                  onClick={() => onArchive(session.id)}
                   style={{ flex: "none", width: 24, padding: 0 }}
                   type="button"
                 >
                   <Icon name="archive" size={12} />
                 </button>
-              </div>
-              <div className="row gap-2" style={{ alignItems: "center" }}>
-                <span className={session.status === "active" ? "badge sage" : "badge"}>
-                  {statusLabel(session.status ?? "active")}
-                </span>
               </div>
             </div>
           );
