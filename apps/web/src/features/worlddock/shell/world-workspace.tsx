@@ -64,6 +64,11 @@ type WorldWorkspaceProps = {
   actions: WorldDockActions;
 };
 
+type PotentialAssetPendingAction = {
+  assetId: string;
+  action: "dismiss" | "promote";
+} | null;
+
 export function WorldWorkspace({
   view,
   currentWorld,
@@ -191,12 +196,15 @@ const ExplorationWorkspace = ({
   const [forceLegacyFallback, setForceLegacyFallback] = useState(false);
   const [potentialAssetDrawerOpen, setPotentialAssetDrawerOpen] = useState(false);
   const [potentialAssetActionError, setPotentialAssetActionError] = useState<string | null>(null);
-  const [potentialAssetPendingAction, setPotentialAssetPendingAction] = useState<{
-    assetId: string;
-    action: "dismiss" | "promote";
-  } | null>(null);
+  const [potentialAssetPendingAction, setPotentialAssetPendingAction] = useState<PotentialAssetPendingAction>(null);
+  const potentialAssetPendingActionRef = useRef<PotentialAssetPendingAction>(null);
   const potentialAssets = potentialAssetsQuery.data ?? [];
   const activePotentialAssetCount = potentialAssets.filter((asset) => asset.status === "active").length;
+
+  const setPotentialAssetPending = useCallback((nextPendingAction: PotentialAssetPendingAction) => {
+    potentialAssetPendingActionRef.current = nextPendingAction;
+    setPotentialAssetPendingAction(nextPendingAction);
+  }, []);
 
   const cancelActiveSessionRun = useCallback(() => {
     const runId = activeSessionRunIdRef.current;
@@ -417,8 +425,9 @@ const ExplorationWorkspace = ({
   }, [createSession, resetSessionRuntime, sessionQuery, world?.id]);
 
   const handlePromotePotentialAsset = useCallback(async (potentialAssetId: string) => {
+    if (potentialAssetPendingActionRef.current || potentialAssetPendingAction) return;
     setPotentialAssetActionError(null);
-    setPotentialAssetPendingAction({ assetId: potentialAssetId, action: "promote" });
+    setPotentialAssetPending({ assetId: potentialAssetId, action: "promote" });
     try {
       await promotePotentialAsset.mutateAsync(potentialAssetId);
       pushToast?.({ kind: "save", text: "潜在资产已沉淀" });
@@ -427,13 +436,14 @@ const ExplorationWorkspace = ({
       setPotentialAssetActionError(message);
       pushToast?.({ kind: "warn", text: message });
     } finally {
-      setPotentialAssetPendingAction(null);
+      setPotentialAssetPending(null);
     }
-  }, [promotePotentialAsset, pushToast]);
+  }, [potentialAssetPendingAction, promotePotentialAsset, pushToast, setPotentialAssetPending]);
 
   const handleDismissPotentialAsset = useCallback(async (potentialAssetId: string) => {
+    if (potentialAssetPendingActionRef.current || potentialAssetPendingAction) return;
     setPotentialAssetActionError(null);
-    setPotentialAssetPendingAction({ assetId: potentialAssetId, action: "dismiss" });
+    setPotentialAssetPending({ assetId: potentialAssetId, action: "dismiss" });
     try {
       await dismissPotentialAsset.mutateAsync(potentialAssetId);
       pushToast?.({ kind: "save", text: "潜在资产已忽略" });
@@ -442,9 +452,9 @@ const ExplorationWorkspace = ({
       setPotentialAssetActionError(message);
       pushToast?.({ kind: "warn", text: message });
     } finally {
-      setPotentialAssetPendingAction(null);
+      setPotentialAssetPending(null);
     }
-  }, [dismissPotentialAsset, pushToast]);
+  }, [dismissPotentialAsset, potentialAssetPendingAction, pushToast, setPotentialAssetPending]);
 
   if (!sessionsEnabled || forceLegacyFallback) return renderLegacy();
   if (sessionQuery.isPending) return <SessionLoadingState world={world} />;

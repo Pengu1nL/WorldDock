@@ -37,6 +37,7 @@ describe("PotentialAssetDrawer", () => {
 
     expect(screen.getByText("记忆交易许可")).toBeInTheDocument();
     expect(screen.getByText("规则")).toBeInTheDocument();
+    expect(screen.getByText("待处理")).toBeInTheDocument();
     expect(screen.getByText("需要登记。")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "沉淀" }));
@@ -44,7 +45,7 @@ describe("PotentialAssetDrawer", () => {
     expect(onPromote).toHaveBeenCalledWith("pa_1");
   });
 
-  it("disables the matching action while pending and shows an error", () => {
+  it("disables active actions while pending and shows an error", () => {
     render(
       <PotentialAssetDrawer
         open
@@ -67,6 +68,6 @@ describe("PotentialAssetDrawer", () => {
 
     expect(screen.getByText("沉淀失败，请重试")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "沉淀" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "忽略" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "忽略" })).toBeDisabled();
   });
 });

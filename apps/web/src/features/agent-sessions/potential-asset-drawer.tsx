@@ -54,8 +54,7 @@ export function PotentialAssetDrawer({
       ) : (
         <div className="col" style={{ gap: 10 }}>
           {potentialAssets.map((asset) => {
-            const dismissPending = pendingAction?.assetId === asset.id && pendingAction.action === "dismiss";
-            const promotePending = pendingAction?.assetId === asset.id && pendingAction.action === "promote";
+            const actionDisabled = disabled || Boolean(pendingAction);
 
             return (
               <article
@@ -71,6 +70,7 @@ export function PotentialAssetDrawer({
                   <div className="col" style={{ gap: 6, minWidth: 0 }}>
                     <div className="row gap-2" style={{ alignItems: "center", flexWrap: "wrap" }}>
                       <span className="badge slate">{typeLabel(asset.type)}</span>
+                      {asset.status === "active" ? <span className="badge amber">待处理</span> : null}
                       {asset.status === "promoted" ? <span className="badge sage">已沉淀</span> : null}
                       {asset.status === "dismissed" ? <span className="badge">已忽略</span> : null}
                     </div>
@@ -96,7 +96,7 @@ export function PotentialAssetDrawer({
                   <div className="row gap-2" style={{ justifyContent: "flex-end", marginTop: 12 }}>
                     <button
                       className="btn ghost sm"
-                      disabled={disabled || dismissPending}
+                      disabled={actionDisabled}
                       type="button"
                       onClick={() => onDismiss(asset.id)}
                     >
@@ -104,7 +104,7 @@ export function PotentialAssetDrawer({
                     </button>
                     <button
                       className="btn primary sm"
-                      disabled={disabled || promotePending}
+                      disabled={actionDisabled}
                       type="button"
                       onClick={() => onPromote(asset.id)}
                     >
