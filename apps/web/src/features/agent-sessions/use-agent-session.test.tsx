@@ -269,6 +269,33 @@ describe("exploration session helpers", () => {
     expect(queryClient.getQueryState(worldAssetsKey)?.isInvalidated).toBe(true);
   });
 
+  it("invalidates potential and official asset queries when promotion reports an error", async () => {
+    vi.mocked(api.promotePotentialAsset).mockRejectedValue(new Error("沉淀日志写入失败"));
+    const queryWrapper = createQueryWrapper();
+    const { queryClient } = queryWrapper;
+    const sessionPotentialAssetsKey = agentSessionKeys.potentialAssetsForSession("world_1", "session_1");
+    const officialAssetsKey = ["official-assets", "world_1"];
+    const worldAssetsKey = ["world-assets", "world_1"];
+
+    queryClient.setQueryData(sessionPotentialAssetsKey, [buildPotentialAsset()]);
+    queryClient.setQueryData(officialAssetsKey, { assets: [] });
+    queryClient.setQueryData(worldAssetsKey, { assets: [] });
+
+    const { result } = renderHook(
+      () => usePromotePotentialAsset("world_1", "session_1"),
+      { wrapper: queryWrapper.Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync("pa_1")).rejects.toThrow("沉淀日志写入失败");
+    });
+
+    expect(api.promotePotentialAsset).toHaveBeenCalledWith("world_1", "pa_1");
+    expect(queryClient.getQueryState(sessionPotentialAssetsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(officialAssetsKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(worldAssetsKey)?.isInvalidated).toBe(true);
+  });
+
   it("invalidates potential asset queries after dismissal", async () => {
     vi.mocked(api.dismissPotentialAsset).mockResolvedValue({
       potentialAsset: buildPotentialAsset({ id: "pa_1", status: "dismissed" }),
