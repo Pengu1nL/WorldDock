@@ -29,6 +29,13 @@ export function piEventToAgentChunk(event: PiRuntimeEvent): AgentProviderChunk |
       patchId: event.patchId,
     };
   }
+  if (event.type === "consistency.issue.created") {
+    return {
+      type: "consistency-issue-created",
+      issueId: event.issueId,
+      worldId: event.worldId,
+    };
+  }
   if (event.type === "session.failed") return { type: "failed", code: event.code, message: event.message };
   return null;
 }

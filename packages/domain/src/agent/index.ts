@@ -182,6 +182,13 @@ export const agentEventSchema = z.discriminatedUnion("type", [
     }),
   }),
   baseAgentEventSchema.extend({
+    type: z.literal("consistency.issue.created"),
+    payload: z.object({
+      issueId: z.string().min(1),
+      worldId: z.string().min(1),
+    }),
+  }),
+  baseAgentEventSchema.extend({
     type: z.literal("suggestion.created"),
     payload: z.object({
       suggestionId: z.string().min(1),

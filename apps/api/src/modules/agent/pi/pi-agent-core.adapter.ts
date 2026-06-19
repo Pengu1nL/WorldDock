@@ -164,7 +164,7 @@ function toPiAgentTools(
   }));
 }
 
-function parametersForTool(name: PiToolName, inputSchema?: Record<string, unknown>) {
+export function parametersForTool(name: PiToolName, inputSchema?: Record<string, unknown>) {
   const schemaParameters = parametersFromInputSchema(inputSchema);
   if (schemaParameters) return schemaParameters;
 
@@ -200,11 +200,25 @@ function parametersFromInputSchema(inputSchema: Record<string, unknown> | undefi
   if (!inputSchema || inputSchema.type !== "object") return null;
   const required = inputSchema.required;
   if (!Array.isArray(required) || !required.every((field): field is string => typeof field === "string")) return null;
+  const properties = isRecord(inputSchema.properties) ? inputSchema.properties : {};
 
   return Type.Object(
-    Object.fromEntries(required.map((field) => [field, Type.String()])),
+    Object.fromEntries(required.map((field) => [field, typeFromJsonSchemaProperty(properties[field]) ?? Type.String()])),
     { additionalProperties: true },
   );
+}
+
+function typeFromJsonSchemaProperty(property: unknown) {
+  if (!isRecord(property)) return null;
+  if (property.type === "string") return Type.String();
+  if (property.type === "array" && isRecord(property.items) && property.items.type === "string") {
+    return Type.Array(Type.String());
+  }
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function mapAgentEvent(event: AgentEvent, pendingContextEvents: Map<string, PiRuntimeEvent[]>): PiRuntimeEvent[] {

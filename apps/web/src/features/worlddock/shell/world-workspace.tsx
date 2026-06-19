@@ -6,7 +6,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
 import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawer";
 import { SessionPage } from "../../agent-sessions/session-page";
+import { ConsistencyRepairPanel } from "../../consistency/consistency-repair-panel";
 import { ConsistencyIssuesPage } from "../../consistency/consistency-issues-page";
+import {
+  invalidateConsistencyIssueQueries,
+  useConsistencyIssueDetail,
+  type ConsistencyIssue,
+} from "../../consistency/use-consistency";
 import { AssetMarkdownView } from "../../world-assets/asset-markdown-view";
 import { AssetPatchList } from "../../world-assets/asset-patch-list";
 import { OfficialAssetDetailPage } from "../../world-assets/official-asset-detail-page";
@@ -36,11 +42,15 @@ import {
 } from "../../agent-sessions/use-agent-session";
 import {
   cancelAgentRun,
+  createConsistencyRepairSession,
   getAgentSession,
   getOfficialAsset,
+  revertConsistencyPatchBatch,
   type AgentSessionDetail,
+  type AgentSessionRunEvent,
   type WorldAssetDetail,
   type WorldAssetPatch,
+  type WorldAssetPatchBatch,
 } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
@@ -154,7 +164,10 @@ export function WorldWorkspace({
         />
       )}
       {view === "consistency" && currentWorld && (
-        <ConsistencyIssuesPage world={currentWorld} />
+        <ConsistencyWorkspace
+          world={currentWorld}
+          pushToast={pushToast}
+        />
       )}
       {view === "publish" && currentWorld && (
         <PublishView
@@ -592,6 +605,387 @@ function isAbortError(error: unknown) {
 function getActionErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message.trim()) return error.message;
   return fallback;
+}
+
+const ConsistencyWorkspace = ({
+  world,
+  pushToast,
+}: {
+  world: any;
+  pushToast?: (toast: any) => void;
+}) => {
+  const worldId = world?.id as string | undefined;
+  const queryClient = useQueryClient();
+  const [repairIssue, setRepairIssue] = useState<ConsistencyIssue | null>(null);
+  const [repairSessionDetail, setRepairSessionDetail] = useState<AgentSessionDetail | null>(null);
+  const [repairOptimisticMessages, setRepairOptimisticMessages] = useState<AgentSessionMessage[]>([]);
+  const [repairRunState, setRepairRunState] = useState<"idle" | "running" | "completed" | "failed">("idle");
+  const [repairTokens, setRepairTokens] = useState(0);
+  const [repairBatches, setRepairBatches] = useState<WorldAssetPatchBatch[]>([]);
+  const [creatingRepairSession, setCreatingRepairSession] = useState(false);
+  const [revertingBatchId, setRevertingBatchId] = useState<string | null>(null);
+  const repairAbortRef = useRef<AbortController | null>(null);
+  const activeRepairRunIdRef = useRef<string | null>(null);
+  const repairSessionId = repairSessionDetail?.session.id ?? null;
+  const repairIssueId = repairIssue?.id ?? null;
+  const issueDetailQuery = useConsistencyIssueDetail(worldId, repairIssueId);
+  const currentIssue = issueDetailQuery.data ?? repairIssue;
+  const createRepairRun = useCreateSessionRun(worldId, repairSessionId);
+  const streamRepairRun = useStreamSessionRun(null);
+
+  const cancelActiveRepairRun = useCallback(() => {
+    const runId = activeRepairRunIdRef.current;
+    if (runId) void cancelAgentRun(runId);
+    activeRepairRunIdRef.current = null;
+  }, []);
+
+  const resetRepairSessionRuntime = useCallback((clearSession = false) => {
+    cancelActiveRepairRun();
+    repairAbortRef.current?.abort();
+    repairAbortRef.current = null;
+    setRepairOptimisticMessages([]);
+    setRepairRunState("idle");
+    setRepairTokens(0);
+    setRevertingBatchId(null);
+    if (clearSession) {
+      setRepairIssue(null);
+      setRepairSessionDetail(null);
+      setRepairBatches([]);
+    }
+  }, [cancelActiveRepairRun]);
+
+  useEffect(() => {
+    resetRepairSessionRuntime(true);
+    setCreatingRepairSession(false);
+  }, [resetRepairSessionRuntime, worldId]);
+
+  useEffect(() => () => {
+    cancelActiveRepairRun();
+    repairAbortRef.current?.abort();
+    repairAbortRef.current = null;
+  }, [cancelActiveRepairRun]);
+
+  const invalidateRepairData = useCallback((assetIds: string[] = getConsistencySubjectAssetIds(currentIssue)) => {
+    invalidateConsistencyRepairData(queryClient, worldId, repairIssueId, assetIds);
+  }, [currentIssue, queryClient, repairIssueId, worldId]);
+
+  const handleCreateRepairSession = useCallback(async (issue: ConsistencyIssue) => {
+    if (!worldId || !issue?.id || creatingRepairSession) return;
+
+    resetRepairSessionRuntime(true);
+    setCreatingRepairSession(true);
+    setRepairIssue(issue);
+    try {
+      const detail = await createConsistencyRepairSession(worldId, issue.id);
+      setRepairSessionDetail(detail);
+      queryClient.setQueryData(agentSessionKeys.detail(worldId, detail.session.id), detail);
+      invalidateConsistencyIssueQueries(queryClient, worldId, issue.id);
+      pushToast?.({ kind: "save", text: "矛盾修复会话已创建" });
+    } catch (error) {
+      pushToast?.({ kind: "warn", text: getActionErrorMessage(error, "创建矛盾修复会话失败") });
+    } finally {
+      setCreatingRepairSession(false);
+    }
+  }, [
+    creatingRepairSession,
+    pushToast,
+    queryClient,
+    resetRepairSessionRuntime,
+    worldId,
+  ]);
+
+  const handlePanelCreateRepairSession = useCallback((issueId: string) => {
+    if (!currentIssue || currentIssue.id !== issueId) return;
+    void handleCreateRepairSession(currentIssue);
+  }, [currentIssue, handleCreateRepairSession]);
+
+  const handleRevertRepairBatch = useCallback(async (batchId: string) => {
+    if (!worldId || !repairIssueId || revertingBatchId || repairRunState === "running") return;
+
+    setRevertingBatchId(batchId);
+    try {
+      const { batch } = await revertConsistencyPatchBatch(worldId, repairIssueId, batchId);
+      setRepairBatches((current) => mergePatchBatch(current, batch));
+      invalidateRepairData();
+      await issueDetailQuery.refetch();
+      pushToast?.({ kind: "save", text: "修复 batch 已撤销" });
+    } catch (error) {
+      pushToast?.({ kind: "warn", text: getActionErrorMessage(error, "撤销修复 batch 失败，请重试") });
+    } finally {
+      setRevertingBatchId(null);
+    }
+  }, [
+    invalidateRepairData,
+    issueDetailQuery,
+    pushToast,
+    repairIssueId,
+    repairRunState,
+    revertingBatchId,
+    worldId,
+  ]);
+
+  const handleRepairSessionSend = useCallback(async (text: string) => {
+    if (!worldId || !repairIssueId || !repairSessionId || repairRunState === "running") return;
+
+    const now = new Date().toISOString();
+    const seed = `${Date.now()}`;
+    const userMessage: AgentSessionMessage = {
+      id: `optimistic_repair_user_${seed}`,
+      sessionId: repairSessionId,
+      role: "user",
+      content: text,
+      status: "complete",
+      metadata: {},
+      createdAt: now,
+    };
+    const assistantMessage: AgentSessionMessage = {
+      id: `optimistic_repair_assistant_${seed}`,
+      sessionId: repairSessionId,
+      role: "assistant",
+      content: "",
+      status: "streaming",
+      metadata: {},
+      createdAt: now,
+    };
+
+    const abortController = new AbortController();
+    let terminalStatus: "running" | "completed" | "failed" = "running";
+    repairAbortRef.current = abortController;
+    setRepairRunState("running");
+    setRepairTokens(0);
+    setRepairOptimisticMessages([userMessage, assistantMessage]);
+
+    try {
+      const { run } = await createRepairRun.mutateAsync(text);
+      activeRepairRunIdRef.current = run.id;
+      if (repairAbortRef.current !== abortController) {
+        void cancelAgentRun(run.id);
+        activeRepairRunIdRef.current = null;
+        return;
+      }
+
+      await streamRepairRun.mutateAsync({
+        runId: run.id,
+        signal: abortController.signal,
+        onEvent: (event) => {
+          if (repairAbortRef.current !== abortController) return;
+          if (event.type === "message.delta") {
+            setRepairOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, content: `${message.content}${event.payload.text}` }
+                : message,
+            ));
+          }
+          if (
+            event.type === "asset.patch.applied"
+            && event.payload.sessionId === repairSessionId
+          ) {
+            invalidateConsistencyRepairData(queryClient, worldId, repairIssueId, [event.payload.assetId]);
+            pushToast?.({ kind: "save", text: "修复补丁已应用" });
+          }
+          if (
+            event.type === "consistency.issue.created"
+            && event.payload.worldId === worldId
+          ) {
+            invalidateConsistencyIssueQueries(queryClient, worldId, event.payload.issueId);
+            if (event.payload.issueId === repairIssueId) void issueDetailQuery.refetch();
+          }
+          if (event.type === "tool.completed") {
+            const batch = getPatchBatchFromToolCompletedEvent(event);
+            if (batch && (!batch.issueId || batch.issueId === repairIssueId) && batch.sessionId === repairSessionId) {
+              setRepairBatches((current) => mergePatchBatch(current, batch));
+              invalidateRepairData();
+              void issueDetailQuery.refetch();
+            }
+          }
+          if (event.type === "run.completed") {
+            terminalStatus = "completed";
+            activeRepairRunIdRef.current = null;
+            setRepairRunState("completed");
+            setRepairTokens(event.payload.tokenUsage?.totalTokens ?? 0);
+            setRepairOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, status: "complete" }
+                : message,
+            ));
+          }
+          if (event.type === "run.failed") {
+            terminalStatus = "failed";
+            activeRepairRunIdRef.current = null;
+            setRepairRunState("failed");
+            setRepairOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, status: "failed", content: message.content || event.payload.message || "修复失败" }
+                : message,
+            ));
+          }
+          if (event.type === "run.cancelled") {
+            terminalStatus = "failed";
+            activeRepairRunIdRef.current = null;
+            setRepairRunState("failed");
+            setRepairOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, status: "failed", content: `${message.content || "修复已取消"}` }
+                : message,
+            ));
+          }
+        },
+      });
+
+      if (repairAbortRef.current !== abortController) return;
+      repairAbortRef.current = null;
+      if (terminalStatus === "running") terminalStatus = "completed";
+      activeRepairRunIdRef.current = null;
+      setRepairRunState(terminalStatus);
+      if (terminalStatus !== "completed") return;
+
+      setRepairOptimisticMessages([]);
+      invalidateRepairData();
+      await issueDetailQuery.refetch();
+      const refreshed = await getAgentSession(worldId, repairSessionId);
+      setRepairSessionDetail(refreshed);
+      queryClient.setQueryData(agentSessionKeys.detail(worldId, repairSessionId), refreshed);
+    } catch (error) {
+      if (repairAbortRef.current !== abortController) return;
+      if (isAbortError(error)) return;
+      if (isAgentSessionNotFoundError(error)) {
+        resetRepairSessionRuntime(true);
+        pushToast?.({ kind: "warn", text: "矛盾修复会话不存在，已返回列表" });
+        return;
+      }
+      cancelActiveRepairRun();
+      repairAbortRef.current = null;
+      setRepairRunState("failed");
+      setRepairOptimisticMessages((prev) => prev.map((message) =>
+        message.id === assistantMessage.id
+          ? { ...message, status: "failed", content: message.content || "矛盾修复调用失败" }
+          : message,
+      ));
+    }
+  }, [
+    cancelActiveRepairRun,
+    createRepairRun,
+    invalidateRepairData,
+    issueDetailQuery,
+    pushToast,
+    queryClient,
+    repairIssueId,
+    repairRunState,
+    repairSessionId,
+    resetRepairSessionRuntime,
+    streamRepairRun,
+    worldId,
+  ]);
+
+  const handleRepairSessionStop = useCallback(() => {
+    cancelActiveRepairRun();
+    repairAbortRef.current?.abort();
+    repairAbortRef.current = null;
+    setRepairRunState("failed");
+    setRepairOptimisticMessages((prev) => prev.map((message) =>
+      message.status === "streaming"
+        ? { ...message, status: "failed", content: `${message.content || "修复已停止"}` }
+        : message,
+    ));
+  }, [cancelActiveRepairRun]);
+
+  if (repairSessionDetail) {
+    return (
+      <SessionPage
+        backLabel="返回矛盾"
+        contextItems={repairSessionDetail.contextItems}
+        messages={[...repairSessionDetail.messages, ...repairOptimisticMessages]}
+        onBack={() => resetRepairSessionRuntime(true)}
+        onSend={handleRepairSessionSend}
+        onStop={handleRepairSessionStop}
+        rightSlot={(
+          <ConsistencyRepairPanel
+            batches={repairBatches}
+            creatingRepairSession={creatingRepairSession}
+            issue={currentIssue}
+            onCreateRepairSession={handlePanelCreateRepairSession}
+            onRevertBatch={handleRevertRepairBatch}
+            repairDisabled={repairRunState === "running"}
+            revertDisabled={repairRunState === "running"}
+            revertingBatchId={revertingBatchId}
+          />
+        )}
+        runState={{ status: repairRunState, tokens: repairTokens }}
+        session={repairSessionDetail.session}
+        subjects={repairSessionDetail.subjects}
+      />
+    );
+  }
+
+  return (
+    <ConsistencyIssuesPage
+      actionPending={creatingRepairSession}
+      onCreateRepairSession={handleCreateRepairSession}
+      world={world}
+    />
+  );
+};
+
+function invalidateConsistencyRepairData(
+  queryClient: ReturnType<typeof useQueryClient>,
+  worldId: string | null | undefined,
+  issueId: string | null | undefined,
+  assetIds: string[],
+) {
+  invalidateConsistencyIssueQueries(queryClient, worldId, issueId);
+  if (!worldId) return;
+  void queryClient.invalidateQueries({ queryKey: officialAssetsQueryKeys.world(worldId) });
+  for (const assetId of assetIds) {
+    invalidateOfficialAssetDetailAndPatches(queryClient, worldId, assetId);
+  }
+}
+
+function mergePatchBatch(
+  current: WorldAssetPatchBatch[],
+  incoming: WorldAssetPatchBatch,
+) {
+  const batches = new Map(current.map((batch) => [batch.id, batch]));
+  batches.set(incoming.id, incoming);
+  return [...batches.values()].sort((a, b) => {
+    const left = Date.parse(b.createdAt ?? "");
+    const right = Date.parse(a.createdAt ?? "");
+    if (Number.isNaN(left) || Number.isNaN(right)) return b.id.localeCompare(a.id);
+    return left - right;
+  });
+}
+
+function getPatchBatchFromToolCompletedEvent(
+  event: Extract<AgentSessionRunEvent, { type: "tool.completed" }>,
+): WorldAssetPatchBatch | null {
+  const batch = event.payload.result.batch;
+  if (!isRecord(batch)) return null;
+  if (typeof batch.id !== "string" || typeof batch.worldId !== "string" || typeof batch.sessionId !== "string") {
+    return null;
+  }
+  if (batch.status !== "applied" && batch.status !== "reverted") return null;
+
+  return {
+    id: batch.id,
+    worldId: batch.worldId,
+    sessionId: batch.sessionId,
+    issueId: typeof batch.issueId === "string" ? batch.issueId : null,
+    status: batch.status,
+    patchIds: Array.isArray(batch.patchIds)
+      ? batch.patchIds.filter((patchId): patchId is string => typeof patchId === "string")
+      : [],
+    metadata: isRecord(batch.metadata) ? batch.metadata : {},
+    createdAt: typeof batch.createdAt === "string" ? batch.createdAt : new Date().toISOString(),
+    appliedAt: typeof batch.appliedAt === "string" ? batch.appliedAt : null,
+    revertedAt: typeof batch.revertedAt === "string" ? batch.revertedAt : null,
+  };
+}
+
+function getConsistencySubjectAssetIds(issue?: ConsistencyIssue | null) {
+  return Array.isArray(issue?.subjectAssetIds) ? issue.subjectAssetIds : [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 const AssetLibraryWorkspace = ({

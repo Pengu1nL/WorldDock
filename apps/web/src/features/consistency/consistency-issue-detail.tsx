@@ -10,6 +10,7 @@ export type ConsistencyIssueDetailProps = {
   loading?: boolean;
   actionPending?: boolean;
   onIgnoreIssue?: (issueId: string) => void;
+  onCreateRepairSession?: (issue: ConsistencyIssue) => void;
   onReopenIssue?: (issueId: string) => void;
 };
 
@@ -18,6 +19,7 @@ export function ConsistencyIssueDetail({
   loading = false,
   actionPending = false,
   onIgnoreIssue,
+  onCreateRepairSession,
   onReopenIssue,
 }: ConsistencyIssueDetailProps) {
   if (loading && !issue) {
@@ -45,6 +47,7 @@ export function ConsistencyIssueDetail({
   const evidence = getEvidence(issue);
   const subjectAssetIds = getSubjectAssetIds(issue);
   const canReopen = issue.status === "ignored" || issue.status === "resolved";
+  const canCreateRepairSession = issue.status === "open" || issue.status === "repairing";
 
   return (
     <aside className="card" style={{ padding: 0, minHeight: 0, overflow: "hidden" }}>
@@ -123,7 +126,18 @@ export function ConsistencyIssueDetail({
           )}
         </section>
 
-        <div className="row gap-2" style={{ paddingTop: 4 }}>
+        <div className="row gap-2" style={{ paddingTop: 4, flexWrap: "wrap" }}>
+          {canCreateRepairSession ? (
+            <button
+              className="btn sm"
+              disabled={actionPending || !onCreateRepairSession}
+              onClick={() => onCreateRepairSession?.(issue)}
+              type="button"
+            >
+              <Icon name="session" size={12} />
+              <span>启动修复</span>
+            </button>
+          ) : null}
           {canReopen ? (
             <button
               className="btn sm"

@@ -1,4 +1,5 @@
 import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import { consistencyIssueSeveritySchema } from "@worlddock/contract/consistency";
 import type { ConsistencyService } from "../../consistency/consistency.service";
 import type { OfficialAssetsService } from "../../official-assets/official-assets.service";
 import type { WorldAssetPatchesService } from "../../official-assets/world-asset-patches.service";
@@ -102,6 +103,29 @@ export function createWorldToolRegistry(
     };
   });
 
+  registry.register("create_consistency_issue", async (input) => {
+    if (!consistency) {
+      throw new Error("Consistency issue create tool is unavailable: ConsistencyService is not configured.");
+    }
+    const title = readToolText(input.title);
+    const description = readToolText(input.description, input.summary);
+    const subjectAssetIds = readToolTextList(input.subjectAssetIds, input.involves, input.assetIds);
+    if (!title || !description || subjectAssetIds.length === 0) {
+      throw new Error("create_consistency_issue title, description, and subjectAssetIds are required.");
+    }
+    return {
+      issue: await consistency.createIssue({
+        worldId: readToolText(input.worldId),
+        title,
+        description,
+        severity: consistencyIssueSeveritySchema.catch("normal").parse(input.severity),
+        subjectAssetIds,
+        evidence: readToolEvidence(input.evidence),
+        metadata: isRecord(input.metadata) ? input.metadata : {},
+      }),
+    };
+  });
+
   registry.register("resolve_consistency_issue", async (input) => {
     if (!consistency) {
       throw new Error("Consistency issue resolve tool is unavailable: ConsistencyService is not configured.");
@@ -182,6 +206,30 @@ function readToolMarkdown(...values: unknown[]) {
     if (text.trim()) return text;
   }
   return "";
+}
+
+function readToolTextList(...values: unknown[]) {
+  for (const value of values) {
+    if (!Array.isArray(value)) continue;
+    const entries = value.map((entry) => readToolText(entry)).filter(Boolean);
+    if (entries.length > 0) return [...new Set(entries)];
+  }
+  return [];
+}
+
+function readToolEvidence(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    if (!isRecord(entry)) return null;
+    const quote = readToolText(entry.quote, entry.text);
+    if (!quote) return null;
+    return {
+      assetId: readToolText(entry.assetId) || undefined,
+      messageId: readToolText(entry.messageId) || undefined,
+      quote,
+      confidence: typeof entry.confidence === "number" ? entry.confidence : undefined,
+    };
+  }).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 }
 
 function readToolPatches(value: unknown) {

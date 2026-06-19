@@ -79,6 +79,42 @@ export class ConsistencyService {
     return this.consistencyIssues.getIssue(worldId, issueId);
   }
 
+  async createIssue(input: {
+    worldId: string;
+    title: string;
+    description: string;
+    severity?: ConsistencyIssueRecord["severity"];
+    subjectAssetIds: string[];
+    evidence?: ConsistencyIssueRecord["evidence"];
+    metadata?: Record<string, unknown>;
+  }): Promise<ConsistencyIssueRecord> {
+    await this.requireWorld(input.worldId);
+    const subjectAssetIds = [...new Set(input.subjectAssetIds.map((assetId) => assetId.trim()).filter(Boolean))].sort();
+    if (!input.title.trim() || !input.description.trim() || subjectAssetIds.length === 0) {
+      throw this.badRequest("Consistency issue title, description, and subject assets are required.");
+    }
+    await this.ensureIssueSubjectAssets(input.worldId, subjectAssetIds);
+    const metadata = input.metadata ?? {};
+    const dedupeKey = typeof metadata.dedupeKey === "string" && metadata.dedupeKey.trim()
+      ? metadata.dedupeKey.trim()
+      : `consistency-issue:${input.worldId}:${subjectAssetIds.join(":")}::${input.title.trim()}`;
+
+    return this.consistencyIssues.createIssueIfOpenDedupeKeyAbsent({
+      worldId: input.worldId,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      involves: subjectAssetIds,
+      severity: input.severity ?? "normal",
+      subjectAssetIds,
+      evidence: input.evidence ?? [],
+      metadata: {
+        ...metadata,
+        dedupeKey,
+        source: metadata.source ?? "pi_tool",
+      },
+    }, dedupeKey);
+  }
+
   async updateIssueStatus(
     worldId: string,
     issueId: string,
@@ -250,6 +286,14 @@ export class ConsistencyService {
       if (detail) assets.push(detail.asset);
     }
     return assets;
+  }
+
+  private async ensureIssueSubjectAssets(worldId: string, assetIds: string[]) {
+    const details = await Promise.all(assetIds.map((assetId) => this.officialAssets.getAsset(worldId, assetId)));
+    const missingAssetIds = assetIds.filter((_, index) => !details[index]);
+    if (missingAssetIds.length > 0) {
+      throw this.badRequest("Consistency issue subject assets must belong to the world official assets.");
+    }
   }
 
   private validatePatchBatchInput(

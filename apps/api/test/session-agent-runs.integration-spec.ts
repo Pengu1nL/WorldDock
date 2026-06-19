@@ -170,7 +170,7 @@ describe("agent session run local endpoints", () => {
     }));
   });
 
-  it("persists and streams applied asset patch provider events", async () => {
+  it("persists and streams applied asset patch and consistency issue provider events", async () => {
     const worlds = createInMemoryWorlds();
     const agents = createInMemoryAgents();
     const sessions = createInMemoryAgentSessions();
@@ -197,6 +197,11 @@ describe("agent session run local endpoints", () => {
         assetId: "asset_1",
         patchId: "patch_1",
       },
+      {
+        type: "consistency-issue-created",
+        issueId: "issue_1",
+        worldId: world.id,
+      },
       { type: "delta", text: "补丁已应用。" },
     ]);
     app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
@@ -222,12 +227,28 @@ describe("agent session run local endpoints", () => {
         },
       }),
     }));
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "consistency.issue.created",
+      data: expect.objectContaining({
+        payload: {
+          issueId: "issue_1",
+          worldId: world.id,
+        },
+      }),
+    }));
     expect(await agents.listEvents(created.body.run.id)).toContainEqual(expect.objectContaining({
       type: "asset.patch.applied",
       payload: {
         sessionId: session.id,
         assetId: "asset_1",
         patchId: "patch_1",
+      },
+    }));
+    expect(await agents.listEvents(created.body.run.id)).toContainEqual(expect.objectContaining({
+      type: "consistency.issue.created",
+      payload: {
+        issueId: "issue_1",
+        worldId: world.id,
       },
     }));
   });

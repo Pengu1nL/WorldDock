@@ -58,6 +58,16 @@ function runtimeEventsFromToolResult(toolName: PiToolName, result: Record<string
       }];
     }
   }
+  if (toolName === "create_consistency_issue" && isRecord(result.issue)) {
+    const issue = result.issue;
+    if (typeof issue.id === "string" && typeof issue.worldId === "string") {
+      return [{
+        type: "consistency.issue.created",
+        issueId: issue.id,
+        worldId: issue.worldId,
+      }];
+    }
+  }
   return [];
 }
 

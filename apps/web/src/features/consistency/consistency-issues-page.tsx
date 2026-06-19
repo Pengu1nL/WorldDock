@@ -32,6 +32,7 @@ type ConsistencyIssuesPageProps = {
   actionError?: string | null;
   nextCursor?: string | null;
   onClearActionError?: () => void;
+  onCreateRepairSession?: (issue: ConsistencyIssue) => void | Promise<void>;
   onRunCheck?: () => void | Promise<void>;
   onOpenIssue?: (issueId: string) => void;
   onIgnoreIssue?: (issueId: string) => void | Promise<void>;
@@ -86,8 +87,10 @@ function ConsistencyIssuesRemotePage({
   world,
   statusFilter,
   search,
+  actionPending: externalActionPending = false,
   onStatusFilterChange,
   onSearchChange,
+  onCreateRepairSession,
   onOpenIssue,
 }: ConsistencyIssuesRemotePageProps) {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -129,7 +132,7 @@ function ConsistencyIssuesRemotePage({
 
   return (
     <ConsistencyIssuesContent
-      actionPending={ignoreIssue.isPending || reopenIssue.isPending}
+      actionPending={externalActionPending || ignoreIssue.isPending || reopenIssue.isPending}
       actionError={remoteActionError}
       detailIssue={detailQuery.data ?? null}
       detailLoading={detailQuery.isLoading}
@@ -144,6 +147,7 @@ function ConsistencyIssuesRemotePage({
         if (selectedIssueId === issueId) setSelectedIssueId(null);
       }}
       onClearActionError={() => setRemoteActionError(null)}
+      onCreateRepairSession={onCreateRepairSession}
       onLoadMore={nextCursor ? async () => {
         if (cursor === nextCursor && issuesQuery.isError) {
           const result = await issuesQuery.refetch();
@@ -208,6 +212,7 @@ function ConsistencyIssuesContent({
   onStatusFilterChange,
   onSearchChange,
   onClearActionError,
+  onCreateRepairSession,
   onRunCheck,
   onOpenIssue,
   onIgnoreIssue,
@@ -361,6 +366,7 @@ function ConsistencyIssuesContent({
           actionPending={actionPending}
           issue={activeIssue}
           loading={detailLoading}
+          onCreateRepairSession={onCreateRepairSession ? (issue) => handleAction(() => onCreateRepairSession(issue)) : undefined}
           onIgnoreIssue={onIgnoreIssue ? (issueId) => handleAction(() => onIgnoreIssue(issueId)) : undefined}
           onReopenIssue={onReopenIssue ? (issueId) => handleAction(() => onReopenIssue(issueId)) : undefined}
         />

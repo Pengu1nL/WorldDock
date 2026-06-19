@@ -40,6 +40,20 @@ const WORLD_TOOL_DEFINITIONS: WorldToolDefinition[] = [
     inputSchema: { type: "object", required: ["worldId", "assetId", "sessionId", "afterMarkdown"] },
   },
   {
+    name: "create_consistency_issue",
+    description: "Create a tracked consistency issue when exploration identifies contradictory official asset facts.",
+    inputSchema: {
+      type: "object",
+      required: ["worldId", "title", "description", "subjectAssetIds"],
+      properties: {
+        worldId: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+        subjectAssetIds: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+  {
     name: "resolve_consistency_issue",
     description: "Resolve a tracked consistency issue after repair work has been applied.",
     inputSchema: { type: "object", required: ["worldId", "issueId", "sessionId", "patches"] },

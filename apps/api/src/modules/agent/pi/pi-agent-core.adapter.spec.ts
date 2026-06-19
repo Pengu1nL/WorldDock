@@ -6,7 +6,12 @@ import {
   registerFauxProvider,
 } from "@earendil-works/pi-ai";
 import type { PiRuntimeEvent } from "@worlddock/domain/agent/pi";
-import { buildContextMessage, buildSystemPrompt, createPiAgentCoreAdapter } from "./pi-agent-core.adapter";
+import {
+  buildContextMessage,
+  buildSystemPrompt,
+  createPiAgentCoreAdapter,
+  parametersForTool,
+} from "./pi-agent-core.adapter";
 import { piEventToAgentChunk } from "./pi-event-adapter";
 import type { PiRuntimeToolExecutor } from "./pi-runtime.client";
 
@@ -545,6 +550,47 @@ describe("piEventToAgentChunk", () => {
       type: "failed",
       code: "PI_SESSION_FAILED",
       message: "upstream model failed",
+    });
+  });
+
+  it("bridges consistency issue creation events to provider chunks", () => {
+    expect(piEventToAgentChunk({
+      type: "consistency.issue.created",
+      issueId: "issue_1",
+      worldId: "world_1",
+    })).toEqual({
+      type: "consistency-issue-created",
+      issueId: "issue_1",
+      worldId: "world_1",
+    });
+  });
+});
+
+describe("parametersForTool", () => {
+  it("preserves array typed input schema fields", () => {
+    const parameters = parametersForTool("create_consistency_issue", {
+      type: "object",
+      required: ["worldId", "title", "description", "subjectAssetIds"],
+      properties: {
+        worldId: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+        subjectAssetIds: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
+    }) as any;
+
+    expect(parameters).toMatchObject({
+      type: "object",
+      required: ["worldId", "title", "description", "subjectAssetIds"],
+      properties: {
+        subjectAssetIds: {
+          type: "array",
+          items: { type: "string" },
+        },
+      },
     });
   });
 });

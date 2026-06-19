@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PiRuntimeClient, PiSessionInput } from "./pi-runtime.client";
 import { PiSessionRunner } from "./pi-session-runner";
 import { SafetyGate } from "./safety-gate";
+import { createWorldToolRegistry } from "./world-tools";
 import { WorldToolRegistry } from "./world-tool-registry";
 
 const BASE_INPUT: PiSessionInput = {
@@ -79,6 +80,69 @@ describe("PiSessionRunner", () => {
       toolCallId: "tool_1",
       result: { suggestionId: "pending_setting_1" },
     }]);
+  });
+
+  it("emits consistency issue created events from create_consistency_issue tool results", async () => {
+    const createdIssue = {
+      id: "issue_1",
+      worldId: "world_1",
+      title: "登记口径冲突",
+      description: "必须登记与无需登记冲突。",
+      involves: ["asset_1"],
+      severity: "normal",
+      status: "open",
+      subjectAssetIds: ["asset_1"],
+      evidence: [],
+      metadata: {},
+      createdAt: new Date("2026-06-19T00:00:00.000Z"),
+      updatedAt: new Date("2026-06-19T00:00:00.000Z"),
+      resolvedAt: null,
+    };
+    const registry = createWorldToolRegistry(
+      {} as never,
+      undefined,
+      undefined,
+      {
+        createIssue: async () => createdIssue,
+      } as never,
+    );
+    const runtime: PiRuntimeClient = {
+      async *runSession(_input, executeTool): AsyncIterable<PiRuntimeEvent> {
+        if (!executeTool) throw new Error("Expected tool executor.");
+        const toolCall: PiToolCall = {
+          id: "tool_issue_1",
+          name: "create_consistency_issue",
+          arguments: {
+            worldId: "world_1",
+            title: "登记口径冲突",
+            description: "必须登记与无需登记冲突。",
+            subjectAssetIds: ["asset_1"],
+          },
+        };
+        const execution = await executeTool(toolCall);
+        yield { type: "tool.completed", toolCallId: toolCall.id, result: execution.result };
+        for (const contextEvent of execution.contextEvents) yield contextEvent;
+      },
+    };
+    const runner = new PiSessionRunner(runtime, registry, new SafetyGate());
+
+    const events = await collect(runner.run({
+      ...BASE_INPUT,
+      policy: { kind: "world_exploration" },
+    }));
+
+    expect(events).toEqual([
+      {
+        type: "tool.completed",
+        toolCallId: "tool_issue_1",
+        result: { issue: createdIssue },
+      },
+      {
+        type: "consistency.issue.created",
+        issueId: "issue_1",
+        worldId: "world_1",
+      },
+    ]);
   });
 });
 

@@ -184,6 +184,12 @@ export type AgentSessionRunEvent = AgentEvent | (AgentEventBase & {
     assetId: string;
     patchId: string;
   };
+}) | (AgentEventBase & {
+  type: "consistency.issue.created";
+  payload: {
+    issueId: string;
+    worldId: string;
+  };
 });
 
 export type SaveAgentSuggestionResponse = {
@@ -905,6 +911,18 @@ export async function applyConsistencyPatchBatch(
   return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/patch-batches`, {
     method: "POST",
     body: input,
+    ...options,
+  });
+}
+
+export async function revertConsistencyPatchBatch(
+  worldId: string,
+  issueId: string,
+  batchId: string,
+  options: ApiClientOptions = {},
+): Promise<{ batch: WorldAssetPatchBatch }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/patch-batches/${batchId}/revert`, {
+    method: "POST",
     ...options,
   });
 }

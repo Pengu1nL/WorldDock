@@ -23,6 +23,22 @@ describe("SafetyGate session policies", () => {
       arguments: { worldId: "world_1", type: "rule", name: "记忆交易许可" },
     }, new Set(), { kind: "world_exploration", intent: "asset_deposition" })).not.toThrow();
   });
+
+  it("allows create_consistency_issue only in ordinary world exploration", () => {
+    const gate = new SafetyGate();
+
+    expect(() => gate.assertToolAllowed({
+      id: "tool_1",
+      name: "create_consistency_issue",
+      arguments: { worldId: "world_1", title: "登记口径冲突" },
+    }, new Set(), { kind: "world_exploration" })).not.toThrow();
+
+    expect(() => gate.assertToolAllowed({
+      id: "tool_2",
+      name: "create_consistency_issue",
+      arguments: { worldId: "world_1", title: "登记口径冲突" },
+    }, new Set(), { kind: "world_exploration", intent: "asset_deposition" })).toThrow(/Blocked unsafe pi tool/);
+  });
 });
 
 describe("describeWorldTools session policies", () => {
@@ -31,6 +47,7 @@ describe("describeWorldTools session policies", () => {
 
     expect(names).toContain("get_world_manifest");
     expect(names).toContain("propose_setting");
+    expect(names).toContain("create_consistency_issue");
     expect(names).not.toContain("create_world_asset");
     expect(names).not.toContain("apply_world_asset_patch");
     expect(names).not.toContain("resolve_consistency_issue");
@@ -82,7 +99,25 @@ describe("describeWorldTools session policies", () => {
     expect(names).not.toContain("propose_setting");
     expect(names.filter((name) => name.startsWith("propose_"))).toEqual([]);
     expect(names).not.toContain("apply_world_asset_patch");
+    expect(names).not.toContain("create_consistency_issue");
     expect(names).not.toContain("resolve_consistency_issue");
+  });
+
+  it("describes create_consistency_issue with array subject assets", () => {
+    const tool = describeWorldTools({ kind: "world_exploration" }).find((item) => item.name === "create_consistency_issue");
+
+    expect(tool).toMatchObject({
+      inputSchema: {
+        type: "object",
+        required: ["worldId", "title", "description", "subjectAssetIds"],
+        properties: {
+          subjectAssetIds: {
+            type: "array",
+            items: { type: "string" },
+          },
+        },
+      },
+    });
   });
 });
 

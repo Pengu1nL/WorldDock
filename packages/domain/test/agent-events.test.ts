@@ -99,6 +99,20 @@ describe("agent event contracts", () => {
     }).payload.toolCall.name).toBe("create_world_asset");
   });
 
+  it("validates consistency issue created session stream events", () => {
+    expect(agentEventSchema.parse({
+      id: "evt_consistency_1",
+      runId: "run_1",
+      type: "consistency.issue.created",
+      sequence: 5,
+      createdAt: "2026-05-26T12:00:04.000Z",
+      payload: {
+        issueId: "issue_1",
+        worldId: "world_1",
+      },
+    }).payload.issueId).toBe("issue_1");
+  });
+
   it("keeps Pi tools and context references local-only", () => {
     expect(piToolNameSchema.parse("list_local_releases")).toBe("list_local_releases");
     expect(() => piToolNameSchema.parse(`list_${"repo"}sitory_releases`)).toThrow();
