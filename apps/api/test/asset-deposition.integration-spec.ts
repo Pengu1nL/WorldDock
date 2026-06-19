@@ -210,9 +210,21 @@ describe("asset deposition local endpoints", () => {
     const createAsset = officialAssets.createAsset.bind(officialAssets);
     let concurrentDismissStatus: string | null | undefined;
     let claimedPromotedAssetId: string | null | undefined;
+    let claimedStatus: string | null | undefined;
+    let duplicateDuringClaimCount: number | undefined;
     officialAssets.createAsset = async (input) => {
       const claimed = await potentialAssets.findById(world.id, potentialAsset.id);
       claimedPromotedAssetId = claimed?.promotedAssetId;
+      claimedStatus = claimed?.status;
+      duplicateDuringClaimCount = (await potentialAssets.createMany([{
+        worldId: world.id,
+        sessionId: potentialAsset.sessionId,
+        runId: null,
+        type: potentialAsset.type,
+        title: potentialAsset.title,
+        summary: "重复发现。",
+        evidence: [{ quote: "重复发现。", confidence: 0.7 }],
+      }])).length;
       concurrentDismissStatus = (await potentialAssets.dismiss(world.id, potentialAsset.id))?.status ?? null;
       return createAsset(input);
     };
@@ -224,6 +236,8 @@ describe("asset deposition local endpoints", () => {
       .expect(201);
 
     expect(claimedPromotedAssetId).toBeNull();
+    expect(claimedStatus).toBe("active");
+    expect(duplicateDuringClaimCount).toBe(0);
     expect(concurrentDismissStatus).toBeNull();
     expect((await potentialAssets.findById(world.id, potentialAsset.id))?.status).toBe("promoted");
     expect(officialAssets.stores.assets.size).toBe(1);
@@ -256,6 +270,34 @@ describe("asset deposition local endpoints", () => {
       }),
     });
     expect(officialAssets.stores.assets.size).toBe(1);
+  });
+
+  it("links the potential asset when the first complete attempt fails after official asset creation", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    const completePromotion = potentialAssets.completePromotion.bind(potentialAssets);
+    let completeAttempts = 0;
+    potentialAssets.completePromotion = async (...args) => {
+      completeAttempts++;
+      if (completeAttempts === 1) return null;
+      return completePromotion(...args);
+    };
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(409);
+
+    const linked = await potentialAssets.findById(world.id, potentialAsset.id);
+    expect(linked).toMatchObject({
+      status: "promoted",
+      promotedAssetId: `official_asset_${potentialAsset.id}`,
+      metadata: expect.objectContaining({
+        promotionFinalizationError: "Potential asset is not active and cannot be promoted.",
+      }),
+    });
+    expect(completeAttempts).toBe(2);
   });
 
   it("returns 409 when a concurrent promotion already created the deterministic official asset", async () => {

@@ -577,7 +577,18 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
   return {
     stores,
     async createMany(input) {
-      return input.map((item) => {
+      const created = [];
+      for (const item of input) {
+        const status = item.status ?? "active";
+        if (status === "active" && [...stores.potentialAssets.values()].some((asset) =>
+          asset.worldId === item.worldId &&
+          asset.sessionId === item.sessionId &&
+          asset.type === item.type &&
+          asset.title === item.title &&
+          asset.status === "active"
+        )) {
+          continue;
+        }
         const timestamp = now();
         const potentialAsset: PotentialAssetRecord = {
           id: `potential_asset_${counters.potentialAsset++}`,
@@ -595,8 +606,9 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
           updatedAt: timestamp,
         };
         stores.potentialAssets.set(potentialAsset.id, potentialAsset);
-        return potentialAsset;
-      });
+        created.push(potentialAsset);
+      }
+      return created;
     },
     async findById(worldId, id) {
       const asset = stores.potentialAssets.get(id);
@@ -640,6 +652,7 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
       if (!asset || asset.worldId !== worldId) return null;
       if (asset.status === "dismissed") return asset;
       if (asset.status !== "active") return null;
+      if (asset.metadata.promotionToken) return null;
       const updated: PotentialAssetRecord = { ...asset, status: "dismissed", updatedAt: now() };
       stores.potentialAssets.set(id, updated);
       return updated;
@@ -647,9 +660,9 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
     async claimPromotion(worldId, id, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
       if (!asset || asset.worldId !== worldId || asset.status !== "active") return null;
+      if (asset.metadata.promotionToken) return null;
       const updated: PotentialAssetRecord = {
         ...asset,
-        status: "promoted",
         metadata: { ...asset.metadata, ...metadata },
         updatedAt: now(),
       };
@@ -671,12 +684,13 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
     },
     async completePromotion(worldId, id, promotedAssetId, promotionToken, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
-      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== null) {
-        return null;
-      }
+      if (!asset || asset.worldId !== worldId) return null;
+      if (asset.status === "promoted" && asset.promotedAssetId === promotedAssetId) return asset;
+      if (asset.status !== "active" || asset.promotedAssetId !== null) return null;
       if (asset.metadata.promotionToken !== promotionToken) return null;
       const updated: PotentialAssetRecord = {
         ...asset,
+        status: "promoted",
         promotedAssetId,
         metadata: { ...asset.metadata, ...metadata },
         updatedAt: now(),
@@ -686,13 +700,12 @@ export function createInMemoryPotentialAssets(): InMemoryPotentialAssets {
     },
     async rollbackPromotion(worldId, id, promotionToken, metadata = {}) {
       const asset = stores.potentialAssets.get(id);
-      if (!asset || asset.worldId !== worldId || asset.status !== "promoted" || asset.promotedAssetId !== null) {
+      if (!asset || asset.worldId !== worldId || asset.status !== "active" || asset.promotedAssetId !== null) {
         return null;
       }
       if (asset.metadata.promotionToken !== promotionToken) return null;
       const updated: PotentialAssetRecord = {
         ...asset,
-        status: "active",
         promotedAssetId: null,
         metadata,
         updatedAt: now(),
