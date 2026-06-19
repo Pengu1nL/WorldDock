@@ -107,6 +107,7 @@ export function isAgentSessionNotFoundError(error: unknown): boolean {
   if (!error) return false;
   if (error instanceof WorldDockApiError && error.status === 404) return true;
   if (typeof error === "object" && "status" in error && (error as { status?: unknown }).status === 404) return true;
+  if (error instanceof Error && /\b(?:failed\s+)?with 404\b/i.test(error.message)) return true;
   if (error instanceof Error && "cause" in error) return isAgentSessionNotFoundError(error.cause);
   return false;
 }

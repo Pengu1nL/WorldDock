@@ -298,6 +298,7 @@ const ExplorationWorkspace = ({
         }),
       ]);
     } catch (error) {
+      if (abortRef.current !== abortController) return;
       if (isAbortError(error)) return;
       if (isAgentSessionNotFoundError(error)) {
         abortRef.current?.abort();

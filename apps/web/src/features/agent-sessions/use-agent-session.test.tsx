@@ -5,7 +5,11 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { agentSessionKeys, useCurrentExplorationSession } from "./use-agent-session";
+import {
+  agentSessionKeys,
+  isAgentSessionNotFoundError,
+  useCurrentExplorationSession,
+} from "./use-agent-session";
 import * as api from "../worlddock/api";
 
 vi.mock("../worlddock/api", async (importOriginal) => {
@@ -81,6 +85,18 @@ describe("useCurrentExplorationSession", () => {
     expect(api.listAgentSessions).not.toHaveBeenCalled();
     expect(api.createAgentSession).not.toHaveBeenCalled();
     expect(api.getAgentSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("isAgentSessionNotFoundError", () => {
+  it("recognizes the existing SSE stream 404 error message", () => {
+    expect(isAgentSessionNotFoundError(new Error("Agent session run event stream failed with 404"))).toBe(true);
+  });
+
+  it("recognizes status-shaped errors without treating other statuses as not found", () => {
+    expect(isAgentSessionNotFoundError({ status: 404 })).toBe(true);
+    expect(isAgentSessionNotFoundError(new Error("Agent session run event stream failed with 500"))).toBe(false);
+    expect(isAgentSessionNotFoundError({ status: 500 })).toBe(false);
   });
 });
 
