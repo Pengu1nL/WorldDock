@@ -1,10 +1,12 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import {
+  archiveAgentSession,
   createAgentSession,
   createAgentSessionRun,
   getAgentSession,
   listAgentSessions,
+  setCurrentAgentSession,
   streamAgentSessionRunEvents,
   WorldDockApiError,
   type AgentSessionDetail,
@@ -13,11 +15,17 @@ import {
 
 type WorldLike = string | { id?: string | null; name?: string | null } | null | undefined;
 
-const CURRENT_EXPLORATION_QUERY = {
+export const CURRENT_EXPLORATION_QUERY = {
   kind: "world_exploration" as const,
   current: true,
   includeArchived: false,
   limit: 1,
+};
+
+export const EXPLORATION_HISTORY_QUERY = {
+  kind: "world_exploration" as const,
+  includeArchived: false,
+  limit: 50,
 };
 
 export const agentSessionKeys = {
@@ -79,6 +87,55 @@ export function useCurrentExplorationSession(world: WorldLike) {
   });
 }
 
+export function useExplorationSessionList(worldId: string | null | undefined) {
+  return useQuery({
+    queryKey: agentSessionKeys.list(worldId, EXPLORATION_HISTORY_QUERY),
+    queryFn: () => listAgentSessions(worldId as string, EXPLORATION_HISTORY_QUERY),
+    enabled: Boolean(worldId),
+    retry: false,
+    select: (result) => result.sessions,
+  });
+}
+
+export function useSetCurrentAgentSession(worldId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => setCurrentAgentSession(worldId as string, sessionId),
+    onSuccess: ({ session }) => {
+      invalidateExplorationSessionQueries(queryClient, worldId, session.id);
+    },
+  });
+}
+
+export function useArchiveAgentSession(worldId: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (sessionId: string) => archiveAgentSession(worldId as string, sessionId),
+    onSuccess: ({ session }) => {
+      invalidateExplorationSessionQueries(queryClient, worldId, session.id);
+    },
+  });
+}
+
+export function useCreateExplorationSession(world: WorldLike) {
+  const worldId = getWorldId(world);
+  const worldName = typeof world === "object" && world ? world.name : undefined;
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (title?: string) => createAgentSession(worldId as string, {
+      kind: "world_exploration",
+      title: title?.trim() || `${worldName?.trim() || "世界"} 推演`,
+      current: true,
+    }),
+    onSuccess: ({ session }) => {
+      invalidateExplorationSessionQueries(queryClient, worldId, session.id);
+    },
+  });
+}
+
 export function useCreateSessionRun(worldId: string | null | undefined, sessionId: string | null | undefined) {
   return useMutation({
     mutationFn: (prompt: string) => createAgentSessionRun(worldId as string, sessionId as string, { prompt }),
@@ -115,6 +172,19 @@ export function isAgentSessionNotFoundError(error: unknown): boolean {
 function getWorldId(world: WorldLike) {
   if (typeof world === "string") return world;
   return world?.id ?? undefined;
+}
+
+function invalidateExplorationSessionQueries(
+  queryClient: QueryClient,
+  worldId: string | null | undefined,
+  sessionId?: string | null,
+) {
+  if (!worldId) return;
+  void queryClient.invalidateQueries({ queryKey: agentSessionKeys.list(worldId, EXPLORATION_HISTORY_QUERY) });
+  void queryClient.invalidateQueries({ queryKey: agentSessionKeys.currentDetail(worldId, CURRENT_EXPLORATION_QUERY) });
+  if (sessionId) {
+    void queryClient.invalidateQueries({ queryKey: agentSessionKeys.detail(worldId, sessionId) });
+  }
 }
 
 export type CurrentExplorationSessionResult = AgentSessionDetail;

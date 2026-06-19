@@ -3,13 +3,19 @@
 import type { AgentSessionMessage } from "@worlddock/contract";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
 import { SessionPage } from "../../agent-sessions/session-page";
 import {
+  EXPLORATION_HISTORY_QUERY,
   agentSessionKeys,
   agentSessionsFeatureEnabled,
   isAgentSessionNotFoundError,
+  useArchiveAgentSession,
+  useCreateExplorationSession,
   useCreateSessionRun,
   useCurrentExplorationSession,
+  useExplorationSessionList,
+  useSetCurrentAgentSession,
   useStreamSessionRun,
 } from "../../agent-sessions/use-agent-session";
 import { cancelAgentRun } from "../api";
@@ -162,6 +168,10 @@ const ExplorationWorkspace = ({
   const sessionDetail = sessionQuery.data;
   const sessionId = sessionDetail?.session.id;
   const queryClient = useQueryClient();
+  const historyQuery = useExplorationSessionList(sessionsEnabled ? world?.id : null);
+  const setCurrentSession = useSetCurrentAgentSession(world?.id);
+  const archiveSession = useArchiveAgentSession(world?.id);
+  const createSession = useCreateExplorationSession(sessionsEnabled ? world : null);
   const createRun = useCreateSessionRun(world?.id, sessionId);
   const streamRun = useStreamSessionRun(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -177,15 +187,19 @@ const ExplorationWorkspace = ({
     activeSessionRunIdRef.current = null;
   }, []);
 
-  useEffect(() => {
-    setOptimisticMessages([]);
-    setRunState("idle");
-    setTokens(0);
-    setForceLegacyFallback(false);
+  const resetSessionRuntime = useCallback(() => {
     cancelActiveSessionRun();
     abortRef.current?.abort();
     abortRef.current = null;
-  }, [cancelActiveSessionRun, sessionId]);
+    setOptimisticMessages([]);
+    setRunState("idle");
+    setTokens(0);
+  }, [cancelActiveSessionRun]);
+
+  useEffect(() => {
+    resetSessionRuntime();
+    setForceLegacyFallback(false);
+  }, [resetSessionRuntime, sessionId]);
 
   useEffect(() => () => {
     cancelActiveSessionRun();
@@ -320,6 +334,7 @@ const ExplorationWorkspace = ({
             limit: 1,
           }),
         }),
+        queryClient.invalidateQueries({ queryKey: agentSessionKeys.list(world.id, EXPLORATION_HISTORY_QUERY) }),
       ]);
     } catch (error) {
       if (abortRef.current !== abortController) return;
@@ -357,6 +372,27 @@ const ExplorationWorkspace = ({
     ));
   }, [cancelActiveSessionRun]);
 
+  const handleOpenSession = useCallback(async (nextSessionId: string) => {
+    if (!world?.id || nextSessionId === sessionId) return;
+    resetSessionRuntime();
+    await setCurrentSession.mutateAsync(nextSessionId);
+    await sessionQuery.refetch();
+  }, [resetSessionRuntime, sessionId, sessionQuery, setCurrentSession, world?.id]);
+
+  const handleArchiveSession = useCallback(async (targetSessionId: string) => {
+    if (!world?.id) return;
+    if (targetSessionId === sessionId) resetSessionRuntime();
+    await archiveSession.mutateAsync(targetSessionId);
+    if (targetSessionId === sessionId) await sessionQuery.refetch();
+  }, [archiveSession, resetSessionRuntime, sessionId, sessionQuery, world?.id]);
+
+  const handleCreateSession = useCallback(async () => {
+    if (!world?.id) return;
+    resetSessionRuntime();
+    await createSession.mutateAsync();
+    await sessionQuery.refetch();
+  }, [createSession, resetSessionRuntime, sessionQuery, world?.id]);
+
   if (!sessionsEnabled || forceLegacyFallback) return renderLegacy();
   if (sessionQuery.isPending) return <SessionLoadingState world={world} />;
   if (isAgentSessionNotFoundError(sessionQuery.error)) return renderLegacy();
@@ -379,6 +415,17 @@ const ExplorationWorkspace = ({
       runState={{ status: runState, tokens }}
       onSend={handleSessionSend}
       onStop={handleSessionStop}
+      rightSlot={(
+        <SessionHistoryPanel
+          sessions={historyQuery.data ?? []}
+          activeSessionId={sessionId}
+          isLoading={historyQuery.isPending}
+          isCreating={createSession.isPending}
+          onCreate={handleCreateSession}
+          onOpen={handleOpenSession}
+          onArchive={handleArchiveSession}
+        />
+      )}
     />
   );
 };

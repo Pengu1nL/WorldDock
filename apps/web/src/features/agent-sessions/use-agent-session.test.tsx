@@ -1,14 +1,19 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  EXPLORATION_HISTORY_QUERY,
   agentSessionKeys,
   isAgentSessionNotFoundError,
+  useArchiveAgentSession,
+  useCreateExplorationSession,
   useCurrentExplorationSession,
+  useExplorationSessionList,
+  useSetCurrentAgentSession,
 } from "./use-agent-session";
 import * as api from "../worlddock/api";
 
@@ -16,9 +21,11 @@ vi.mock("../worlddock/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../worlddock/api")>();
   return {
     ...actual,
+    archiveAgentSession: vi.fn(),
     createAgentSession: vi.fn(),
     getAgentSession: vi.fn(),
     listAgentSessions: vi.fn(),
+    setCurrentAgentSession: vi.fn(),
   };
 });
 
@@ -85,6 +92,70 @@ describe("useCurrentExplorationSession", () => {
     expect(api.listAgentSessions).not.toHaveBeenCalled();
     expect(api.createAgentSession).not.toHaveBeenCalled();
     expect(api.getAgentSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("exploration session helpers", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("lists non-archived exploration session history", async () => {
+    const session = buildSession({ id: "session_history", title: "黑市推演" });
+    vi.mocked(api.listAgentSessions).mockResolvedValue({ sessions: [session], nextCursor: null });
+
+    const { result } = renderHook(
+      () => useExplorationSessionList("world_1"),
+      { wrapper: createQueryWrapper().Wrapper },
+    );
+
+    await waitFor(() => expect(result.current.data?.[0]?.id).toBe("session_history"));
+
+    expect(api.listAgentSessions).toHaveBeenCalledWith("world_1", EXPLORATION_HISTORY_QUERY);
+  });
+
+  it("creates a current exploration session with the world name", async () => {
+    const session = buildSession({ id: "session_new", title: "雾港 推演" });
+    vi.mocked(api.createAgentSession).mockResolvedValue({ session });
+
+    const { result } = renderHook(
+      () => useCreateExplorationSession({ id: "world_1", name: "雾港" }),
+      { wrapper: createQueryWrapper().Wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(api.createAgentSession).toHaveBeenCalledWith("world_1", {
+      kind: "world_exploration",
+      title: "雾港 推演",
+      current: true,
+    });
+  });
+
+  it("sets and archives exploration sessions through the API", async () => {
+    const session = buildSession({ id: "session_target" });
+    vi.mocked(api.setCurrentAgentSession).mockResolvedValue({ session });
+    vi.mocked(api.archiveAgentSession).mockResolvedValue({ session });
+    const wrapper = createQueryWrapper().Wrapper;
+
+    const currentMutation = renderHook(
+      () => useSetCurrentAgentSession("world_1"),
+      { wrapper },
+    );
+    const archiveMutation = renderHook(
+      () => useArchiveAgentSession("world_1"),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await currentMutation.result.current.mutateAsync("session_target");
+      await archiveMutation.result.current.mutateAsync("session_target");
+    });
+
+    expect(api.setCurrentAgentSession).toHaveBeenCalledWith("world_1", "session_target");
+    expect(api.archiveAgentSession).toHaveBeenCalledWith("world_1", "session_target");
   });
 });
 
