@@ -12,6 +12,7 @@ import {
   useCurrentExplorationSession,
   useStreamSessionRun,
 } from "../../agent-sessions/use-agent-session";
+import { cancelAgentRun } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
 import { ArchiveView, ConflictsView, SeedsView } from "../view-archive";
@@ -164,24 +165,33 @@ const ExplorationWorkspace = ({
   const createRun = useCreateSessionRun(world?.id, sessionId);
   const streamRun = useStreamSessionRun(null);
   const abortRef = useRef<AbortController | null>(null);
+  const activeSessionRunIdRef = useRef<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<AgentSessionMessage[]>([]);
   const [runState, setRunState] = useState<"idle" | "running" | "completed" | "failed">("idle");
   const [tokens, setTokens] = useState(0);
   const [forceLegacyFallback, setForceLegacyFallback] = useState(false);
+
+  const cancelActiveSessionRun = useCallback(() => {
+    const runId = activeSessionRunIdRef.current;
+    if (runId) void cancelAgentRun(runId);
+    activeSessionRunIdRef.current = null;
+  }, []);
 
   useEffect(() => {
     setOptimisticMessages([]);
     setRunState("idle");
     setTokens(0);
     setForceLegacyFallback(false);
+    cancelActiveSessionRun();
     abortRef.current?.abort();
     abortRef.current = null;
-  }, [sessionId]);
+  }, [cancelActiveSessionRun, sessionId]);
 
   useEffect(() => () => {
+    cancelActiveSessionRun();
     abortRef.current?.abort();
     abortRef.current = null;
-  }, []);
+  }, [cancelActiveSessionRun]);
 
   const renderLegacy = () => (
     <LegacyExplorationWorkspace
@@ -231,7 +241,12 @@ const ExplorationWorkspace = ({
 
     try {
       const { run } = await createRun.mutateAsync(text);
-      if (abortRef.current !== abortController) return;
+      activeSessionRunIdRef.current = run.id;
+      if (abortRef.current !== abortController) {
+        void cancelAgentRun(run.id);
+        activeSessionRunIdRef.current = null;
+        return;
+      }
 
       await streamRun.mutateAsync({
         runId: run.id,
@@ -247,11 +262,18 @@ const ExplorationWorkspace = ({
           }
           if (event.type === "run.completed") {
             terminalStatus = "completed";
+            activeSessionRunIdRef.current = null;
             setRunState("completed");
             setTokens(event.payload.tokenUsage?.totalTokens ?? 0);
+            setOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, status: "complete" }
+                : message,
+            ));
           }
           if (event.type === "run.failed") {
             terminalStatus = "failed";
+            activeSessionRunIdRef.current = null;
             setRunState("failed");
             setOptimisticMessages((prev) => prev.map((message) =>
               message.id === assistantMessage.id
@@ -261,6 +283,7 @@ const ExplorationWorkspace = ({
           }
           if (event.type === "run.cancelled") {
             terminalStatus = "failed";
+            activeSessionRunIdRef.current = null;
             setRunState("failed");
             setOptimisticMessages((prev) => prev.map((message) =>
               message.id === assistantMessage.id
@@ -274,6 +297,7 @@ const ExplorationWorkspace = ({
       if (abortRef.current !== abortController) return;
       abortRef.current = null;
       if (terminalStatus === "running") terminalStatus = "completed";
+      activeSessionRunIdRef.current = null;
       setRunState(terminalStatus);
       if (terminalStatus !== "completed") return;
 
@@ -301,6 +325,7 @@ const ExplorationWorkspace = ({
       if (abortRef.current !== abortController) return;
       if (isAbortError(error)) return;
       if (isAgentSessionNotFoundError(error)) {
+        cancelActiveSessionRun();
         abortRef.current?.abort();
         abortRef.current = null;
         setOptimisticMessages([]);
@@ -309,6 +334,7 @@ const ExplorationWorkspace = ({
         setForceLegacyFallback(true);
         return;
       }
+      cancelActiveSessionRun();
       abortRef.current = null;
       setRunState("failed");
       setOptimisticMessages((prev) => prev.map((message) =>
@@ -317,9 +343,10 @@ const ExplorationWorkspace = ({
           : message,
       ));
     }
-  }, [createRun, queryClient, runState, sessionId, streamRun, world]);
+  }, [cancelActiveSessionRun, createRun, queryClient, runState, sessionId, streamRun, world]);
 
   const handleSessionStop = useCallback(() => {
+    cancelActiveSessionRun();
     abortRef.current?.abort();
     abortRef.current = null;
     setRunState("failed");
@@ -328,7 +355,7 @@ const ExplorationWorkspace = ({
         ? { ...message, status: "failed", content: `${message.content || "推演已停止"}` }
         : message,
     ));
-  }, []);
+  }, [cancelActiveSessionRun]);
 
   if (!sessionsEnabled || forceLegacyFallback) return renderLegacy();
   if (sessionQuery.isPending) return <SessionLoadingState world={world} />;
