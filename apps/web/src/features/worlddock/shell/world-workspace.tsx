@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
 import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawer";
 import { SessionPage } from "../../agent-sessions/session-page";
+import { OfficialAssetLibraryPage } from "../../world-assets/official-asset-library-page";
+import type { OfficialAssetType } from "../../world-assets/official-asset-card";
 import {
   EXPLORATION_HISTORY_QUERY,
   agentSessionKeys,
@@ -25,7 +27,7 @@ import {
 import { cancelAgentRun } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
-import { ArchiveView, ConflictsView, SeedsView } from "../view-archive";
+import { ArchiveView, ConflictsView } from "../view-archive";
 import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
 import { Composer, Message } from "../view-workbench";
@@ -584,8 +586,6 @@ function getActionErrorMessage(error: unknown, fallback: string) {
 const AssetLibraryWorkspace = ({
   world,
   savedSettings,
-  savedSeeds,
-  savedConflicts,
   savedIssues,
   setDrawerOpen,
   setView,
@@ -594,63 +594,66 @@ const AssetLibraryWorkspace = ({
   reorderAssets,
   openAssetRelation,
 }: any) => {
-  const [assetView, setAssetView] = useState<"archive" | "seeds">("archive");
+  const [officialAssetsUnavailable, setOfficialAssetsUnavailable] = useState(false);
+
+  useEffect(() => {
+    setOfficialAssetsUnavailable(false);
+  }, [world?.id]);
+
+  if (officialAssetsUnavailable) {
+    return (
+      <ArchiveView world={world} savedSettings={savedSettings} savedIssues={savedIssues}
+        onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
+        onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
+        onCreateAsset={openAssetEditor}
+        onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
+        onDeleteAsset={removeEditedAsset}
+        onReorderAssets={reorderAssets}
+        onRelateAssets={openAssetRelation}
+        onBackToWorkbench={() => setView("exploration")}/>
+    );
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-      <div style={{
-        padding: "10px 32px",
-        borderBottom: "1px solid var(--hairline)",
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        flexWrap: "wrap",
-      }}>
-        <button
-          className={"sb-btn " + (assetView === "archive" ? "primary" : "")}
-          onClick={() => setAssetView("archive")}
-          style={{ height: 26, fontSize: 12 }}
-          type="button"
-        >
-          设定 <span className="mono sb-dim">{savedSettings.length}</span>
-        </button>
-        <button
-          className={"sb-btn " + (assetView === "seeds" ? "primary" : "")}
-          onClick={() => setAssetView("seeds")}
-          style={{ height: 26, fontSize: 12 }}
-          type="button"
-        >
-          种子 <span className="mono sb-dim">{savedSeeds.length}</span>
-        </button>
-      </div>
-      {assetView === "archive" ? (
-        <ArchiveView world={world} savedSettings={savedSettings} savedIssues={savedIssues}
-          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-          onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
-          onCreateAsset={openAssetEditor}
-          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-          onDeleteAsset={removeEditedAsset}
-          onReorderAssets={reorderAssets}
-          onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("exploration")}/>
-      ) : (
-        <SeedsView world={world} savedSeeds={savedSeeds} savedConflicts={savedConflicts}
-          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-          onJumpToConflict={(c: any) => {
-            setDrawerOpen(null);
-            setView("consistency");
-            setTimeout(() => setDrawerOpen({ kind: "detail", item: c, readonly: true }), 50);
-          }}
-          onCreateAsset={openAssetEditor}
-          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-          onDeleteAsset={removeEditedAsset}
-          onReorderAssets={reorderAssets}
-          onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("exploration")}/>
-      )}
-    </div>
+    <OfficialAssetLibraryPage
+      world={world}
+      onCreateAsset={(type: OfficialAssetType) => openAssetEditor("setting", {
+        kind: "setting",
+        title: "",
+        category: officialAssetTypeToLegacyCategory(type),
+        summary: "",
+        body: "",
+        payload: { officialAssetType: type },
+      })}
+      onLoadError={() => setOfficialAssetsUnavailable(true)}
+      onOpenAsset={(assetId: string) => setDrawerOpen({
+        kind: "detail",
+        readonly: true,
+        item: {
+          id: assetId,
+          kind: "setting",
+          title: "官方资产",
+          category: "官方资产",
+          summary: "详情页将在后续任务接入。",
+          body: `asset id: ${assetId}`,
+          payload: { officialAssetId: assetId },
+        },
+      })}
+    />
   );
 };
+
+function officialAssetTypeToLegacyCategory(type: OfficialAssetType) {
+  const categoryByType: Record<OfficialAssetType, string> = {
+    character: "角色",
+    organization: "组织",
+    location: "地点",
+    event: "事件",
+    rule: "世界规则",
+  };
+
+  return categoryByType[type];
+}
 
 const Workbench = ({
   world, messages, agentBusy, savedIds, pendingCount,
