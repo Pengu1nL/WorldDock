@@ -6,6 +6,7 @@ import {
   getAgentSession,
   listAgentSessions,
   streamAgentSessionRunEvents,
+  WorldDockApiError,
   type AgentSessionDetail,
   type AgentSessionRunEvent,
 } from "../worlddock/api";
@@ -27,6 +28,11 @@ export const agentSessionKeys = {
   ],
   list: (worldId: string | null | undefined, query: Record<string, unknown>) => [
     "agent-sessions",
+    worldId,
+    query,
+  ],
+  currentDetail: (worldId: string | null | undefined, query: Record<string, unknown>) => [
+    "agent-session-current",
     worldId,
     query,
   ],
@@ -56,7 +62,7 @@ export function useCurrentExplorationSession(world: WorldLike) {
   const worldName = typeof world === "object" && world ? world.name : undefined;
 
   return useQuery({
-    queryKey: agentSessionKeys.list(worldId, CURRENT_EXPLORATION_QUERY),
+    queryKey: agentSessionKeys.currentDetail(worldId, CURRENT_EXPLORATION_QUERY),
     queryFn: async () => {
       const current = await listAgentSessions(worldId as string, CURRENT_EXPLORATION_QUERY);
       const session = current.sessions[0]
@@ -95,6 +101,14 @@ export function useStreamSessionRun(runId: string | null | undefined) {
       return streamAgentSessionRunEvents(targetRunId, { signal }, onEvent);
     },
   });
+}
+
+export function isAgentSessionNotFoundError(error: unknown): boolean {
+  if (!error) return false;
+  if (error instanceof WorldDockApiError && error.status === 404) return true;
+  if (typeof error === "object" && "status" in error && (error as { status?: unknown }).status === 404) return true;
+  if (error instanceof Error && "cause" in error) return isAgentSessionNotFoundError(error.cause);
+  return false;
 }
 
 function getWorldId(world: WorldLike) {

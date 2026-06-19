@@ -5,7 +5,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useCurrentExplorationSession } from "./use-agent-session";
+import { agentSessionKeys, useCurrentExplorationSession } from "./use-agent-session";
 import * as api from "../worlddock/api";
 
 vi.mock("../worlddock/api", async (importOriginal) => {
@@ -31,7 +31,7 @@ describe("useCurrentExplorationSession", () => {
 
     const { result } = renderHook(
       () => useCurrentExplorationSession({ id: "world_1", name: "雾港" }),
-      { wrapper: createQueryWrapper() },
+      { wrapper: createQueryWrapper().Wrapper },
     );
 
     await waitFor(() => expect(result.current.data?.session.id).toBe("session_created"));
@@ -54,16 +54,33 @@ describe("useCurrentExplorationSession", () => {
     const session = buildSession({ id: "session_current", title: "已有推演" });
     vi.mocked(api.listAgentSessions).mockResolvedValue({ sessions: [session], nextCursor: null });
     vi.mocked(api.getAgentSession).mockResolvedValue(buildDetail(session));
+    const queryWrapper = createQueryWrapper();
 
     const { result } = renderHook(
       () => useCurrentExplorationSession({ id: "world_1", name: "雾港" }),
-      { wrapper: createQueryWrapper() },
+      { wrapper: queryWrapper.Wrapper },
     );
 
     await waitFor(() => expect(result.current.data?.session.id).toBe("session_current"));
 
     expect(api.createAgentSession).not.toHaveBeenCalled();
     expect(api.getAgentSession).toHaveBeenCalledWith("world_1", "session_current");
+    expect(queryWrapper.queryClient.getQueryData(agentSessionKeys.currentDetail("world_1", currentExplorationQuery))).toEqual(
+      buildDetail(session),
+    );
+    expect(queryWrapper.queryClient.getQueryData(agentSessionKeys.list("world_1", currentExplorationQuery))).toBeUndefined();
+  });
+
+  it("stays disabled when no world id is available", () => {
+    const { result } = renderHook(
+      () => useCurrentExplorationSession(null),
+      { wrapper: createQueryWrapper().Wrapper },
+    );
+
+    expect(result.current.fetchStatus).toBe("idle");
+    expect(api.listAgentSessions).not.toHaveBeenCalled();
+    expect(api.createAgentSession).not.toHaveBeenCalled();
+    expect(api.getAgentSession).not.toHaveBeenCalled();
   });
 });
 
@@ -75,10 +92,19 @@ function createQueryWrapper() {
     },
   });
 
-  return function QueryWrapper({ children }: { children: ReactNode }) {
+  function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-  };
+  }
+
+  return { queryClient, Wrapper };
 }
+
+const currentExplorationQuery = {
+  kind: "world_exploration",
+  current: true,
+  includeArchived: false,
+  limit: 1,
+};
 
 function buildSession(overrides: Record<string, unknown> = {}) {
   return {

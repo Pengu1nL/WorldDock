@@ -7,11 +7,11 @@ import { SessionPage } from "../../agent-sessions/session-page";
 import {
   agentSessionKeys,
   agentSessionsFeatureEnabled,
+  isAgentSessionNotFoundError,
   useCreateSessionRun,
   useCurrentExplorationSession,
   useStreamSessionRun,
 } from "../../agent-sessions/use-agent-session";
-import { WorldDockApiError } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
 import { ArchiveView, ConflictsView, SeedsView } from "../view-archive";
@@ -167,14 +167,21 @@ const ExplorationWorkspace = ({
   const [optimisticMessages, setOptimisticMessages] = useState<AgentSessionMessage[]>([]);
   const [runState, setRunState] = useState<"idle" | "running" | "completed" | "failed">("idle");
   const [tokens, setTokens] = useState(0);
+  const [forceLegacyFallback, setForceLegacyFallback] = useState(false);
 
   useEffect(() => {
     setOptimisticMessages([]);
     setRunState("idle");
     setTokens(0);
+    setForceLegacyFallback(false);
     abortRef.current?.abort();
     abortRef.current = null;
   }, [sessionId]);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
 
   const renderLegacy = () => (
     <LegacyExplorationWorkspace
@@ -224,6 +231,8 @@ const ExplorationWorkspace = ({
 
     try {
       const { run } = await createRun.mutateAsync(text);
+      if (abortRef.current !== abortController) return;
+
       await streamRun.mutateAsync({
         runId: run.id,
         signal: abortController.signal,
@@ -272,6 +281,14 @@ const ExplorationWorkspace = ({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: agentSessionKeys.detail(world.id, sessionId) }),
         queryClient.invalidateQueries({
+          queryKey: agentSessionKeys.currentDetail(world.id, {
+            kind: "world_exploration",
+            current: true,
+            includeArchived: false,
+            limit: 1,
+          }),
+        }),
+        queryClient.invalidateQueries({
           queryKey: agentSessionKeys.list(world.id, {
             kind: "world_exploration",
             current: true,
@@ -282,6 +299,15 @@ const ExplorationWorkspace = ({
       ]);
     } catch (error) {
       if (isAbortError(error)) return;
+      if (isAgentSessionNotFoundError(error)) {
+        abortRef.current?.abort();
+        abortRef.current = null;
+        setOptimisticMessages([]);
+        setRunState("idle");
+        setTokens(0);
+        setForceLegacyFallback(true);
+        return;
+      }
       abortRef.current = null;
       setRunState("failed");
       setOptimisticMessages((prev) => prev.map((message) =>
@@ -303,9 +329,9 @@ const ExplorationWorkspace = ({
     ));
   }, []);
 
-  if (!sessionsEnabled) return renderLegacy();
+  if (!sessionsEnabled || forceLegacyFallback) return renderLegacy();
   if (sessionQuery.isPending) return <SessionLoadingState world={world} />;
-  if (isNotFoundError(sessionQuery.error)) return renderLegacy();
+  if (isAgentSessionNotFoundError(sessionQuery.error)) return renderLegacy();
   if (sessionQuery.isError) {
     return (
       <SessionErrorState
@@ -381,10 +407,6 @@ function SessionErrorState({ message, onRetry }: { message: string; onRetry: () 
       </button>
     </div>
   );
-}
-
-function isNotFoundError(error: unknown) {
-  return error instanceof WorldDockApiError && error.status === 404;
 }
 
 function isAbortError(error: unknown) {
