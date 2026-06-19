@@ -106,7 +106,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
     if (currentMetadata.promotionToken) return null;
     const updated = await this.prisma.potentialAsset.updateMany({
-      where: { worldId, id, status: "active", metadata: currentMetadata as never },
+      where: { worldId, id, status: "active", metadata: jsonEquals(currentMetadata) },
       data: { status: "dismissed" },
     });
     if (updated.count > 0) {
@@ -126,7 +126,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
     if (currentMetadata.promotionToken) return null;
     const updated = await this.prisma.potentialAsset.updateMany({
-      where: { worldId, id, status: "active", metadata: currentMetadata as never },
+      where: { worldId, id, status: "active", metadata: jsonEquals(currentMetadata) },
       data: {
         metadata: { ...currentMetadata, ...metadata } as never,
       },
@@ -174,7 +174,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
     if (currentMetadata.promotionToken !== promotionToken) return null;
     const updated = await this.prisma.potentialAsset.updateMany({
-      where: { worldId, id, status: "active", promotedAssetId: null, metadata: currentMetadata as never },
+      where: { worldId, id, status: "active", promotedAssetId: null, metadata: jsonEquals(currentMetadata) },
       data: {
         status: "promoted",
         promotedAssetId,
@@ -199,7 +199,7 @@ export class PrismaPotentialAssetsRepository implements PotentialAssetsRepositor
     const currentMetadata = isRecord(current.metadata) ? current.metadata : {};
     if (currentMetadata.promotionToken !== promotionToken) return null;
     const updated = await this.prisma.potentialAsset.updateMany({
-      where: { worldId, id, status: "active", promotedAssetId: null, metadata: currentMetadata as never },
+      where: { worldId, id, status: "active", promotedAssetId: null, metadata: jsonEquals(currentMetadata) },
       data: {
         promotedAssetId: null,
         metadata: metadata as never,
@@ -249,6 +249,10 @@ function mapPotentialAsset(asset: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonEquals(value: Record<string, unknown>) {
+  return { equals: value } as never;
 }
 
 function isActiveDedupeUniqueConstraintError(error: unknown) {
