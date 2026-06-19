@@ -1,6 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import type { AgentSessionMessage } from "@worlddock/contract";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SessionPage } from "../../agent-sessions/session-page";
+import {
+  agentSessionKeys,
+  agentSessionsFeatureEnabled,
+  useCreateSessionRun,
+  useCurrentExplorationSession,
+  useStreamSessionRun,
+} from "../../agent-sessions/use-agent-session";
+import { WorldDockApiError } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
 import { ArchiveView, ConflictsView, SeedsView } from "../view-archive";
@@ -76,22 +87,17 @@ export function WorldWorkspace({
   return (
     <>
       {view === "exploration" && currentWorld && (
-        <Workbench
+        <ExplorationWorkspace
           world={currentWorld}
           messages={messages}
           agentBusy={agentBusy}
           savedIds={savedIds}
           pendingCount={pendingItems.length}
-          contextRefs={getLatestCompletedContextRefs(messages)}
-          onSend={(text: string) => {
-            setMessages((prev: any[]) => [...prev, { id: "u_" + Date.now(), role: "user", text }]);
-            setTimeout(() => startAgentRun(text), 200);
-          }}
-          onStop={stopAgent}
-          onSave={handleSave}
-          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s })}
-          onOpenContext={(snapshot?: any) => setDrawerOpen({ kind: "context", snapshot })}
-          onOpenSuggestions={() => setDrawerOpen({ kind: "pending" })}
+          setMessages={setMessages}
+          startAgentRun={startAgentRun}
+          stopAgent={stopAgent}
+          handleSave={handleSave}
+          setDrawerOpen={setDrawerOpen}
         />
       )}
       {view === "asset-library" && currentWorld && (
@@ -136,6 +142,254 @@ export function WorldWorkspace({
       )}
     </>
   );
+}
+
+const ExplorationWorkspace = ({
+  world,
+  messages,
+  agentBusy,
+  savedIds,
+  pendingCount,
+  setMessages,
+  startAgentRun,
+  stopAgent,
+  handleSave,
+  setDrawerOpen,
+}: any) => {
+  const sessionsEnabled = agentSessionsFeatureEnabled();
+  const sessionQuery = useCurrentExplorationSession(sessionsEnabled ? world : null);
+  const sessionDetail = sessionQuery.data;
+  const sessionId = sessionDetail?.session.id;
+  const queryClient = useQueryClient();
+  const createRun = useCreateSessionRun(world?.id, sessionId);
+  const streamRun = useStreamSessionRun(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [optimisticMessages, setOptimisticMessages] = useState<AgentSessionMessage[]>([]);
+  const [runState, setRunState] = useState<"idle" | "running" | "completed" | "failed">("idle");
+  const [tokens, setTokens] = useState(0);
+
+  useEffect(() => {
+    setOptimisticMessages([]);
+    setRunState("idle");
+    setTokens(0);
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, [sessionId]);
+
+  const renderLegacy = () => (
+    <LegacyExplorationWorkspace
+      world={world}
+      messages={messages}
+      agentBusy={agentBusy}
+      savedIds={savedIds}
+      pendingCount={pendingCount}
+      setMessages={setMessages}
+      startAgentRun={startAgentRun}
+      stopAgent={stopAgent}
+      handleSave={handleSave}
+      setDrawerOpen={setDrawerOpen}
+    />
+  );
+
+  const handleSessionSend = useCallback(async (text: string) => {
+    if (!world?.id || !sessionId || runState === "running") return;
+
+    const now = new Date().toISOString();
+    const seed = `${Date.now()}`;
+    const userMessage: AgentSessionMessage = {
+      id: `optimistic_user_${seed}`,
+      sessionId,
+      role: "user",
+      content: text,
+      status: "complete",
+      metadata: {},
+      createdAt: now,
+    };
+    const assistantMessage: AgentSessionMessage = {
+      id: `optimistic_assistant_${seed}`,
+      sessionId,
+      role: "assistant",
+      content: "",
+      status: "streaming",
+      metadata: {},
+      createdAt: now,
+    };
+
+    const abortController = new AbortController();
+    let terminalStatus: "running" | "completed" | "failed" = "running";
+    abortRef.current = abortController;
+    setRunState("running");
+    setTokens(0);
+    setOptimisticMessages([userMessage, assistantMessage]);
+
+    try {
+      const { run } = await createRun.mutateAsync(text);
+      await streamRun.mutateAsync({
+        runId: run.id,
+        signal: abortController.signal,
+        onEvent: (event) => {
+          if (abortRef.current !== abortController) return;
+          if (event.type === "message.delta") {
+            setOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, content: `${message.content}${event.payload.text}` }
+                : message,
+            ));
+          }
+          if (event.type === "run.completed") {
+            terminalStatus = "completed";
+            setRunState("completed");
+            setTokens(event.payload.tokenUsage?.totalTokens ?? 0);
+          }
+          if (event.type === "run.failed") {
+            terminalStatus = "failed";
+            setRunState("failed");
+            setOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, status: "failed", content: message.content || event.payload.message || "推演失败" }
+                : message,
+            ));
+          }
+          if (event.type === "run.cancelled") {
+            terminalStatus = "failed";
+            setRunState("failed");
+            setOptimisticMessages((prev) => prev.map((message) =>
+              message.id === assistantMessage.id
+                ? { ...message, status: "failed", content: `${message.content || "推演已取消"}` }
+                : message,
+            ));
+          }
+        },
+      });
+
+      if (abortRef.current !== abortController) return;
+      abortRef.current = null;
+      if (terminalStatus === "running") terminalStatus = "completed";
+      setRunState(terminalStatus);
+      if (terminalStatus !== "completed") return;
+
+      setOptimisticMessages([]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: agentSessionKeys.detail(world.id, sessionId) }),
+        queryClient.invalidateQueries({
+          queryKey: agentSessionKeys.list(world.id, {
+            kind: "world_exploration",
+            current: true,
+            includeArchived: false,
+            limit: 1,
+          }),
+        }),
+      ]);
+    } catch (error) {
+      if (isAbortError(error)) return;
+      abortRef.current = null;
+      setRunState("failed");
+      setOptimisticMessages((prev) => prev.map((message) =>
+        message.id === assistantMessage.id
+          ? { ...message, status: "failed", content: message.content || "Agent 调用失败" }
+          : message,
+      ));
+    }
+  }, [createRun, queryClient, runState, sessionId, streamRun, world]);
+
+  const handleSessionStop = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setRunState("failed");
+    setOptimisticMessages((prev) => prev.map((message) =>
+      message.status === "streaming"
+        ? { ...message, status: "failed", content: `${message.content || "推演已停止"}` }
+        : message,
+    ));
+  }, []);
+
+  if (!sessionsEnabled) return renderLegacy();
+  if (sessionQuery.isPending) return <SessionLoadingState world={world} />;
+  if (isNotFoundError(sessionQuery.error)) return renderLegacy();
+  if (sessionQuery.isError) {
+    return (
+      <SessionErrorState
+        message={sessionQuery.error instanceof Error ? sessionQuery.error.message : "Session 加载失败"}
+        onRetry={() => sessionQuery.refetch()}
+      />
+    );
+  }
+  if (!sessionDetail) return <SessionLoadingState world={world} />;
+
+  return (
+    <SessionPage
+      session={sessionDetail.session}
+      subjects={sessionDetail.subjects}
+      messages={[...sessionDetail.messages, ...optimisticMessages]}
+      contextItems={sessionDetail.contextItems}
+      runState={{ status: runState, tokens }}
+      onSend={handleSessionSend}
+      onStop={handleSessionStop}
+    />
+  );
+};
+
+const LegacyExplorationWorkspace = ({
+  world,
+  messages,
+  agentBusy,
+  savedIds,
+  pendingCount,
+  setMessages,
+  startAgentRun,
+  stopAgent,
+  handleSave,
+  setDrawerOpen,
+}: any) => (
+  <Workbench
+    world={world}
+    messages={messages}
+    agentBusy={agentBusy}
+    savedIds={savedIds}
+    pendingCount={pendingCount}
+    contextRefs={getLatestCompletedContextRefs(messages)}
+    onSend={(text: string) => {
+      setMessages((prev: any[]) => [...prev, { id: "u_" + Date.now(), role: "user", text }]);
+      setTimeout(() => startAgentRun(text), 200);
+    }}
+    onStop={stopAgent}
+    onSave={handleSave}
+    onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s })}
+    onOpenContext={(snapshot?: any) => setDrawerOpen({ kind: "context", snapshot })}
+    onOpenSuggestions={() => setDrawerOpen({ kind: "pending" })}
+  />
+);
+
+function SessionLoadingState({ world }: { world: any }) {
+  return (
+    <div className="row gap-2" style={{ flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" }}>
+      <span className="dot amber pulse" />
+      <span className="mono" style={{ color: "var(--fg-3)", fontSize: 12 }}>
+        正在载入 {world?.name ?? "世界"} 推演
+      </span>
+    </div>
+  );
+}
+
+function SessionErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="col gap-3" style={{ flex: 1, minHeight: 0, alignItems: "center", justifyContent: "center" }}>
+      <span className="mono" style={{ color: "var(--brick)", fontSize: 12 }}>{message}</span>
+      <button className="btn sm" type="button" onClick={onRetry}>
+        <Icon name="refresh" size={12} />
+        <span>重试</span>
+      </button>
+    </div>
+  );
+}
+
+function isNotFoundError(error: unknown) {
+  return error instanceof WorldDockApiError && error.status === 404;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError"
+    || error instanceof Error && error.name === "AbortError";
 }
 
 const AssetLibraryWorkspace = ({
