@@ -3,7 +3,7 @@ import { installApiMocks } from "./helpers";
 
 test("creator can create a world, continue a run, and save suggestions", async ({ page }) => {
   await installApiMocks(page);
-  await installSessionMocks(page);
+  const sessionMocks = await installSessionMocks(page);
   await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
 
@@ -21,6 +21,7 @@ test("creator can create a world, continue a run, and save suggestions", async (
   await page.getByRole("button", { name: /潜在资产/ }).click();
   await expect(page.getByText("记忆交易许可")).toBeVisible();
   await page.getByRole("button", { name: "沉淀" }).click();
+  await expect.poll(() => sessionMocks.wasPromoted()).toBe(true);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /资产库/ }).click();
   await expect(page.locator("main").getByText("《记忆交易法》", { exact: true })).toBeVisible();
@@ -28,6 +29,7 @@ test("creator can create a world, continue a run, and save suggestions", async (
 
 async function installSessionMocks(page: Page) {
   let sessionRunCompleted = false;
+  let promoted = false;
 
   await page.route("**/v1/worlds/world_created/agent-sessions**", async (route) => {
     const request = route.request();
@@ -72,7 +74,15 @@ async function installSessionMocks(page: Page) {
     });
   });
 
+  await page.route("**/v1/worlds/world_created/assets", async (route) => {
+    return json(route, {
+      assets: promoted ? [memoryTradeLawAsset] : [],
+      nextCursor: null,
+    });
+  });
+
   await page.route("**/v1/worlds/world_created/potential-assets/pa_1/promote", async (route) => {
+    promoted = true;
     return json(route, {
       asset: {
         id: "archive_1",
@@ -82,6 +92,10 @@ async function installSessionMocks(page: Page) {
       depositionRun: { id: "deposition_run_e2e" },
     }, 201);
   });
+
+  return {
+    wasPromoted: () => promoted,
+  };
 }
 
 const session = {
@@ -128,6 +142,20 @@ const potentialAsset = {
   summary: "需要登记。",
   evidence: [],
   status: "active",
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+};
+
+const memoryTradeLawAsset = {
+  id: "archive_1",
+  worldId: "world_created",
+  kind: "setting",
+  title: "《记忆交易法》",
+  category: "世界规则",
+  summary: "认证机构可以托管、估价并转让记忆，但亲属记忆交易必须经过冷静期。",
+  body: "所有记忆交易都必须由认证机构托管，亲属关系内的交易需要七日冷静期和独立见证。",
+  payload: { relations: [] },
+  position: 0,
   createdAt: "2026-05-28T10:00:00.000Z",
   updatedAt: "2026-05-28T10:00:00.000Z",
 };

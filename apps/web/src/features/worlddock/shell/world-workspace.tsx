@@ -109,6 +109,7 @@ export function WorldWorkspace({
           stopAgent={stopAgent}
           handleSave={handleSave}
           setDrawerOpen={setDrawerOpen}
+          pushToast={pushToast}
         />
       )}
       {view === "asset-library" && currentWorld && (
@@ -166,6 +167,7 @@ const ExplorationWorkspace = ({
   stopAgent,
   handleSave,
   setDrawerOpen,
+  pushToast,
 }: any) => {
   const sessionsEnabled = agentSessionsFeatureEnabled();
   const sessionQuery = useCurrentExplorationSession(sessionsEnabled ? world : null);
@@ -188,6 +190,11 @@ const ExplorationWorkspace = ({
   const [tokens, setTokens] = useState(0);
   const [forceLegacyFallback, setForceLegacyFallback] = useState(false);
   const [potentialAssetDrawerOpen, setPotentialAssetDrawerOpen] = useState(false);
+  const [potentialAssetActionError, setPotentialAssetActionError] = useState<string | null>(null);
+  const [potentialAssetPendingAction, setPotentialAssetPendingAction] = useState<{
+    assetId: string;
+    action: "dismiss" | "promote";
+  } | null>(null);
   const potentialAssets = potentialAssetsQuery.data ?? [];
   const activePotentialAssetCount = potentialAssets.filter((asset) => asset.status === "active").length;
 
@@ -409,6 +416,36 @@ const ExplorationWorkspace = ({
     await sessionQuery.refetch();
   }, [createSession, resetSessionRuntime, sessionQuery, world?.id]);
 
+  const handlePromotePotentialAsset = useCallback(async (potentialAssetId: string) => {
+    setPotentialAssetActionError(null);
+    setPotentialAssetPendingAction({ assetId: potentialAssetId, action: "promote" });
+    try {
+      await promotePotentialAsset.mutateAsync(potentialAssetId);
+      pushToast?.({ kind: "save", text: "潜在资产已沉淀" });
+    } catch (error) {
+      const message = getActionErrorMessage(error, "沉淀失败，请重试");
+      setPotentialAssetActionError(message);
+      pushToast?.({ kind: "warn", text: message });
+    } finally {
+      setPotentialAssetPendingAction(null);
+    }
+  }, [promotePotentialAsset, pushToast]);
+
+  const handleDismissPotentialAsset = useCallback(async (potentialAssetId: string) => {
+    setPotentialAssetActionError(null);
+    setPotentialAssetPendingAction({ assetId: potentialAssetId, action: "dismiss" });
+    try {
+      await dismissPotentialAsset.mutateAsync(potentialAssetId);
+      pushToast?.({ kind: "save", text: "潜在资产已忽略" });
+    } catch (error) {
+      const message = getActionErrorMessage(error, "忽略失败，请重试");
+      setPotentialAssetActionError(message);
+      pushToast?.({ kind: "warn", text: message });
+    } finally {
+      setPotentialAssetPendingAction(null);
+    }
+  }, [dismissPotentialAsset, pushToast]);
+
   if (!sessionsEnabled || forceLegacyFallback) return renderLegacy();
   if (sessionQuery.isPending) return <SessionLoadingState world={world} />;
   if (isAgentSessionNotFoundError(sessionQuery.error)) return renderLegacy();
@@ -450,9 +487,11 @@ const ExplorationWorkspace = ({
       <PotentialAssetDrawer
         open={potentialAssetDrawerOpen}
         potentialAssets={potentialAssets}
+        pendingAction={potentialAssetPendingAction}
+        error={potentialAssetActionError}
         onClose={() => setPotentialAssetDrawerOpen(false)}
-        onPromote={(potentialAssetId) => promotePotentialAsset.mutate(potentialAssetId)}
-        onDismiss={(potentialAssetId) => dismissPotentialAsset.mutate(potentialAssetId)}
+        onPromote={handlePromotePotentialAsset}
+        onDismiss={handleDismissPotentialAsset}
       />
     </>
   );
@@ -515,6 +554,11 @@ function SessionErrorState({ message, onRetry }: { message: string; onRetry: () 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === "AbortError"
     || error instanceof Error && error.name === "AbortError";
+}
+
+function getActionErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
 }
 
 const AssetLibraryWorkspace = ({

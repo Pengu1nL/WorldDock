@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "pnpm build && PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=\"$(node scripts/resolve-playwright-chromium.mjs)\" playwright test --project=chromium --workers=1 --reporter=line"
+    "test:e2e": "NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS=1 pnpm build && NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS=1 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=\"$(node scripts/resolve-playwright-chromium.mjs)\" playwright test --project=chromium --workers=1 --reporter=line"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "latest",

@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EXPLORATION_HISTORY_QUERY,
   agentSessionKeys,
+  agentSessionsFeatureEnabled,
   isAgentSessionNotFoundError,
   useArchiveAgentSession,
   useCreateExplorationSession,
@@ -98,6 +99,29 @@ describe("useCurrentExplorationSession", () => {
     expect(api.listAgentSessions).not.toHaveBeenCalled();
     expect(api.createAgentSession).not.toHaveBeenCalled();
     expect(api.getAgentSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("agentSessionsFeatureEnabled", () => {
+  const originalValue = process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS;
+
+  afterEach(() => {
+    if (originalValue === undefined) {
+      delete process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS;
+    } else {
+      process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS = originalValue;
+    }
+  });
+
+  it("requires the agent sessions feature flag to be explicitly enabled", () => {
+    delete process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS;
+    expect(agentSessionsFeatureEnabled()).toBe(false);
+
+    process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS = "0";
+    expect(agentSessionsFeatureEnabled()).toBe(false);
+
+    process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS = "1";
+    expect(agentSessionsFeatureEnabled()).toBe(true);
   });
 });
 

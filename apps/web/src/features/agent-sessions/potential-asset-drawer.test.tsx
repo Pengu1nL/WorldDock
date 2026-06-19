@@ -43,4 +43,30 @@ describe("PotentialAssetDrawer", () => {
 
     expect(onPromote).toHaveBeenCalledWith("pa_1");
   });
+
+  it("disables the matching action while pending and shows an error", () => {
+    render(
+      <PotentialAssetDrawer
+        open
+        potentialAssets={[
+          {
+            id: "pa_1",
+            type: "rule",
+            title: "记忆交易许可",
+            summary: "需要登记。",
+            status: "active",
+          } as any,
+        ]}
+        pendingAction={{ assetId: "pa_1", action: "promote" }}
+        error="沉淀失败，请重试"
+        onClose={vi.fn()}
+        onPromote={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("沉淀失败，请重试")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "沉淀" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "忽略" })).toBeEnabled();
+  });
 });
