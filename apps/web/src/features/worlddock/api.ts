@@ -177,6 +177,13 @@ export type AgentSessionRunEvent = AgentEvent | (AgentEventBase & {
     potentialAsset?: PotentialAsset;
     [key: string]: unknown;
   };
+}) | (AgentEventBase & {
+  type: "asset.patch.applied";
+  payload: {
+    sessionId: string;
+    assetId: string;
+    patchId: string;
+  };
 });
 
 export type SaveAgentSuggestionResponse = {
@@ -792,6 +799,17 @@ export async function applyOfficialAssetPatch(
   return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}/patches`, {
     method: "POST",
     body: input,
+    ...options,
+  });
+}
+
+export async function listOfficialAssetPatches(
+  worldId: string,
+  assetId: string,
+  options: ApiClientOptions = {},
+): Promise<{ patches: WorldAssetPatch[] }> {
+  return requestJson(`/v1/worlds/${worldId}/official-assets/${assetId}/patches`, {
+    method: "GET",
     ...options,
   });
 }

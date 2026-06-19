@@ -23,6 +23,8 @@ export type SessionPageProps = {
   runState: SessionRunState;
   onSend: (text: string) => void;
   onStop: () => void;
+  onBack?: () => void;
+  backLabel?: string;
   rightSlot?: ReactNode;
   potentialAssetCount?: number;
   activePotentialAssetCount?: number;
@@ -37,6 +39,8 @@ export function SessionPage({
   runState,
   onSend,
   onStop,
+  onBack,
+  backLabel = "返回",
   rightSlot,
   potentialAssetCount = 0,
   activePotentialAssetCount,
@@ -68,6 +72,12 @@ export function SessionPage({
         >
           <div style={{ maxWidth: "var(--max-chat)", margin: "0 auto" }}>
             <div className="row gap-2" style={{ alignItems: "center", flexWrap: "wrap" }}>
+              {onBack ? (
+                <button className="btn sm" onClick={onBack} type="button">
+                  <Icon name="chevron" size={11} style={{ transform: "rotate(180deg)" }} />
+                  <span>{backLabel}</span>
+                </button>
+              ) : null}
               <Icon name="session" size={18} style={{ color: "var(--fg-2)" }} />
               <h1
                 className="title-font"

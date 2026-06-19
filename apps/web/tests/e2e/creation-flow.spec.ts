@@ -76,9 +76,9 @@ async function installSessionMocks(page: Page) {
     });
   });
 
-  await page.route("**/v1/worlds/world_created/assets", async (route) => {
+  await page.route("**/v1/worlds/world_created/official-assets", async (route) => {
     return json(route, {
-      assets: promoted ? [memoryTradeLawAsset] : [],
+      assets: promoted ? [memoryTradeLawOfficialAsset] : [],
       nextCursor: null,
     });
   });
@@ -151,18 +151,20 @@ function buildPotentialAsset(promoted: boolean) {
   };
 }
 
-const memoryTradeLawAsset = {
-  id: "archive_1",
+const memoryTradeLawOfficialAsset = {
+  id: "official_asset_1",
   worldId: "world_created",
-  kind: "setting",
-  title: "《记忆交易法》",
-  category: "世界规则",
+  type: "rule",
+  name: "《记忆交易法》",
   summary: "认证机构可以托管、估价并转让记忆，但亲属记忆交易必须经过冷静期。",
-  body: "所有记忆交易都必须由认证机构托管，亲属关系内的交易需要七日冷静期和独立见证。",
-  payload: { relations: [] },
-  position: 0,
+  documentKey: "rules/memory-trade-law.md",
+  status: "active",
+  version: 1,
+  tags: ["法律"],
+  metadata: {},
   createdAt: "2026-05-28T10:00:00.000Z",
   updatedAt: "2026-05-28T10:00:00.000Z",
+  archivedAt: null,
 };
 
 function json(route: Route, body: unknown, status = 200) {

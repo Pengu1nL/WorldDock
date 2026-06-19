@@ -15,20 +15,28 @@ import { getOfficialAssetTypeLabel, type OfficialAssetType } from "./official-as
 type OfficialAssetDetailPageProps = {
   detail?: WorldAssetDetail | null;
   patches?: WorldAssetPatch[];
+  patchesLoading?: boolean;
+  patchesError?: unknown;
   loading?: boolean;
   error?: unknown;
   onBack: () => void;
   onStartEdit?: (assetId: string) => void;
+  onRevertPatch?: (patchId: string) => void;
+  revertingPatchId?: string | null;
   onRefresh?: () => void;
 };
 
 export function OfficialAssetDetailPage({
   detail,
   patches = [],
+  patchesLoading = false,
+  patchesError,
   loading = false,
   error,
   onBack,
   onStartEdit,
+  onRevertPatch,
+  revertingPatchId = null,
   onRefresh,
 }: OfficialAssetDetailPageProps) {
   const asset = detail?.asset;
@@ -108,7 +116,13 @@ export function OfficialAssetDetailPage({
           <AssetMetadataCard asset={asset} />
           <AssetRevisionCard revisions={detail?.revisions ?? []} currentVersion={asset?.version} />
           <AssetIndexCard indexes={detail?.indexes ?? []} />
-          <AssetPatchList patches={patches} />
+          <AssetPatchList
+            error={patchesError}
+            loading={patchesLoading}
+            onRevert={onRevertPatch}
+            patches={patches}
+            revertingPatchId={revertingPatchId}
+          />
         </aside>
       </div>
     </div>

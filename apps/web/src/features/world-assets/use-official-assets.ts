@@ -1,7 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
+  createAssetEditSession,
   createOfficialAsset,
+  listOfficialAssetPatches,
   listOfficialAssets,
+  revertOfficialAssetPatch,
   type CreateOfficialAssetInput,
   type ListOfficialAssetsOptions,
 } from "../worlddock/api";
@@ -28,6 +31,14 @@ export const officialAssetsQueryKeys = {
   ] as const,
   detail: (worldId: string | null | undefined, assetId: string | null | undefined) => [
     ...officialAssetsQueryKeys.details(worldId),
+    assetId ?? "",
+  ] as const,
+  patchLists: (worldId: string | null | undefined) => [
+    ...officialAssetsQueryKeys.world(worldId),
+    "patches",
+  ] as const,
+  patches: (worldId: string | null | undefined, assetId: string | null | undefined) => [
+    ...officialAssetsQueryKeys.patchLists(worldId),
     assetId ?? "",
   ] as const,
 };
@@ -64,6 +75,64 @@ export function useCreateOfficialAsset(worldId: string | null | undefined) {
       });
     },
   });
+}
+
+export function useOfficialAssetPatches(
+  worldId: string | null | undefined,
+  assetId: string | null | undefined,
+) {
+  return useQuery({
+    queryKey: officialAssetsQueryKeys.patches(worldId, assetId),
+    queryFn: () => {
+      if (!worldId || !assetId) throw new Error("World id and asset id are required.");
+      return listOfficialAssetPatches(worldId, assetId);
+    },
+    enabled: Boolean(worldId && assetId),
+    retry: false,
+    select: (result) => result.patches,
+  });
+}
+
+export function useRevertOfficialAssetPatch(
+  worldId: string | null | undefined,
+  assetId: string | null | undefined,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (patchId: string) => {
+      if (!worldId || !assetId) throw new Error("World id and asset id are required.");
+      return revertOfficialAssetPatch(worldId, assetId, patchId);
+    },
+    onSuccess: () => {
+      invalidateOfficialAssetDetailAndPatches(queryClient, worldId, assetId);
+    },
+  });
+}
+
+type CreateAssetEditSessionVariables = {
+  assetId: string;
+  input?: { title?: string };
+};
+
+export function useCreateAssetEditSession(worldId: string | null | undefined) {
+  return useMutation({
+    mutationFn: ({ assetId, input }: CreateAssetEditSessionVariables) => {
+      if (!worldId || !assetId) throw new Error("World id and asset id are required.");
+      return createAssetEditSession(worldId, assetId, input);
+    },
+  });
+}
+
+export function invalidateOfficialAssetDetailAndPatches(
+  queryClient: QueryClient,
+  worldId: string | null | undefined,
+  assetId: string | null | undefined,
+) {
+  if (!worldId || !assetId) return;
+  void queryClient.invalidateQueries({ queryKey: officialAssetsQueryKeys.detail(worldId, assetId) });
+  void queryClient.invalidateQueries({ queryKey: officialAssetsQueryKeys.lists(worldId) });
+  void queryClient.invalidateQueries({ queryKey: officialAssetsQueryKeys.patches(worldId, assetId) });
 }
 
 function normalizeOfficialAssetsQuery(query: OfficialAssetsQuery = {}): OfficialAssetsQuery {
