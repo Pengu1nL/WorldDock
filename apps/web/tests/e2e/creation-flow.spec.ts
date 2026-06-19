@@ -22,7 +22,7 @@ test("creator can create a world, continue a run, and save suggestions", async (
   await expect(page.getByText("记忆交易许可")).toBeVisible();
   await page.getByRole("button", { name: "沉淀" }).click();
   await expect.poll(() => sessionMocks.wasPromoted()).toBe(true);
-  await expect(page.getByText("已沉淀")).toBeVisible();
+  await expect(page.getByText("已沉淀", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "沉淀" })).toHaveCount(0);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /资产库/ }).click();
