@@ -1,0 +1,327 @@
+import type { ReactNode } from "react";
+
+type AssetMarkdownViewProps = {
+  markdown: string;
+  skipFirstHeadingText?: string;
+};
+
+type MarkdownBlock =
+  | { type: "heading"; level: number; text: string }
+  | { type: "paragraph"; text: string }
+  | { type: "list"; ordered: boolean; items: string[] }
+  | { type: "code"; language?: string; text: string }
+  | { type: "table"; headers: string[]; rows: string[][] };
+
+export function AssetMarkdownView({
+  markdown,
+  skipFirstHeadingText,
+}: AssetMarkdownViewProps) {
+  const blocks = parseMarkdown(markdown);
+  const visibleBlocks = shouldSkipFirstHeading(blocks, skipFirstHeadingText)
+    ? blocks.slice(1)
+    : blocks;
+
+  if (visibleBlocks.length === 0) {
+    return (
+      <div className="prose" style={{ color: "var(--fg-3)", fontSize: "var(--t-13)" }}>
+        暂无文档内容。
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="prose"
+      style={{
+        color: "var(--fg-1)",
+        fontSize: "var(--t-14)",
+        lineHeight: 1.72,
+      }}
+    >
+      {visibleBlocks.map((block, index) => renderBlock(block, index))}
+    </div>
+  );
+}
+
+function parseMarkdown(markdown: string): MarkdownBlock[] {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const blocks: MarkdownBlock[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    const fence = trimmed.match(/^```([A-Za-z0-9_-]+)?\s*$/);
+    if (fence) {
+      const codeLines: string[] = [];
+      index += 1;
+
+      while (index < lines.length && !lines[index]?.trim().startsWith("```")) {
+        codeLines.push(lines[index] ?? "");
+        index += 1;
+      }
+
+      if (index < lines.length) index += 1;
+      blocks.push({ type: "code", language: fence[1], text: codeLines.join("\n") });
+      continue;
+    }
+
+    if (isTableStart(lines, index)) {
+      const tableLines: string[] = [];
+
+      tableLines.push(lines[index] ?? "");
+      index += 2;
+
+      while (index < lines.length && isPipeRow(lines[index] ?? "")) {
+        tableLines.push(lines[index] ?? "");
+        index += 1;
+      }
+
+      const [headerLine, ...rowLines] = tableLines;
+      blocks.push({
+        type: "table",
+        headers: parseTableCells(headerLine ?? ""),
+        rows: rowLines.map(parseTableCells),
+      });
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      blocks.push({
+        type: "heading",
+        level: heading[1].length,
+        text: heading[2].trim(),
+      });
+      index += 1;
+      continue;
+    }
+
+    const list = getListItem(trimmed);
+    if (list) {
+      const items: string[] = [];
+
+      while (index < lines.length) {
+        const next = getListItem((lines[index] ?? "").trim());
+        if (!next || next.ordered !== list.ordered) break;
+        items.push(next.text);
+        index += 1;
+      }
+
+      blocks.push({ type: "list", ordered: list.ordered, items });
+      continue;
+    }
+
+    const paragraphLines: string[] = [];
+    while (index < lines.length) {
+      const nextLine = lines[index] ?? "";
+      const nextTrimmed = nextLine.trim();
+
+      if (!nextTrimmed) break;
+      if (paragraphLines.length > 0 && isBlockStart(lines, index)) break;
+
+      paragraphLines.push(nextTrimmed);
+      index += 1;
+    }
+
+    blocks.push({ type: "paragraph", text: paragraphLines.join(" ") });
+  }
+
+  return blocks;
+}
+
+function renderBlock(block: MarkdownBlock, index: number): ReactNode {
+  if (block.type === "heading") {
+    const Tag = `h${block.level}` as keyof JSX.IntrinsicElements;
+    const marginTop = index === 0 ? 0 : block.level === 1 ? 28 : 22;
+
+    return (
+      <Tag
+        key={`heading-${index}`}
+        style={{
+          color: "var(--fg)",
+          fontSize: getHeadingSize(block.level),
+          fontWeight: 650,
+          lineHeight: 1.25,
+          margin: `${marginTop}px 0 10px`,
+        }}
+      >
+        {block.text}
+      </Tag>
+    );
+  }
+
+  if (block.type === "paragraph") {
+    return (
+      <p key={`paragraph-${index}`} style={{ margin: index === 0 ? 0 : "0 0 12px" }}>
+        {block.text}
+      </p>
+    );
+  }
+
+  if (block.type === "list") {
+    const Tag = block.ordered ? "ol" : "ul";
+
+    return (
+      <Tag
+        key={`list-${index}`}
+        style={{
+          margin: "0 0 14px",
+          paddingLeft: 22,
+        }}
+      >
+        {block.items.map((item, itemIndex) => (
+          <li key={`${item}-${itemIndex}`} style={{ marginBottom: 4 }}>
+            {item}
+          </li>
+        ))}
+      </Tag>
+    );
+  }
+
+  if (block.type === "code") {
+    return (
+      <pre
+        key={`code-${index}`}
+        className="mono"
+        style={{
+          background: "var(--surface-2)",
+          border: "1px solid var(--hairline)",
+          borderRadius: 6,
+          color: "var(--fg)",
+          fontSize: 12,
+          lineHeight: 1.6,
+          margin: "0 0 16px",
+          overflowX: "auto",
+          padding: 12,
+        }}
+      >
+        {block.language ? (
+          <span style={{ color: "var(--fg-3)", display: "block", marginBottom: 8 }}>
+            {block.language}
+          </span>
+        ) : null}
+        <code>{block.text}</code>
+      </pre>
+    );
+  }
+
+  return (
+    <div key={`table-${index}`} style={{ margin: "0 0 16px", overflowX: "auto" }}>
+      <table
+        style={{
+          borderCollapse: "collapse",
+          fontSize: "var(--t-12)",
+          minWidth: "100%",
+        }}
+      >
+        <thead>
+          <tr>
+            {block.headers.map((header, headerIndex) => (
+              <th
+                key={`${header}-${headerIndex}`}
+                style={{
+                  borderBottom: "1px solid var(--border-2)",
+                  color: "var(--fg)",
+                  fontWeight: 650,
+                  padding: "7px 8px",
+                  textAlign: "left",
+                }}
+              >
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((row, rowIndex) => (
+            <tr key={`row-${rowIndex}`}>
+              {block.headers.map((_, cellIndex) => (
+                <td
+                  key={`cell-${rowIndex}-${cellIndex}`}
+                  style={{
+                    borderBottom: "1px solid var(--hairline)",
+                    color: "var(--fg-1)",
+                    padding: "7px 8px",
+                    verticalAlign: "top",
+                  }}
+                >
+                  {row[cellIndex] ?? ""}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function shouldSkipFirstHeading(blocks: MarkdownBlock[], skipFirstHeadingText?: string) {
+  if (!skipFirstHeadingText) return false;
+  const first = blocks[0];
+  if (!first || first.type !== "heading" || first.level !== 1) return false;
+  return normalizeText(first.text) === normalizeText(skipFirstHeadingText);
+}
+
+function getHeadingSize(level: number) {
+  if (level === 1) return "var(--t-22)";
+  if (level === 2) return "var(--t-18)";
+  if (level === 3) return "var(--t-15)";
+  return "var(--t-13)";
+}
+
+function isBlockStart(lines: string[], index: number) {
+  const trimmed = (lines[index] ?? "").trim();
+  return Boolean(
+    trimmed.match(/^#{1,6}\s+/)
+      || trimmed.match(/^```/)
+      || getListItem(trimmed)
+      || isTableStart(lines, index),
+  );
+}
+
+function getListItem(trimmed: string) {
+  const unordered = trimmed.match(/^[-*+]\s+(.+)$/);
+  if (unordered) return { ordered: false, text: unordered[1].trim() };
+
+  const ordered = trimmed.match(/^\d+[.)]\s+(.+)$/);
+  if (ordered) return { ordered: true, text: ordered[1].trim() };
+
+  return null;
+}
+
+function isTableStart(lines: string[], index: number) {
+  const current = lines[index] ?? "";
+  const separator = (lines[index + 1] ?? "").trim();
+  return isPipeRow(current) && isTableSeparator(separator);
+}
+
+function isPipeRow(line: string) {
+  return line.includes("|") && parseTableCells(line).length > 1;
+}
+
+function isTableSeparator(line: string) {
+  if (!line.includes("|")) return false;
+  const cells = parseTableCells(line);
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function parseTableCells(line: string) {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
+function normalizeText(text: string) {
+  return text.trim().replace(/\s+/g, " ");
+}

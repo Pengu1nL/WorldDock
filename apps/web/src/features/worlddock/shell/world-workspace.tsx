@@ -1,11 +1,12 @@
 "use client";
 
 import type { AgentSessionMessage } from "@worlddock/contract";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
 import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawer";
 import { SessionPage } from "../../agent-sessions/session-page";
+import { OfficialAssetDetailPage } from "../../world-assets/official-asset-detail-page";
 import { OfficialAssetLibraryPage } from "../../world-assets/official-asset-library-page";
 import {
   EXPLORATION_HISTORY_QUERY,
@@ -23,7 +24,7 @@ import {
   useSessionPotentialAssets,
   useStreamSessionRun,
 } from "../../agent-sessions/use-agent-session";
-import { cancelAgentRun } from "../api";
+import { cancelAgentRun, getOfficialAsset } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
 import { ArchiveView, ConflictsView } from "../view-archive";
@@ -132,6 +133,7 @@ export function WorldWorkspace({
           removeEditedAsset={removeEditedAsset}
           reorderAssets={reorderAssets}
           openAssetRelation={openAssetRelation}
+          pushToast={pushToast}
         />
       )}
       {view === "consistency" && currentWorld && (
@@ -592,11 +594,24 @@ const AssetLibraryWorkspace = ({
   removeEditedAsset,
   reorderAssets,
   openAssetRelation,
+  pushToast,
 }: any) => {
   const [officialAssetsUnavailable, setOfficialAssetsUnavailable] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+
+  const assetDetailQuery = useQuery({
+    queryKey: ["official-assets", world?.id ?? "", "detail", selectedAssetId ?? ""],
+    queryFn: () => {
+      if (!world?.id || !selectedAssetId) throw new Error("World id and asset id are required.");
+      return getOfficialAsset(world.id, selectedAssetId);
+    },
+    enabled: Boolean(world?.id && selectedAssetId && !officialAssetsUnavailable),
+    retry: false,
+  });
 
   useEffect(() => {
     setOfficialAssetsUnavailable(false);
+    setSelectedAssetId(null);
   }, [world?.id]);
 
   if (officialAssetsUnavailable) {
@@ -613,23 +628,29 @@ const AssetLibraryWorkspace = ({
     );
   }
 
+  if (selectedAssetId) {
+    return (
+      <OfficialAssetDetailPage
+        detail={assetDetailQuery.data ?? null}
+        error={assetDetailQuery.error}
+        loading={assetDetailQuery.isLoading}
+        onBack={() => setSelectedAssetId(null)}
+        onRefresh={() => {
+          void assetDetailQuery.refetch();
+        }}
+        onStartEdit={() => {
+          pushToast?.({ kind: "warn", text: "编辑会话将在后续任务接入" });
+        }}
+        patches={[]}
+      />
+    );
+  }
+
   return (
     <OfficialAssetLibraryPage
       world={world}
       onLoadError={() => setOfficialAssetsUnavailable(true)}
-      onOpenAsset={(assetId: string) => setDrawerOpen({
-        kind: "detail",
-        readonly: true,
-        item: {
-          id: assetId,
-          kind: "setting",
-          title: "官方资产",
-          category: "官方资产",
-          summary: "详情页将在后续任务接入。",
-          body: `asset id: ${assetId}`,
-          payload: { officialAssetId: assetId },
-        },
-      })}
+      onOpenAsset={(assetId: string) => setSelectedAssetId(assetId)}
     />
   );
 };
