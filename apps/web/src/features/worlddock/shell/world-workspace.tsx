@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
 import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawer";
 import { SessionPage } from "../../agent-sessions/session-page";
+import { ConsistencyIssuesPage } from "../../consistency/consistency-issues-page";
 import { AssetMarkdownView } from "../../world-assets/asset-markdown-view";
 import { AssetPatchList } from "../../world-assets/asset-patch-list";
 import { OfficialAssetDetailPage } from "../../world-assets/official-asset-detail-page";
@@ -43,7 +44,7 @@ import {
 } from "../api";
 import { Icon } from "../components";
 import { getSuggestionKey } from "../suggestion-utils";
-import { ArchiveView, ConflictsView } from "../view-archive";
+import { ArchiveView } from "../view-archive";
 import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
 import { Composer, Message } from "../view-workbench";
@@ -153,14 +154,7 @@ export function WorldWorkspace({
         />
       )}
       {view === "consistency" && currentWorld && (
-        <ConflictsView world={currentWorld} savedConflicts={savedConflicts} savedSeeds={savedSeeds}
-          onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-          onCreateAsset={openAssetEditor}
-          onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-          onDeleteAsset={removeEditedAsset}
-          onReorderAssets={reorderAssets}
-          onRelateAssets={openAssetRelation}
-          onBackToWorkbench={() => setView("exploration")}/>
+        <ConsistencyIssuesPage world={currentWorld} />
       )}
       {view === "publish" && currentWorld && (
         <PublishView

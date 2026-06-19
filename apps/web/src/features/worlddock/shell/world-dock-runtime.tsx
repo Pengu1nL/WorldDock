@@ -27,6 +27,10 @@ import {
 } from "../api";
 import { AgentRunPanel } from "../../agent/agent-run-panel";
 import { ContextInspector } from "../../agent/context-inspector";
+import {
+  getLoadedConsistencyIssueBadge,
+  useConsistencyIssues,
+} from "../../consistency/use-consistency";
 import { AssetEditor } from "../../world-assets/asset-editor";
 import { AssetSearch } from "../../world-assets/asset-search";
 import { Drawer, Toasts } from "../components";
@@ -779,7 +783,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     pushToast({
       kind: "save",
       text: `已升格为冲突 · ${issue.title}`,
-      action: { label: "查看", onClick: () => setView("consistency") },
+      action: { label: "查看", onClick: () => setView("asset-library") },
     });
   };
 
@@ -797,6 +801,8 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     return [...set.values()];
   }, [messages]);
   const pendingItems = useMemo(() => allSuggestions.filter((s: any) => !savedIds.includes(getSuggestionKey(s))), [allSuggestions, savedIds]);
+  const consistencyIssuesQuery = useConsistencyIssues(currentWorld?.id, { status: "open", limit: 50 });
+  const openConsistencyIssueBadge = getLoadedConsistencyIssueBadge(consistencyIssuesQuery.data);
 
   // ────────── Top-level render ──────────
   return (
@@ -805,8 +811,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
         world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
         mode={t.mode}
         tokens={runTokens}
-        assetCount={allSavedAssets.length}
-        openIssueCount={savedIssues.length}
       />
       <div className="app-body">
         <WorldNavigationRail
@@ -823,6 +827,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
           }}
           world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
           pendingCount={pendingItems.length}
+          consistencyIssueBadge={openConsistencyIssueBadge}
         />
         <main className="app-main" ref={mainRef} style={{ position: "relative", overflow: "hidden" }}>
           {view === "worlds" && (() => {
@@ -966,7 +971,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
                 onBackToWorkbench={() => { setDrawerOpen(null); setView("exploration"); }}
                 onJumpToItem={(targetItem: any) => {
                   // Jump to a linked item: switch to the appropriate pool and reopen drawer on it
-                  const targetView: WorldDockView = targetItem.kind === "conflict" ? "consistency" : "asset-library";
+                  const targetView: WorldDockView = "asset-library";
                   setDrawerOpen(null);
                   setView(targetView);
                   setTimeout(() => setDrawerOpen({ kind: "detail", item: targetItem, readonly: true }), 50);

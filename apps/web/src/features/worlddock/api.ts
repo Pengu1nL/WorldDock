@@ -861,6 +861,28 @@ export async function getConsistencyIssue(
   });
 }
 
+export async function ignoreConsistencyIssue(
+  worldId: string,
+  issueId: string,
+  options: ApiClientOptions = {},
+): Promise<{ issue: ConsistencyIssue }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/ignore`, {
+    method: "POST",
+    ...options,
+  });
+}
+
+export async function reopenConsistencyIssue(
+  worldId: string,
+  issueId: string,
+  options: ApiClientOptions = {},
+): Promise<{ issue: ConsistencyIssue }> {
+  return requestJson(`/v1/worlds/${worldId}/consistency-issues/${issueId}/reopen`, {
+    method: "POST",
+    ...options,
+  });
+}
+
 export async function createConsistencyRepairSession(
   worldId: string,
   issueId: string,
