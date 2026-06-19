@@ -11,6 +11,7 @@ type SessionComposerProps = {
 
 export function SessionComposer({ busy, tokens, onSend, onStop }: SessionComposerProps) {
   const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
   const canSend = text.trim().length > 0 && !busy;
 
   const send = () => {
@@ -32,9 +33,10 @@ export function SessionComposer({ busy, tokens, onSend, onStop }: SessionCompose
       <div style={{ maxWidth: "var(--max-chat)", margin: "0 auto" }}>
         <div
           style={{
-            border: "1px solid var(--border-2)",
+            border: `1px solid ${focused ? "var(--border-3)" : "var(--border-2)"}`,
             borderRadius: 8,
             background: "var(--surface)",
+            boxShadow: focused ? "0 0 0 3px color-mix(in srgb, var(--amber) 18%, transparent)" : "none",
             padding: "10px 12px 8px",
           }}
         >
@@ -42,6 +44,8 @@ export function SessionComposer({ busy, tokens, onSend, onStop }: SessionCompose
             aria-label="继续推演"
             value={text}
             onChange={(event) => setText(event.target.value)}
+            onBlur={() => setFocused(false)}
+            onFocus={() => setFocused(true)}
             onKeyDown={(event) => {
               if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
                 event.preventDefault();

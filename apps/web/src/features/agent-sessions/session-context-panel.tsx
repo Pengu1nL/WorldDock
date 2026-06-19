@@ -2,8 +2,16 @@ import type { AgentSessionContextItem, AgentSessionSubject } from "@worlddock/co
 
 import { Icon } from "../worlddock/components";
 
+export type SessionSubjectView = AgentSessionSubject | {
+  id?: string;
+  subjectKind?: AgentSessionSubject["kind"];
+  subjectId?: string;
+  role?: AgentSessionSubject["role"];
+  title?: string | null;
+};
+
 type SessionContextPanelProps = {
-  subjects: AgentSessionSubject[];
+  subjects: SessionSubjectView[];
   contextItems: AgentSessionContextItem[];
 };
 
@@ -23,22 +31,26 @@ export function SessionContextPanel({ subjects, contextItems }: SessionContextPa
       {subjects.length > 0 ? (
         <div className="col" style={{ gap: 6 }}>
           <div className="label">主体</div>
-          {subjects.map((subject, index) => (
-            <div
-              key={subject.id ?? `${subject.kind}-${subject.targetId}-${index}`}
-              className="row gap-2"
-              style={{
-                padding: "7px 0",
-                borderBottom: "1px solid var(--hairline)",
-                alignItems: "baseline",
-              }}
-            >
-              <span className="tag">{subject.kind}</span>
-              <span style={{ minWidth: 0, color: "var(--fg)", fontSize: "var(--t-13)" }}>
-                {subject.title ?? subject.targetId}
-              </span>
-            </div>
-          ))}
+          {subjects.map((subject, index) => {
+            const view = normalizeSubject(subject);
+
+            return (
+              <div
+                key={subject.id ?? `${view.kind}-${view.targetId}-${index}`}
+                className="row gap-2"
+                style={{
+                  padding: "7px 0",
+                  borderBottom: "1px solid var(--hairline)",
+                  alignItems: "baseline",
+                }}
+              >
+                <span className="tag">{view.kind}</span>
+                <span style={{ minWidth: 0, color: "var(--fg)", fontSize: "var(--t-13)" }}>
+                  {view.title ?? view.targetId}
+                </span>
+              </div>
+            );
+          })}
         </div>
       ) : null}
 
@@ -53,6 +65,17 @@ export function SessionContextPanel({ subjects, contextItems }: SessionContextPa
       </div>
     </section>
   );
+}
+
+function normalizeSubject(subject: SessionSubjectView) {
+  const backendSubject = subject as Extract<SessionSubjectView, { subjectKind?: AgentSessionSubject["kind"] }>;
+  const contractSubject = subject as AgentSessionSubject;
+
+  return {
+    kind: contractSubject.kind ?? backendSubject.subjectKind ?? "world",
+    targetId: contractSubject.targetId ?? backendSubject.subjectId ?? "",
+    title: subject.title,
+  };
 }
 
 function ContextItem({ item }: { item: ContextItemWithLegacyExcerpt }) {

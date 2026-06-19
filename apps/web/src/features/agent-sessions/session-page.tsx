@@ -2,13 +2,12 @@ import type {
   AgentSession,
   AgentSessionContextItem,
   AgentSessionMessage,
-  AgentSessionSubject,
 } from "@worlddock/contract";
 import type { ReactNode } from "react";
 
 import { Icon } from "../worlddock/components";
 import { SessionComposer } from "./session-composer";
-import { SessionContextPanel } from "./session-context-panel";
+import { SessionContextPanel, type SessionSubjectView } from "./session-context-panel";
 import { SessionMessageList } from "./session-message-list";
 
 type SessionRunState = {
@@ -18,7 +17,7 @@ type SessionRunState = {
 
 export type SessionPageProps = {
   session: AgentSession;
-  subjects: AgentSessionSubject[];
+  subjects: SessionSubjectView[];
   messages: AgentSessionMessage[];
   contextItems: AgentSessionContextItem[];
   runState: SessionRunState;
