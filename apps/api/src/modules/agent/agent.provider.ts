@@ -45,6 +45,7 @@ export type AgentProviderChunk =
   | { type: "delta"; text: string }
   | { type: "tool-requested"; toolCall: PiToolCall }
   | { type: "tool-completed"; toolCallId: string; result: Record<string, unknown> }
+  | { type: "asset-patch-applied"; sessionId: string; assetId: string; patchId: string }
   | { type: "suggestion"; suggestion: WorldSuggestion }
   | { type: "usage"; tokenUsage: TokenUsage }
   | { type: "failed"; code: string; message: string };

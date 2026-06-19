@@ -389,6 +389,16 @@ export class AgentService {
             lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
           }
 
+          if (chunk.type === "asset-patch-applied") {
+            const event = await this.append(run.id, sequence++, "asset.patch.applied", {
+              sessionId: chunk.sessionId,
+              assetId: chunk.assetId,
+              patchId: chunk.patchId,
+            });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
           if (chunk.type === "delta") {
             const event = await this.append(run.id, sequence++, "message.delta", { text: chunk.text });
             yield event;
@@ -596,6 +606,16 @@ export class AgentService {
 
           if (chunk.type === "tool-completed") {
             const event = await this.append(run.id, sequence++, "tool.completed", { toolCallId: chunk.toolCallId, result: chunk.result });
+            yield event;
+            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+          }
+
+          if (chunk.type === "asset-patch-applied") {
+            const event = await this.append(run.id, sequence++, "asset.patch.applied", {
+              sessionId: chunk.sessionId,
+              assetId: chunk.assetId,
+              patchId: chunk.patchId,
+            });
             yield event;
             lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
           }

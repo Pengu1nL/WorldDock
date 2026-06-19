@@ -76,7 +76,11 @@ async function installSessionMocks(page: Page) {
     });
   });
 
-  await page.route("**/v1/worlds/world_created/official-assets", async (route) => {
+  await page.route("**/v1/worlds/world_created/official-assets**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/v1/worlds/world_created/official-assets") {
+      return route.fallback();
+    }
     return json(route, {
       assets: promoted ? [memoryTradeLawOfficialAsset] : [],
       nextCursor: null,

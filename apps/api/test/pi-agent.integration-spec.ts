@@ -47,6 +47,63 @@ describe("pi agent runtime boundary", () => {
     expect(events[2]).toMatchObject({ type: "context.used", source: "tool", targetId: "asset_1" });
   });
 
+  it("turns applied asset patch tool results into patch applied events", async () => {
+    const runtime: PiRuntimeClient = {
+      async *runSession(_input, executeTool) {
+        const toolCall = {
+          id: "call_patch_1",
+          name: "apply_world_asset_patch" as const,
+          arguments: {
+            worldId: "world_1",
+            assetId: "asset_1",
+            sessionId: "session_1",
+            afterMarkdown: "# 记忆交易许可\n\n## 概括\n\n需要登记并审计。",
+          },
+        };
+        yield { type: "tool.requested", toolCall };
+        const executed = await executeTool?.(toolCall);
+        yield { type: "tool.completed", toolCallId: toolCall.id, result: executed?.result ?? {} };
+        for (const contextEvent of executed?.contextEvents ?? []) yield contextEvent;
+        yield { type: "session.completed" };
+      },
+    };
+    const registry = new WorldToolRegistry();
+    registry.register("apply_world_asset_patch", async () => ({
+      patch: {
+        id: "patch_1",
+        assetId: "asset_1",
+        sessionId: "session_1",
+      },
+    }));
+    const runner = new PiSessionRunner(runtime, registry, new SafetyGate());
+
+    const events: PiRuntimeEvent[] = [];
+    for await (const event of runner.run({
+      runId: "run_1",
+      worldId: "world_1",
+      prompt: "应用资产补丁",
+      context: [],
+      policy: { kind: "asset_edit" },
+      tools: localPiTools(),
+      skills: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events.map((event) => event.type)).toEqual([
+      "tool.requested",
+      "tool.completed",
+      "asset.patch.applied",
+      "session.completed",
+    ]);
+    expect(events[2]).toEqual({
+      type: "asset.patch.applied",
+      sessionId: "session_1",
+      assetId: "asset_1",
+      patchId: "patch_1",
+    });
+  });
+
   it("treats manifest index cards as disclosed for later detail expansion", async () => {
     const runtime: PiRuntimeClient = {
       async *runSession(_input, executeTool) {

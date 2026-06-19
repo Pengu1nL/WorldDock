@@ -170,6 +170,68 @@ describe("agent session run local endpoints", () => {
     }));
   });
 
+  it("persists and streams applied asset patch provider events", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "asset_edit",
+      title: "编辑记忆交易许可",
+      status: "active",
+      current: false,
+      metadata: {},
+    });
+    const provider = createMockStreamingAgentProvider([
+      {
+        type: "asset-patch-applied",
+        sessionId: session.id,
+        assetId: "asset_1",
+        patchId: "patch_1",
+      },
+      { type: "delta", text: "补丁已应用。" },
+    ]);
+    app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "应用补丁" })
+      .expect(201);
+
+    const streamed = await request(app.getHttpServer())
+      .get(`/v1/agent-session-runs/${created.body.run.id}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+
+    const events = parseSseMessages(streamed.text);
+    expect(events).toContainEqual(expect.objectContaining({
+      type: "asset.patch.applied",
+      data: expect.objectContaining({
+        payload: {
+          sessionId: session.id,
+          assetId: "asset_1",
+          patchId: "patch_1",
+        },
+      }),
+    }));
+    expect(await agents.listEvents(created.body.run.id)).toContainEqual(expect.objectContaining({
+      type: "asset.patch.applied",
+      payload: {
+        sessionId: session.id,
+        assetId: "asset_1",
+        patchId: "patch_1",
+      },
+    }));
+  });
+
   it("does not create official suggestions for world exploration session runs", async () => {
     const worlds = createInMemoryWorlds();
     const agents = createInMemoryAgents();

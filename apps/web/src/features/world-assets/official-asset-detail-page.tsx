@@ -21,6 +21,7 @@ type OfficialAssetDetailPageProps = {
   error?: unknown;
   onBack: () => void;
   onStartEdit?: (assetId: string) => void;
+  creatingEditSession?: boolean;
   onRevertPatch?: (patchId: string) => void;
   revertingPatchId?: string | null;
   onRefresh?: () => void;
@@ -35,6 +36,7 @@ export function OfficialAssetDetailPage({
   error,
   onBack,
   onStartEdit,
+  creatingEditSession = false,
   onRevertPatch,
   revertingPatchId = null,
   onRefresh,
@@ -60,12 +62,12 @@ export function OfficialAssetDetailPage({
           </button>
           <button
             className="btn"
-            disabled={!asset || !onStartEdit}
+            disabled={!asset || !onStartEdit || creatingEditSession}
             onClick={() => asset && onStartEdit?.(asset.id)}
             type="button"
           >
             <Icon name="edit" size={12} />
-            <span>编辑</span>
+            <span>{creatingEditSession ? "创建中" : "编辑"}</span>
           </button>
           <button
             className="btn"

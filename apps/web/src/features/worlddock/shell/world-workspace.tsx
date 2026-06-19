@@ -673,7 +673,7 @@ const AssetLibraryWorkspace = ({
   }, [cancelActiveEditRun]);
 
   const handleStartEdit = useCallback(async (assetId: string) => {
-    if (!worldId) return;
+    if (!worldId || createEditSession.isPending) return;
 
     resetEditSessionRuntime(true);
     try {
@@ -897,6 +897,7 @@ const AssetLibraryWorkspace = ({
         detail={assetDetailQuery.data ?? null}
         error={assetDetailQuery.error}
         loading={assetDetailQuery.isLoading}
+        creatingEditSession={createEditSession.isPending}
         onBack={() => setSelectedAssetId(null)}
         onRefresh={() => {
           void assetDetailQuery.refetch();

@@ -84,6 +84,26 @@ describe("OfficialAssetDetailPage", () => {
     expect(onStartEdit).toHaveBeenCalledWith("asset_1");
   });
 
+  it("disables edit action while creating an edit session", () => {
+    const onStartEdit = vi.fn();
+
+    render(
+      <OfficialAssetDetailPage
+        detail={detail}
+        creatingEditSession
+        onBack={vi.fn()}
+        onStartEdit={onStartEdit}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: /创建中/ });
+    expect(button).toBeDisabled();
+
+    fireEvent.click(button);
+
+    expect(onStartEdit).not.toHaveBeenCalled();
+  });
+
   it("keeps showing stale markdown when refresh fails after detail loaded", () => {
     render(
       <OfficialAssetDetailPage

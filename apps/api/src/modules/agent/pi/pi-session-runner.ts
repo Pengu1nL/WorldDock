@@ -18,7 +18,7 @@ const SESSION_WORLD_SCOPED_TOOLS = new Set<PiToolName>([
   "propose_release_notes",
 ]);
 
-function contextEventsFromToolResult(toolName: PiToolName, result: Record<string, unknown>): PiRuntimeEvent[] {
+function runtimeEventsFromToolResult(toolName: PiToolName, result: Record<string, unknown>): PiRuntimeEvent[] {
   if (toolName === "get_world_manifest" && result.manifest && typeof result.manifest === "object") {
     const manifest = result.manifest as { worldId: string; name: string; summary: string };
     return [{ type: "context.used", level: "manifest", kind: "world", title: manifest.name, excerpt: manifest.summary, targetId: manifest.worldId, source: "tool" }];
@@ -43,6 +43,21 @@ function contextEventsFromToolResult(toolName: PiToolName, result: Record<string
       return { type: "context.used", level: "source_fragment", kind: item.kind, title: `${item.kind}:${item.targetId}`, excerpt: item.text, targetId: item.targetId, source: "tool" };
     });
   }
+  if (toolName === "apply_world_asset_patch" && isRecord(result.patch)) {
+    const patch = result.patch;
+    if (
+      typeof patch.id === "string"
+      && typeof patch.assetId === "string"
+      && typeof patch.sessionId === "string"
+    ) {
+      return [{
+        type: "asset.patch.applied",
+        sessionId: patch.sessionId,
+        assetId: patch.assetId,
+        patchId: patch.id,
+      }];
+    }
+  }
   return [];
 }
 
@@ -60,7 +75,7 @@ export class PiSessionRunner {
       this.safetyGate.assertToolAllowed(toolCall, disclosedAssetIds, input.policy);
       assertToolWorldMatchesSession(toolCall, input.worldId);
       const result = await this.tools.execute(toolCall.name, toolCall.arguments);
-      const contextEvents = contextEventsFromToolResult(toolCall.name, result);
+      const contextEvents = runtimeEventsFromToolResult(toolCall.name, result);
       for (const assetId of disclosedAssetIdsFromToolResult(toolCall.name, result)) {
         disclosedAssetIds.add(assetId);
       }

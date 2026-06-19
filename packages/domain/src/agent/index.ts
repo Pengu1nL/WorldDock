@@ -174,6 +174,14 @@ export const agentEventSchema = z.discriminatedUnion("type", [
     payload: z.object({ toolCallId: z.string().min(1), result: z.record(z.string(), z.unknown()) }),
   }),
   baseAgentEventSchema.extend({
+    type: z.literal("asset.patch.applied"),
+    payload: z.object({
+      sessionId: z.string().min(1),
+      assetId: z.string().min(1),
+      patchId: z.string().min(1),
+    }),
+  }),
+  baseAgentEventSchema.extend({
     type: z.literal("suggestion.created"),
     payload: z.object({
       suggestionId: z.string().min(1),
