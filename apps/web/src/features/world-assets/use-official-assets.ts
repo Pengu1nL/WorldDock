@@ -22,6 +22,14 @@ export const officialAssetsQueryKeys = {
     ...officialAssetsQueryKeys.lists(worldId),
     normalizeOfficialAssetsQuery(query),
   ] as const,
+  details: (worldId: string | null | undefined) => [
+    ...officialAssetsQueryKeys.world(worldId),
+    "detail",
+  ] as const,
+  detail: (worldId: string | null | undefined, assetId: string | null | undefined) => [
+    ...officialAssetsQueryKeys.details(worldId),
+    assetId ?? "",
+  ] as const,
 };
 
 export function useOfficialAssets(

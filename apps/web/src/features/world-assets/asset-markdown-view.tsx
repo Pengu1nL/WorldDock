@@ -12,6 +12,8 @@ type MarkdownBlock =
   | { type: "code"; language?: string; text: string }
   | { type: "table"; headers: string[]; rows: string[][] };
 
+const HEADING_TAGS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
+
 export function AssetMarkdownView({
   markdown,
   skipFirstHeadingText,
@@ -138,7 +140,7 @@ function parseMarkdown(markdown: string): MarkdownBlock[] {
 
 function renderBlock(block: MarkdownBlock, index: number): ReactNode {
   if (block.type === "heading") {
-    const Tag = `h${block.level}` as keyof JSX.IntrinsicElements;
+    const Tag = getHeadingTag(block.level);
     const marginTop = index === 0 ? 0 : block.level === 1 ? 28 : 22;
 
     return (
@@ -275,6 +277,10 @@ function getHeadingSize(level: number) {
   if (level === 2) return "var(--t-18)";
   if (level === 3) return "var(--t-15)";
   return "var(--t-13)";
+}
+
+function getHeadingTag(level: number) {
+  return HEADING_TAGS[Math.min(Math.max(level, 1), HEADING_TAGS.length) - 1];
 }
 
 function isBlockStart(lines: string[], index: number) {

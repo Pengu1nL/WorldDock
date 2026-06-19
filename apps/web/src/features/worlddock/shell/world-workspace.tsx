@@ -8,6 +8,7 @@ import { PotentialAssetDrawer } from "../../agent-sessions/potential-asset-drawe
 import { SessionPage } from "../../agent-sessions/session-page";
 import { OfficialAssetDetailPage } from "../../world-assets/official-asset-detail-page";
 import { OfficialAssetLibraryPage } from "../../world-assets/official-asset-library-page";
+import { officialAssetsQueryKeys } from "../../world-assets/use-official-assets";
 import {
   EXPLORATION_HISTORY_QUERY,
   agentSessionKeys,
@@ -600,7 +601,7 @@ const AssetLibraryWorkspace = ({
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   const assetDetailQuery = useQuery({
-    queryKey: ["official-assets", world?.id ?? "", "detail", selectedAssetId ?? ""],
+    queryKey: officialAssetsQueryKeys.detail(world?.id, selectedAssetId),
     queryFn: () => {
       if (!world?.id || !selectedAssetId) throw new Error("World id and asset id are required.");
       return getOfficialAsset(world.id, selectedAssetId);

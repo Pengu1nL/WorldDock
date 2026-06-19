@@ -1,9 +1,11 @@
 import type {
+  WorldAssetIndex,
+  WorldAssetRevision,
+} from "@worlddock/contract";
+import type {
   OfficialWorldAsset,
   WorldAssetDetail,
-  WorldAssetIndex,
   WorldAssetPatch,
-  WorldAssetRevision,
 } from "../worlddock/api";
 import { Icon } from "../worlddock/components";
 import { AssetMarkdownView } from "./asset-markdown-view";
@@ -86,12 +88,15 @@ export function OfficialAssetDetailPage({
             padding: "22px 24px",
           }}
         >
-          {error ? (
+          {error && !detail ? (
             <DetailError error={error} />
           ) : loading && !detail ? (
             <DetailLoading />
           ) : detail ? (
-            <AssetMarkdownView markdown={detail.markdown} skipFirstHeadingText={detail.asset.name} />
+            <>
+              {error ? <DetailRefreshWarning error={error} /> : null}
+              <AssetMarkdownView markdown={detail.markdown} skipFirstHeadingText={detail.asset.name} />
+            </>
           ) : (
             <div className="prose" style={{ color: "var(--fg-3)", fontSize: "var(--t-13)" }}>
               请选择一个官方资产。
@@ -125,6 +130,26 @@ function DetailError({ error }: { error: unknown }) {
   return (
     <div className="prose" style={{ color: "var(--brick)", fontSize: "var(--t-13)", lineHeight: 1.6 }}>
       {getErrorMessage(error)}
+    </div>
+  );
+}
+
+function DetailRefreshWarning({ error }: { error: unknown }) {
+  return (
+    <div
+      className="prose"
+      style={{
+        background: "var(--amber-bg)",
+        border: "1px solid var(--amber-dim)",
+        borderRadius: 6,
+        color: "var(--amber)",
+        fontSize: "var(--t-12)",
+        lineHeight: 1.55,
+        marginBottom: 16,
+        padding: "9px 10px",
+      }}
+    >
+      刷新失败，仍显示上次内容。{getErrorMessage(error)}
     </div>
   );
 }
