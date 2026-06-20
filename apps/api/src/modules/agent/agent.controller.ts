@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Inject, Param, Patch, Post, Sse, type MessageEvent } from "@nestjs/common";
+import { Body, Controller, Header, HttpCode, Inject, Param, Patch, Post, Sse, type MessageEvent } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { z } from "zod";
 import { AgentService } from "./agent.service";
@@ -32,6 +32,7 @@ export class AgentController {
   }
 
   @Post("worlds/:worldId/agent-runs")
+  @Header("Deprecation", "true")
   async createRun(@Param("worldId") worldId: string, @Body() body: unknown) {
     const input = createRunSchema.parse(body);
     const result = await this.agentService.createRun(worldId, input);
@@ -122,17 +123,20 @@ export class AgentController {
   }
 
   @Post("agent-suggestions/:suggestionId/save")
+  @Header("Deprecation", "true")
   async save(@Param("suggestionId") suggestionId: string) {
     return this.agentService.saveSuggestion(suggestionId);
   }
 
   @Patch("agent-suggestions/:suggestionId")
+  @Header("Deprecation", "true")
   async edit(@Param("suggestionId") suggestionId: string, @Body() body: unknown) {
     const input = z.object({ suggestion: z.unknown() }).parse(body);
     return { suggestion: await this.agentService.editSuggestion(suggestionId, input) };
   }
 
   @Post("agent-suggestions/:suggestionId/discard")
+  @Header("Deprecation", "true")
   async discard(@Param("suggestionId") suggestionId: string) {
     return { suggestion: await this.agentService.discardSuggestion(suggestionId) };
   }

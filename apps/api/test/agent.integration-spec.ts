@@ -51,6 +51,7 @@ describe("agent local endpoints", () => {
       .send({ prompt: "继续推演记忆交易", mode: "expand" })
       .expect(201);
     const runId = created.body.run.id;
+    expect(created.headers.deprecation).toBe("true");
     expect(created.body).toMatchObject({
       run: { worldId: world.id, status: "running", prompt: "继续推演记忆交易" },
       suggestions: [],
@@ -80,6 +81,69 @@ describe("agent local endpoints", () => {
       prompt: "继续推演记忆交易",
       world: { id: world.id, name: "回忆所" },
     });
+  });
+
+  it("marks legacy suggestion write endpoints as deprecated", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const world = await worlds.createWorld({
+      name: "回忆所",
+      type: "近未来",
+      summary: "记忆可以被买卖。",
+      tags: ["记忆"],
+      mode: "local",
+      maturity: 20,
+    });
+    const run = await agents.createRun({
+      worldId: world.id,
+      mode: "expand",
+      prompt: "继续推演记忆交易",
+      model: null,
+    });
+    const legacySuggestion = {
+      id: "setting_memory_license",
+      kind: "setting" as const,
+      category: "世界规则",
+      title: "记忆交易许可",
+      summary: "所有记忆交易都需要登记许可。",
+      body: "未经登记的记忆交易会触发城市信用审查。",
+    };
+    const [saveTarget, editTarget, discardTarget] = await Promise.all([
+      agents.createSuggestion({ runId: run.id, worldId: world.id, suggestion: legacySuggestion }),
+      agents.createSuggestion({ runId: run.id, worldId: world.id, suggestion: legacySuggestion }),
+      agents.createSuggestion({ runId: run.id, worldId: world.id, suggestion: legacySuggestion }),
+    ]);
+    app = await createAgentApp(worlds, agents, createMockStreamingAgentProvider());
+
+    const saved = await request(app.getHttpServer())
+      .post(`/v1/agent-suggestions/${saveTarget.id}/save`)
+      .expect(201);
+    expect(saved.headers.deprecation).toBe("true");
+    expect(saved.body.suggestion).toMatchObject({ id: saveTarget.id, status: "saved" });
+    expect(saved.body.asset).toMatchObject({ kind: "setting", title: "记忆交易许可" });
+
+    const edited = await request(app.getHttpServer())
+      .patch(`/v1/agent-suggestions/${editTarget.id}`)
+      .send({
+        suggestion: {
+          ...legacySuggestion,
+          title: "记忆许可年审",
+          summary: "所有记忆交易许可都需要年审。",
+        },
+      })
+      .expect(200);
+    expect(edited.headers.deprecation).toBe("true");
+    expect(edited.body.suggestion).toMatchObject({
+      id: editTarget.id,
+      status: "edited",
+      suggestion: expect.objectContaining({ title: "记忆许可年审" }),
+    });
+
+    const discarded = await request(app.getHttpServer())
+      .post(`/v1/agent-suggestions/${discardTarget.id}/discard`)
+      .expect(201);
+    expect(discarded.headers.deprecation).toBe("true");
+    expect(discarded.body.suggestion).toMatchObject({ id: discardTarget.id, status: "discarded" });
   });
 
   it("cancels a local running run", async () => {
