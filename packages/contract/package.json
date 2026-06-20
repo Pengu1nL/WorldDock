@@ -1,32 +1,61 @@
 {
   "name": "@worlddock/contract",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "WorldDock push/pull contract schemas.",
   "license": "MIT",
   "private": false,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./agent-sessions": "./src/agent-sessions/index.ts",
-    "./assets": "./src/assets/index.ts",
-    "./consistency": "./src/consistency/index.ts",
-    "./hub-api": "./src/hub-api/index.ts",
-    "./potential-assets": "./src/potential-assets/index.ts",
-    "./releases": "./src/releases/index.ts",
-    "./world": "./src/world/index.ts",
-    "./worlds/world-package": "./src/worlds/world-package.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./agent-sessions": {
+      "types": "./dist/agent-sessions/index.d.ts",
+      "import": "./dist/agent-sessions/index.js"
+    },
+    "./assets": {
+      "types": "./dist/assets/index.d.ts",
+      "import": "./dist/assets/index.js"
+    },
+    "./consistency": {
+      "types": "./dist/consistency/index.d.ts",
+      "import": "./dist/consistency/index.js"
+    },
+    "./hub-api": {
+      "types": "./dist/hub-api/index.d.ts",
+      "import": "./dist/hub-api/index.js"
+    },
+    "./potential-assets": {
+      "types": "./dist/potential-assets/index.d.ts",
+      "import": "./dist/potential-assets/index.js"
+    },
+    "./releases": {
+      "types": "./dist/releases/index.d.ts",
+      "import": "./dist/releases/index.js"
+    },
+    "./world": {
+      "types": "./dist/world/index.d.ts",
+      "import": "./dist/world/index.js"
+    },
+    "./worlds/world-package": {
+      "types": "./dist/worlds/world-package.d.ts",
+      "import": "./dist/worlds/world-package.js"
+    }
   },
   "files": [
-    "src"
+    "dist"
   ],
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "prepublishOnly": "pnpm lint && pnpm test && pnpm build"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "lint": "pnpm build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && vitest run",
+    "test:pack": "pnpm build && node scripts/verify-package.mjs",
+    "prepack": "pnpm build",
+    "prepublishOnly": "pnpm lint && pnpm test && pnpm test:pack"
   },
   "dependencies": {
     "zod": "latest"

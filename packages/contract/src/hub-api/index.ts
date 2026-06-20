@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { releaseSnapshotSchema } from "../releases";
+import { releaseSnapshotSchema } from "../releases/index.js";
 
 export const hubPersonalAccessTokenScopeSchema = z.enum(["repo:push", "repo:pull"]);
 export type HubPersonalAccessTokenScope = z.infer<typeof hubPersonalAccessTokenScopeSchema>;

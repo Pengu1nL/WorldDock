@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema } from "../assets";
+import { officialWorldAssetStatusSchema, officialWorldAssetTypeSchema } from "../assets/index.js";
 
 const worldPackageWorldSchema = z.object({
   name: z.string().min(1),

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { officialWorldAssetTypeSchema } from "../assets";
+import { officialWorldAssetTypeSchema } from "../assets/index.js";
 
 export const potentialAssetStatusSchema = z.enum([
   "active",

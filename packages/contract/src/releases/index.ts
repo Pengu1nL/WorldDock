@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { officialWorldPackageAssetSchema, worldPackageSchema } from "../worlds/world-package";
+import { officialWorldPackageAssetSchema, worldPackageSchema } from "../worlds/world-package.js";
 
 export const contractVersionSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
 
