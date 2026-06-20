@@ -48,6 +48,36 @@ const memoryTradeLawAsset = {
   updatedAt: "2026-05-28T10:00:00.000Z",
 };
 
+const sessionAssetSession = {
+  id: "session_1",
+  worldId: "world_created",
+  kind: "world_exploration",
+  title: "回忆所 推演",
+  status: "active",
+  current: true,
+  subjects: [],
+  contextItems: [],
+  metadata: {},
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+};
+
+const memoryTradeLawOfficialAsset = {
+  id: "asset_1",
+  worldId: "world_created",
+  type: "rule",
+  name: "《记忆交易法》",
+  summary: "认证机构可以托管、估价并转让记忆，但亲属记忆交易必须经过冷静期。",
+  documentKey: "rules/memory-trade-law.md",
+  status: "active",
+  version: 1,
+  tags: ["法律", "记忆"],
+  metadata: {},
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+  archivedAt: null,
+};
+
 const tideLawAsset = {
   id: "tide_law",
   worldId: "tide",
@@ -158,6 +188,123 @@ export async function gotoApp(page: Page, options: { installMocks?: boolean; moc
   }
   await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
+}
+
+export async function installSessionAssetMocks(page: Page) {
+  let sessionCreated = false;
+  let sessionRunCompleted = false;
+  let promoted = false;
+
+  await page.route("**/v1/worlds/world_created/agent-sessions**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    const method = request.method();
+
+    if (method === "POST" && path === "/v1/worlds/world_created/agent-sessions") {
+      sessionCreated = true;
+      return json(route, { session: sessionAssetSession }, 201);
+    }
+
+    if (method === "GET" && path === "/v1/worlds/world_created/agent-sessions") {
+      return json(route, {
+        sessions: sessionCreated ? [sessionAssetSession] : [],
+        nextCursor: null,
+      });
+    }
+
+    if (method === "GET" && path === "/v1/worlds/world_created/agent-sessions/session_1") {
+      return json(route, buildSessionAssetDetail(sessionRunCompleted));
+    }
+
+    if (method === "POST" && path === "/v1/worlds/world_created/agent-sessions/session_1/runs") {
+      return json(route, {
+        run: {
+          id: "run_1",
+          worldId: "world_created",
+          sessionId: "session_1",
+          status: "running",
+          prompt: postData(request).prompt ?? "继续推演",
+        },
+      }, 201);
+    }
+
+    if (method === "GET" && path === "/v1/worlds/world_created/agent-sessions/session_1/potential-assets") {
+      return json(route, {
+        potentialAssets: sessionRunCompleted ? [buildSessionPotentialAsset(promoted)] : [],
+        nextCursor: null,
+      });
+    }
+
+    return route.fallback();
+  });
+
+  await page.route("**/v1/agent-session-runs/run_1/events", async (route) => {
+    sessionRunCompleted = true;
+    return route.fulfill({
+      status: 200,
+      contentType: "text/event-stream",
+      body: [
+        sessionSse(1, "message.delta", { text: "亲属记忆交易需要冷静期复核。" }),
+        sessionSse(2, "potential_asset.detected", {
+          potentialAssetId: "pa_1",
+          potentialAsset: buildSessionPotentialAsset(promoted),
+        }),
+        sessionSse(3, "run.completed", {
+          tokenUsage: { inputTokens: 80, outputTokens: 40, totalTokens: 120 },
+        }),
+      ].join(""),
+    });
+  });
+
+  await page.route("**/v1/worlds/world_created/potential-assets/pa_1/promote", async (route) => {
+    promoted = true;
+    return json(route, {
+      asset: memoryTradeLawOfficialAsset,
+      markdown: memoryTradeLawMarkdown,
+      indexes: [],
+      revisions: [],
+      potentialAsset: buildSessionPotentialAsset(promoted),
+      depositionRun: {
+        id: "deposition_run_1",
+        worldId: "world_created",
+        sessionId: "session_1",
+        status: "completed",
+      },
+    }, 201);
+  });
+
+  await page.route("**/v1/worlds/world_created/official-assets**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    const method = request.method();
+
+    if (method === "GET" && path === "/v1/worlds/world_created/official-assets") {
+      return json(route, {
+        assets: promoted ? [memoryTradeLawOfficialAsset] : [],
+        nextCursor: null,
+      });
+    }
+
+    if (method === "GET" && path === "/v1/worlds/world_created/official-assets/asset_1") {
+      return json(route, {
+        asset: memoryTradeLawOfficialAsset,
+        markdown: memoryTradeLawMarkdown,
+        indexes: [],
+        revisions: [],
+      });
+    }
+
+    if (method === "GET" && path === "/v1/worlds/world_created/official-assets/asset_1/patches") {
+      return json(route, { patches: [] });
+    }
+
+    return route.fallback();
+  });
+
+  return {
+    wasPromoted: () => promoted,
+  };
 }
 
 export async function installApiMocks(page: Page, options: ApiMockOptions = {}) {
@@ -443,6 +590,78 @@ function agentSse(sequence: number, type: string, payload: unknown) {
     payload,
   });
 }
+
+function sessionSse(sequence: number, type: string, payload: unknown) {
+  return sse(type, {
+    id: `evt_session_run_${sequence}`,
+    runId: "run_1",
+    sequence,
+    createdAt: `2026-05-28T10:00:0${sequence}.000Z`,
+    type,
+    payload,
+  });
+}
+
+function buildSessionAssetDetail(sessionRunCompleted: boolean) {
+  return {
+    session: sessionAssetSession,
+    subjects: [],
+    contextItems: [],
+    messages: sessionRunCompleted
+      ? [
+        {
+          id: "msg_session_user_1",
+          sessionId: "session_1",
+          role: "user",
+          content: "检查亲属记忆交易的制度漏洞。",
+          status: "complete",
+          metadata: {},
+          createdAt: "2026-05-28T10:00:01.000Z",
+        },
+        {
+          id: "msg_session_assistant_1",
+          sessionId: "session_1",
+          role: "assistant",
+          content: "亲属记忆交易需要冷静期复核。",
+          status: "complete",
+          metadata: {},
+          createdAt: "2026-05-28T10:00:03.000Z",
+        },
+      ]
+      : [],
+  };
+}
+
+function buildSessionPotentialAsset(promoted: boolean) {
+  return {
+    id: "pa_1",
+    worldId: "world_created",
+    sessionId: "session_1",
+    type: "rule",
+    title: "记忆交易许可",
+    summary: "亲属记忆交易需要冷静期复核，并由独立见证人确认。",
+    evidence: [
+      {
+        messageId: "msg_session_assistant_1",
+        quote: "亲属记忆交易需要冷静期复核。",
+      },
+    ],
+    status: promoted ? "promoted" : "active",
+    promotedAssetId: promoted ? "asset_1" : null,
+    createdAt: "2026-05-28T10:00:00.000Z",
+    updatedAt: promoted ? "2026-05-28T10:00:04.000Z" : "2026-05-28T10:00:00.000Z",
+  };
+}
+
+const memoryTradeLawMarkdown = [
+  "# 《记忆交易法》",
+  "",
+  "## 资产详情",
+  "",
+  "认证机构可以托管、估价并转让记忆。",
+  "",
+  "亲属记忆交易必须经过七日冷静期，并由独立见证人确认。",
+].join("\n");
 
 function postData(request: ReturnType<Route["request"]>) {
   try {
