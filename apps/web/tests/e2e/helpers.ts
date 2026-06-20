@@ -76,6 +76,78 @@ const tideSecretAsset = {
   updatedAt: "2026-05-28T10:00:00.000Z",
 };
 
+const tideLawOfficialAsset = {
+  id: "official_tide_law",
+  worldId: "tide",
+  type: "rule",
+  name: "潮汐律",
+  summary: "潮汐每 13 年一次反向，税制与航线许可随之切换。",
+  documentKey: "rules/tide-law.md",
+  status: "active",
+  version: 1,
+  tags: ["制度", "航线"],
+  metadata: {},
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+  archivedAt: null,
+};
+
+const tideRegistryOfficialAsset = {
+  id: "official_tide_registry",
+  worldId: "tide",
+  type: "rule",
+  name: "潮汐登记条例",
+  summary: "港口需要在反向潮前完成船只登记，但偏远航线允许口头备案。",
+  documentKey: "rules/tide-registry.md",
+  status: "active",
+  version: 1,
+  tags: ["登记", "港口"],
+  metadata: {},
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+  archivedAt: null,
+};
+
+const tideConsistencyIssue = {
+  id: "issue_1",
+  worldId: "tide",
+  title: "登记口径冲突",
+  description: "潮汐律要求所有航线登记后才能离港，但登记条例又允许偏远航线口头备案。",
+  severity: "normal",
+  status: "open",
+  subjectAssetIds: ["official_tide_law", "official_tide_registry"],
+  evidence: [
+    {
+      assetId: "official_tide_law",
+      quote: "所有航线必须登记后才能离港。",
+      confidence: 0.9,
+    },
+    {
+      assetId: "official_tide_registry",
+      quote: "偏远航线可由港务长口头备案后先行离港。",
+      confidence: 0.86,
+    },
+  ],
+  metadata: {},
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+  resolvedAt: null,
+};
+
+const tideConsistencyRepairSession = {
+  id: "session_consistency_repair_1",
+  worldId: "tide",
+  kind: "consistency_repair",
+  title: "修复登记口径冲突",
+  status: "active",
+  current: true,
+  subjects: [],
+  contextItems: [],
+  metadata: { issueId: tideConsistencyIssue.id },
+  createdAt: "2026-05-28T10:00:00.000Z",
+  updatedAt: "2026-05-28T10:00:00.000Z",
+};
+
 type ApiMockOptions = {
   onPushWorld?: (push: { worldId: string; input: Record<string, any> }) => void;
 };
@@ -93,6 +165,7 @@ export async function installApiMocks(page: Page, options: ApiMockOptions = {}) 
     hubUrl: "https://hub.worlddock.test",
     tokenPrefix: "wdpat_e2",
   };
+  let tideConsistencyIssueDiscovered = false;
 
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
@@ -188,6 +261,64 @@ export async function installApiMocks(page: Page, options: ApiMockOptions = {}) 
         assets: worldId === "world_created" ? [memoryTradeLawAsset] : [],
         nextCursor: null,
       });
+    }
+
+    if (method === "GET" && path === "/v1/worlds/tide/official-assets") {
+      return json(route, {
+        assets: [tideLawOfficialAsset, tideRegistryOfficialAsset],
+        nextCursor: null,
+      });
+    }
+
+    if (method === "GET" && path === "/v1/worlds/tide/consistency-issues") {
+      const status = url.searchParams.get("status");
+      return json(route, {
+        issues: tideConsistencyIssueDiscovered && (!status || status === "open") ? [tideConsistencyIssue] : [],
+        nextCursor: null,
+      });
+    }
+
+    if (method === "POST" && path === "/v1/worlds/tide/consistency-issues/check") {
+      tideConsistencyIssueDiscovered = true;
+      return json(route, { issues: [tideConsistencyIssue] });
+    }
+
+    if (method === "GET" && path === "/v1/worlds/tide/consistency-issues/issue_1") {
+      return json(route, { issue: tideConsistencyIssue });
+    }
+
+    if (method === "POST" && path === "/v1/worlds/tide/consistency-issues/issue_1/repair-sessions") {
+      return json(route, {
+        session: tideConsistencyRepairSession,
+        subjects: [
+          {
+            id: "subject_consistency_issue_1",
+            sessionId: tideConsistencyRepairSession.id,
+            subjectKind: "consistency_issue",
+            subjectId: tideConsistencyIssue.id,
+            role: "repair_target",
+            title: tideConsistencyIssue.title,
+            metadata: {},
+            createdAt: "2026-05-28T10:00:00.000Z",
+            updatedAt: "2026-05-28T10:00:00.000Z",
+          },
+        ],
+        contextItems: [
+          {
+            id: "ctx_tide_law",
+            sessionId: tideConsistencyRepairSession.id,
+            kind: "asset_document",
+            targetId: tideLawOfficialAsset.id,
+            title: tideLawOfficialAsset.name,
+            summary: tideLawOfficialAsset.summary,
+            source: "official_asset",
+            metadata: {},
+            createdAt: "2026-05-28T10:00:00.000Z",
+            updatedAt: "2026-05-28T10:00:00.000Z",
+          },
+        ],
+        messages: [],
+      }, 201);
     }
 
     if (method === "POST" && /\/v1\/worlds\/[^/]+\/push$/.test(path)) {
