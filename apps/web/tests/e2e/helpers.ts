@@ -240,6 +240,10 @@ export async function installSessionAssetMocks(page: Page) {
   });
 
   await page.route("**/v1/agent-session-runs/run_1/events", async (route) => {
+    if (route.request().method() !== "GET") {
+      return route.fallback();
+    }
+
     sessionRunCompleted = true;
     return route.fulfill({
       status: 200,
@@ -258,6 +262,10 @@ export async function installSessionAssetMocks(page: Page) {
   });
 
   await page.route("**/v1/worlds/world_created/potential-assets/pa_1/promote", async (route) => {
+    if (route.request().method() !== "POST") {
+      return route.fallback();
+    }
+
     promoted = true;
     return json(route, {
       asset: memoryTradeLawOfficialAsset,
