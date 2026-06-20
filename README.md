@@ -129,17 +129,11 @@ pnpm --filter @worlddock/cli test:pack
 
 连接 WorldHub 的 Personal Access Token 范围见当前 WorldHub API 文档。
 
-## 文档入口
+## 文档
 
-- 产品定位：`docs/product/positioning.md`
-- Cloud Alpha 范围：`docs/product/cloud-release-scope.md`
-- Alpha API：`docs/product/api.md`
-- 前端技术栈：`docs/frontend_tech_stack.md`
-- 后端技术栈：`docs/backend_tech_stack.md`
-- 后端验收报告：`docs/backend_final_validation_report.md`
-- 生产发布检查：`docs/operations/production_release_checklist.md`
-- 事故处理：`docs/operations/incident_runbook.md`
-- 数据备份恢复：`docs/operations/database_backup_restore.md`
+- 公开契约变更流程：`docs/contract-rfc.md`
+
+本地规划、阶段复盘和内部运维文档位于 `docs/`，默认不随公开仓库发布。
 
 ## 验收状态
 
