@@ -63,6 +63,12 @@ describe("SessionPage", () => {
     expect(screen.getByText("浮城税契")).toBeInTheDocument();
   });
 
+  it("labels the right information panel consistently", () => {
+    renderSessionPage();
+
+    expect(screen.getByLabelText("推演信息面板")).toBeInTheDocument();
+  });
+
   it("opens potential assets from the header badge", () => {
     const onOpenPotentialAssets = vi.fn();
     renderSessionPage({

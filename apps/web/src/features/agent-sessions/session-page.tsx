@@ -52,16 +52,8 @@ export function SessionPage({
     : String(potentialAssetCount);
 
   return (
-    <div
-      style={{
-        height: "100%",
-        minHeight: 0,
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) minmax(260px, 320px)",
-        background: "var(--bg)",
-      }}
-    >
-      <main style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+    <div className="session-layout">
+      <main className="session-main">
         <header
           style={{
             flex: "none",
@@ -120,16 +112,7 @@ export function SessionPage({
         />
       </main>
 
-      <aside
-        style={{
-          minWidth: 0,
-          minHeight: 0,
-          overflow: "auto",
-          borderLeft: "1px solid var(--border)",
-          background: "var(--surface)",
-          padding: "18px 18px 22px",
-        }}
-      >
+      <aside aria-label="推演信息面板" className="session-aside">
         {aside}
       </aside>
     </div>
