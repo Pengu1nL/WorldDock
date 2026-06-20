@@ -5,15 +5,45 @@ import { Icon } from "../worlddock/components";
 
 type SessionMessageListProps = {
   messages: AgentSessionMessage[];
+  onStarterPrompt?: (text: string) => void;
 };
 
-export function SessionMessageList({ messages }: SessionMessageListProps) {
+const STARTER_PROMPTS = [
+  {
+    label: "继续完善世界规则",
+    prompt: "继续完善这个世界的核心规则，并指出它会如何影响角色、组织和冲突。",
+  },
+  {
+    label: "找出潜在矛盾",
+    prompt: "检查当前设定里最可能产生冲突或自相矛盾的地方，并给出可修复方向。",
+  },
+  {
+    label: "沉淀为资产",
+    prompt: "从当前推演里提取可以沉淀为正式资产的角色、地点、组织、事件或规则。",
+  },
+];
+
+export function SessionMessageList({ messages, onStarterPrompt }: SessionMessageListProps) {
   if (messages.length === 0) {
     return (
       <div style={{ maxWidth: "var(--max-chat)", margin: "0 auto", padding: "42px 24px", color: "var(--fg-3)" }}>
-        <div className="row gap-2" style={{ justifyContent: "center", fontSize: "var(--t-13)" }}>
-          <Icon name="spark" size={14} />
-          <span>还没有消息</span>
+        <div className="col gap-3" style={{ alignItems: "center" }}>
+          <div className="row gap-2" style={{ justifyContent: "center", fontSize: "var(--t-13)" }}>
+            <Icon name="spark" size={14} />
+            <span>还没有消息</span>
+          </div>
+          <div className="row gap-2" style={{ justifyContent: "center", flexWrap: "wrap" }}>
+            {STARTER_PROMPTS.map((starter) => (
+              <button
+                key={starter.label}
+                className="btn sm"
+                type="button"
+                onClick={() => onStarterPrompt?.(starter.prompt)}
+              >
+                {starter.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );

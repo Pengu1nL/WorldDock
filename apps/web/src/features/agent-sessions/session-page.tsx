@@ -109,7 +109,7 @@ export function SessionPage({
         </header>
 
         <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
-          <SessionMessageList messages={messages} />
+          <SessionMessageList messages={messages} onStarterPrompt={onSend} />
         </div>
 
         <SessionComposer

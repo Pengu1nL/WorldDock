@@ -77,6 +77,15 @@ describe("SessionPage", () => {
     expect(onOpenPotentialAssets).toHaveBeenCalled();
   });
 
+  it("renders empty session starters that send useful first prompts", () => {
+    const onSend = vi.fn();
+    renderSessionPage({ messages: [], onSend });
+
+    fireEvent.click(screen.getByRole("button", { name: "继续完善世界规则" }));
+
+    expect(onSend).toHaveBeenCalledWith("继续完善这个世界的核心规则，并指出它会如何影响角色、组织和冲突。");
+  });
+
   it("keeps composer disabled for blank text and sends typed text", () => {
     const onSend = vi.fn();
     renderSessionPage({ onSend });
