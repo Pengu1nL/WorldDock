@@ -1,7 +1,8 @@
-import { officialWorldAssetTypeSchema } from "@worlddock/contract/assets";
+import { officialWorldAssetTypeSchema, type OfficialWorldAssetType } from "@worlddock/contract/assets";
 import { consistencyIssueSeveritySchema } from "@worlddock/contract/consistency";
 import type { ConsistencyService } from "../../consistency/consistency.service";
 import type { OfficialAssetsService } from "../../official-assets/official-assets.service";
+import type { OfficialAssetRecord } from "../../official-assets/official-assets.repository";
 import type { WorldAssetPatchesService } from "../../official-assets/world-asset-patches.service";
 import type { ArchiveEntryRecord, ConflictRecord, StorySeedRecord, WorldRecord, WorldRepository } from "../../worlds/world.repository";
 import { normalizeWorldSuggestion } from "../suggestion-normalizer";
@@ -36,7 +37,7 @@ export function createWorldToolRegistry(
   registry.register("search_world_assets", async (input) => {
     const worldId = String(input.worldId ?? "");
     const query = String(input.query ?? "").toLowerCase();
-    const assets = await listDisclosureAssets(worlds, worldId);
+    const assets = await listSearchableAssets(worlds, officialAssets, worldId);
     return {
       cards: assets
         .filter((asset) => !query || `${asset.title}\n${asset.summary}\n${asset.body}`.toLowerCase().includes(query))
@@ -46,7 +47,7 @@ export function createWorldToolRegistry(
   });
 
   registry.register("get_asset_brief", async (input) => {
-    const asset = await findDisclosureAsset(worlds, String(input.worldId ?? ""), String(input.assetId ?? ""));
+    const asset = await findDisclosureAsset(worlds, officialAssets, String(input.worldId ?? ""), String(input.assetId ?? ""));
     if (!asset) return {};
     return {
       found: true,
@@ -55,12 +56,12 @@ export function createWorldToolRegistry(
   });
 
   registry.register("get_asset_detail", async (input) => {
-    const asset = await findDisclosureAsset(worlds, String(input.worldId ?? ""), String(input.assetId ?? ""));
+    const asset = await findDisclosureAsset(worlds, officialAssets, String(input.worldId ?? ""), String(input.assetId ?? ""));
     return asset ? { found: true, detail: { ...toBrief(asset), body: asset.body } } : { found: false };
   });
 
   registry.register("get_asset_source_fragments", async (input) => {
-    const asset = await findDisclosureAsset(worlds, String(input.worldId ?? ""), String(input.assetId ?? ""));
+    const asset = await findDisclosureAsset(worlds, officialAssets, String(input.worldId ?? ""), String(input.assetId ?? ""));
     return asset
       ? { found: true, fragments: [{ kind: asset.kind, targetId: asset.id, text: excerpt(asset.body, 1200) }] }
       : { found: false, fragments: [] };
@@ -75,16 +76,20 @@ export function createWorldToolRegistry(
     if (!officialAssets) {
       throw new Error("World asset write tool is unavailable: OfficialAssetsService is not configured.");
     }
-    return {
-      asset: await officialAssets.createAsset(String(input.worldId), {
-        type: officialWorldAssetTypeSchema.parse(input.type),
-        name: String(input.name ?? input.title ?? ""),
-        summary: String(input.summary ?? ""),
-        markdown: String(input.markdown ?? ""),
-        tags: Array.isArray(input.tags) ? input.tags.map(String) : [],
-        metadata: isRecord(input.metadata) ? input.metadata : {},
-      }),
-    };
+    const worldId = readToolText(input.worldId);
+    const name = readToolText(input.name, input.title);
+    const existingAsset = await findExistingOfficialAssetByName(officialAssets, worldId, name);
+    if (existingAsset) return buildDuplicateAssetNameDecisionResult(name, existingAsset);
+
+    const created = await officialAssets.createAsset(worldId, {
+      type: normalizeOfficialAssetType(input.type),
+      name,
+      summary: readToolText(input.summary),
+      markdown: readToolMarkdown(input.markdown),
+      tags: Array.isArray(input.tags) ? input.tags.map(String).filter((item) => item.trim()) : [],
+      metadata: isRecord(input.metadata) ? input.metadata : {},
+    });
+    return serializeOfficialAssetToolResult(created);
   });
 
   registry.register("apply_world_asset_patch", async (input) => {
@@ -217,6 +222,50 @@ function readToolTextList(...values: unknown[]) {
   return [];
 }
 
+function normalizeOfficialAssetType(value: unknown): OfficialWorldAssetType {
+  const parsed = officialWorldAssetTypeSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+
+  const text = readToolText(value).toLowerCase();
+  const aliases: Record<string, OfficialWorldAssetType> = {
+    character: "character",
+    characters: "character",
+    person: "character",
+    people: "character",
+    role: "character",
+    角色: "character",
+    人物: "character",
+    organization: "organization",
+    organizations: "organization",
+    organisation: "organization",
+    organisations: "organization",
+    faction: "organization",
+    force: "organization",
+    势力: "organization",
+    组织: "organization",
+    机构: "organization",
+    location: "location",
+    locations: "location",
+    place: "location",
+    地点: "location",
+    场所: "location",
+    event: "event",
+    events: "event",
+    历史事件: "event",
+    事件: "event",
+    rule: "rule",
+    rules: "rule",
+    setting: "rule",
+    world_rule: "rule",
+    世界规则: "rule",
+    规则: "rule",
+    设定规则: "rule",
+  };
+  const normalized = aliases[text];
+  if (normalized) return normalized;
+  return officialWorldAssetTypeSchema.parse(value);
+}
+
 function readToolEvidence(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => {
@@ -255,6 +304,75 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+async function findExistingOfficialAssetByName(
+  officialAssets: OfficialAssetsService,
+  worldId: string,
+  name: string,
+) {
+  const normalizedName = normalizeAssetName(name);
+  if (!worldId || !normalizedName) return null;
+
+  if (typeof officialAssets.findActiveAssetByName === "function") {
+    return officialAssets.findActiveAssetByName(worldId, name);
+  }
+
+  const listAssets = (officialAssets as { listAssets?: OfficialAssetsService["listAssets"] }).listAssets;
+  if (typeof listAssets !== "function") return null;
+
+  const { assets } = await listAssets.call(officialAssets, worldId, { q: name, limit: 50 });
+  return assets.find((asset) =>
+    asset.status === "active" && normalizeAssetName(asset.name) === normalizedName
+  ) ?? null;
+}
+
+function buildDuplicateAssetNameDecisionResult(
+  name: string,
+  existingAsset: NonNullable<Awaited<ReturnType<OfficialAssetsService["findActiveAssetByName"]>>>,
+) {
+  return {
+    needsUserDecision: true,
+    code: "OFFICIAL_ASSET_NAME_CONFLICT",
+    message: `资产库中已经存在名为「${name}」的资产。请询问用户：要改用其他名称新建，还是修改当前已经存在的资产？`,
+    conflict: {
+      name,
+      existingAsset: {
+        id: existingAsset.id,
+        name: existingAsset.name,
+        type: existingAsset.type,
+        summary: existingAsset.summary,
+      },
+    },
+  };
+}
+
+function normalizeAssetName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+function serializeOfficialAssetToolResult(
+  detail: Awaited<ReturnType<OfficialAssetsService["createAsset"]>>,
+) {
+  return {
+    asset: {
+      ...detail.asset,
+      createdAt: detail.asset.createdAt.toISOString(),
+      updatedAt: detail.asset.updatedAt.toISOString(),
+      archivedAt: detail.asset.archivedAt?.toISOString() ?? null,
+    },
+    markdown: detail.markdown,
+    indexes: detail.indexes.map((index) => ({
+      ...index,
+      createdAt: index.createdAt.toISOString(),
+      updatedAt: index.updatedAt.toISOString(),
+    })),
+    revisions: detail.revisions.map((revision) => ({
+      ...revision,
+      createdAt: revision.createdAt.toISOString(),
+      updatedAt: revision.updatedAt.toISOString(),
+    })),
+  };
+}
+
 export async function listDisclosureAssets(worlds: WorldRepository, worldId: string) {
   const [archive, seeds, conflicts] = await Promise.all([
     worlds.listArchiveEntries(worldId),
@@ -268,8 +386,59 @@ export async function listDisclosureAssets(worlds: WorldRepository, worldId: str
   ];
 }
 
-async function findDisclosureAsset(worlds: WorldRepository, worldId: string, assetId: string) {
-  return (await listDisclosureAssets(worlds, worldId)).find((asset) => asset.id === assetId) ?? null;
+async function listSearchableAssets(
+  worlds: WorldRepository,
+  officialAssets: OfficialAssetsService | undefined,
+  worldId: string,
+) {
+  const [disclosureAssets, formalAssets] = await Promise.all([
+    listDisclosureAssets(worlds, worldId),
+    listFormalDisclosureAssets(officialAssets, worldId),
+  ]);
+  return [...formalAssets, ...disclosureAssets];
+}
+
+async function listFormalDisclosureAssets(
+  officialAssets: OfficialAssetsService | undefined,
+  worldId: string,
+): Promise<DisclosureAsset[]> {
+  const listAssets = officialAssets && (officialAssets as { listAssets?: OfficialAssetsService["listAssets"] }).listAssets;
+  if (typeof listAssets !== "function") return [];
+
+  const { assets } = await listAssets.call(officialAssets, worldId, { limit: 50 });
+  return assets
+    .filter((asset) => asset.status === "active")
+    .map(officialAssetToDisclosureAsset);
+}
+
+async function findDisclosureAsset(
+  worlds: WorldRepository,
+  officialAssets: OfficialAssetsService | undefined,
+  worldId: string,
+  assetId: string,
+) {
+  const legacyAsset = (await listDisclosureAssets(worlds, worldId)).find((asset) => asset.id === assetId) ?? null;
+  if (legacyAsset) return legacyAsset;
+
+  return findFormalDisclosureAsset(officialAssets, worldId, assetId);
+}
+
+async function findFormalDisclosureAsset(
+  officialAssets: OfficialAssetsService | undefined,
+  worldId: string,
+  assetId: string,
+): Promise<DisclosureAsset | null> {
+  const getAsset = officialAssets && (officialAssets as { getAsset?: OfficialAssetsService["getAsset"] }).getAsset;
+  if (typeof getAsset !== "function" || !assetId.trim()) return null;
+
+  try {
+    const detail = await getAsset.call(officialAssets, worldId, assetId);
+    if (!detail || detail.asset.status !== "active") return null;
+    return officialAssetDetailToDisclosureAsset(detail);
+  } catch (error) {
+    if (isNotFoundError(error)) return null;
+    throw error;
+  }
 }
 
 export function toCard(asset: DisclosureAsset) {
@@ -369,6 +538,41 @@ function conflictToAsset(conflict: ConflictRecord): DisclosureAsset {
   };
 }
 
+function officialAssetToDisclosureAsset(asset: OfficialAssetRecord): DisclosureAsset {
+  return {
+    id: asset.id,
+    worldId: asset.worldId,
+    kind: "setting",
+    title: asset.name,
+    excerpt: asset.summary,
+    summary: asset.summary,
+    body: asset.summary,
+    relations: [],
+    updatedAt: asset.updatedAt,
+  };
+}
+
+function officialAssetDetailToDisclosureAsset(
+  detail: Awaited<ReturnType<OfficialAssetsService["getAsset"]>>,
+): DisclosureAsset {
+  return {
+    ...officialAssetToDisclosureAsset(detail.asset),
+    body: detail.markdown,
+  };
+}
+
 function excerpt(text: string, max = 320) {
   return text.length <= max ? text : `${text.slice(0, max - 3)}...`;
+}
+
+function isNotFoundError(error: unknown) {
+  if (!isRecord(error)) return false;
+  const status = typeof (error as { getStatus?: unknown }).getStatus === "function"
+    ? (error as { getStatus: () => number }).getStatus()
+    : undefined;
+  if (status === 404) return true;
+  if ((error as { status?: unknown }).status === 404 || (error as { statusCode?: unknown }).statusCode === 404) return true;
+
+  const response = (error as { response?: unknown }).response;
+  return isRecord(response) && (response.code === "NOT_FOUND" || response.statusCode === 404);
 }

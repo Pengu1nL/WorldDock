@@ -67,6 +67,15 @@ describe("createPiAgentCoreAdapter", () => {
     expect(systemPrompt).toContain("禁止调用任何写入工具");
   });
 
+  it("instructs asset deposition sessions to check for duplicate asset names before creation", () => {
+    const systemPrompt = buildSystemPrompt(baseInput({
+      policy: { kind: "world_exploration", intent: "asset_deposition" },
+    }));
+
+    expect(systemPrompt).toContain("调用 create_world_asset 前，必须先用 search_world_assets 检查拟创建资产名称是否已有同名正式资产");
+    expect(systemPrompt).toContain("询问用户是改用其他名称新建，还是修改当前已经存在的资产");
+  });
+
   it("runs a real pi Agent loop and bridges WorldDock tool results back into the loop", async () => {
     const faux = registerFauxProvider({
       provider: "worlddock-test",

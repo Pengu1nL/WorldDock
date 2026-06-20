@@ -181,6 +181,23 @@ export class PrismaOfficialAssetsRepository implements OfficialAssetsRepository,
     };
   }
 
+  async findActiveAssetByName(worldId: string, name: string) {
+    const normalizedName = normalizeAssetName(name);
+    if (!normalizedName) return null;
+
+    const assets = await this.prisma.officialWorldAsset.findMany({
+      where: {
+        worldId,
+        status: "active",
+        name: { equals: name.trim(), mode: "insensitive" },
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: 5,
+    });
+    const exact = assets.find((asset) => normalizeAssetName(asset.name) === normalizedName);
+    return exact ? mapOfficialAsset(exact) : null;
+  }
+
   async getAsset(worldId: string, assetId: string): Promise<OfficialAssetDetailRecord | null> {
     const asset = await this.prisma.officialWorldAsset.findFirst({
       where: { worldId, id: assetId },
@@ -566,4 +583,8 @@ function mapOfficialAssetPatch(patch: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeAssetName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }

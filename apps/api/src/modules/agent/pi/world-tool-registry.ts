@@ -31,8 +31,19 @@ const WORLD_TOOL_DEFINITIONS: WorldToolDefinition[] = [
   { name: "list_local_releases", description: "List local release metadata for a world.", inputSchema: { type: "object", required: ["worldId"] } },
   {
     name: "create_world_asset",
-    description: "Create a draft formal world asset only during an asset deposition session. This is not a pending suggestion tool.",
-    inputSchema: { type: "object", required: ["worldId", "type", "name"] },
+    description: "Create one formal world asset during an asset deposition session. Before calling, search for the exact asset name; if the same name exists, ask whether to rename the new asset or update the existing one. This is not a pending suggestion tool.",
+    inputSchema: {
+      type: "object",
+      required: ["worldId", "type", "name", "summary", "markdown"],
+      properties: {
+        worldId: { type: "string" },
+        type: { type: "string" },
+        name: { type: "string" },
+        summary: { type: "string" },
+        markdown: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
+      },
+    },
   },
   {
     name: "apply_world_asset_patch",

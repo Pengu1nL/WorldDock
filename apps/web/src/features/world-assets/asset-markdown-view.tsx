@@ -8,8 +8,10 @@ type AssetMarkdownViewProps = {
 type MarkdownBlock =
   | { type: "heading"; level: number; text: string }
   | { type: "paragraph"; text: string }
+  | { type: "blockquote"; text: string }
   | { type: "list"; ordered: boolean; items: string[] }
   | { type: "code"; language?: string; text: string }
+  | { type: "hr" }
   | { type: "table"; headers: string[]; rows: string[][] };
 
 const HEADING_TAGS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
@@ -71,6 +73,24 @@ function parseMarkdown(markdown: string): MarkdownBlock[] {
 
       if (index < lines.length) index += 1;
       blocks.push({ type: "code", language: fence[1], text: codeLines.join("\n") });
+      continue;
+    }
+
+    if (isThematicBreak(trimmed)) {
+      blocks.push({ type: "hr" });
+      index += 1;
+      continue;
+    }
+
+    if (isBlockquote(trimmed)) {
+      const quoteLines: string[] = [];
+
+      while (index < lines.length && isBlockquote((lines[index] ?? "").trim())) {
+        quoteLines.push((lines[index] ?? "").trim().replace(/^>\s?/, ""));
+        index += 1;
+      }
+
+      blocks.push({ type: "blockquote", text: quoteLines.join(" ") });
       continue;
     }
 
@@ -154,7 +174,7 @@ function renderBlock(block: MarkdownBlock, index: number): ReactNode {
           margin: `${marginTop}px 0 10px`,
         }}
       >
-        {block.text}
+        {renderInlineMarkdown(block.text, `heading-${index}`)}
       </Tag>
     );
   }
@@ -162,8 +182,25 @@ function renderBlock(block: MarkdownBlock, index: number): ReactNode {
   if (block.type === "paragraph") {
     return (
       <p key={`paragraph-${index}`} style={{ margin: index === 0 ? 0 : "0 0 12px" }}>
-        {block.text}
+        {renderInlineMarkdown(block.text, `paragraph-${index}`)}
       </p>
+    );
+  }
+
+  if (block.type === "blockquote") {
+    return (
+      <blockquote
+        key={`blockquote-${index}`}
+        style={{
+          background: "var(--surface-2)",
+          borderLeft: "3px solid var(--accent)",
+          color: "var(--fg-1)",
+          margin: "0 0 16px",
+          padding: "9px 12px",
+        }}
+      >
+        {renderInlineMarkdown(block.text, `blockquote-${index}`)}
+      </blockquote>
     );
   }
 
@@ -180,10 +217,23 @@ function renderBlock(block: MarkdownBlock, index: number): ReactNode {
       >
         {block.items.map((item, itemIndex) => (
           <li key={`${item}-${itemIndex}`} style={{ marginBottom: 4 }}>
-            {item}
+            {renderInlineMarkdown(item, `list-${index}-${itemIndex}`)}
           </li>
         ))}
       </Tag>
+    );
+  }
+
+  if (block.type === "hr") {
+    return (
+      <hr
+        key={`hr-${index}`}
+        style={{
+          border: 0,
+          borderTop: "1px solid var(--hairline)",
+          margin: "22px 0",
+        }}
+      />
     );
   }
 
@@ -236,7 +286,7 @@ function renderBlock(block: MarkdownBlock, index: number): ReactNode {
                   textAlign: "left",
                 }}
               >
-                {header}
+                {renderInlineMarkdown(header, `table-${index}-header-${headerIndex}`)}
               </th>
             ))}
           </tr>
@@ -254,7 +304,7 @@ function renderBlock(block: MarkdownBlock, index: number): ReactNode {
                     verticalAlign: "top",
                   }}
                 >
-                  {row[cellIndex] ?? ""}
+                  {renderInlineMarkdown(row[cellIndex] ?? "", `table-${index}-${rowIndex}-${cellIndex}`)}
                 </td>
               ))}
             </tr>
@@ -288,9 +338,43 @@ function isBlockStart(lines: string[], index: number) {
   return Boolean(
     trimmed.match(/^#{1,6}\s+/)
       || trimmed.match(/^```/)
+      || isThematicBreak(trimmed)
+      || isBlockquote(trimmed)
       || getListItem(trimmed)
       || isTableStart(lines, index),
   );
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string): ReactNode {
+  const nodes: ReactNode[] = [];
+  const pattern = /(`[^`]+`|\*\*.+?\*\*|__.+?__)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index));
+
+    const token = match[0];
+    const key = `${keyPrefix}-${match.index}`;
+    if (token.startsWith("`")) {
+      nodes.push(
+        <code key={key} className="mono" style={{ fontSize: "0.95em" }}>
+          {token.slice(1, -1)}
+        </code>,
+      );
+    } else {
+      nodes.push(
+        <strong key={key} style={{ color: "var(--fg)", fontWeight: 700 }}>
+          {token.slice(2, -2)}
+        </strong>,
+      );
+    }
+
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes.length > 0 ? nodes : text;
 }
 
 function getListItem(trimmed: string) {
@@ -301,6 +385,14 @@ function getListItem(trimmed: string) {
   if (ordered) return { ordered: true, text: ordered[1].trim() };
 
   return null;
+}
+
+function isBlockquote(trimmed: string) {
+  return trimmed.startsWith(">");
+}
+
+function isThematicBreak(trimmed: string) {
+  return /^([-*_])(?:\s*\1){2,}\s*$/.test(trimmed);
 }
 
 function isTableStart(lines: string[], index: number) {

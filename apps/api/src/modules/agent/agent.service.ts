@@ -4,6 +4,7 @@ import { agentEventSchema, suggestionSchema, type AgentEvent, type TokenUsage, t
 import {
   AGENT_SESSIONS_REPOSITORY,
   type AgentSessionRecord,
+  type AgentSessionMessageRecord,
   type CreateAgentSessionContextItemInput,
   type AgentSessionsRepository,
 } from "../agent-sessions/agent-sessions.repository";
@@ -47,10 +48,115 @@ function buildAgentProviderSessionConfig(
   };
 }
 
-function policyForSession(session: Pick<AgentSessionRecord, "kind">): PiSessionPolicy {
+function policyForSession(
+  session: Pick<AgentSessionRecord, "kind">,
+  prompt = "",
+  messages: AgentSessionMessageRecord[] = [],
+): PiSessionPolicy {
+  if (
+    session.kind === "world_exploration" &&
+    (isAssetDepositionPrompt(prompt) || isContextualAssetDepositionPrompt(prompt, messages))
+  ) {
+    return { kind: "world_exploration", intent: "asset_deposition" };
+  }
   if (session.kind === "asset_edit") return { kind: "asset_edit" };
   if (session.kind === "consistency_repair") return { kind: "consistency_repair" };
   return DEFAULT_PI_SESSION_POLICY;
+}
+
+function isAssetDepositionPrompt(prompt: string) {
+  const normalized = normalizePromptText(prompt);
+  if (!normalized) return false;
+
+  return hasAssetDepositionVerb(normalized) && hasAssetTarget(normalized);
+}
+
+function isContextualAssetDepositionPrompt(prompt: string, messages: AgentSessionMessageRecord[]) {
+  const normalized = normalizePromptText(prompt);
+  if (!normalized || !hasAssetDepositionVerb(normalized) || hasAssetTarget(normalized)) return false;
+
+  const recentContext = normalizePromptText(
+    recentMessagesBeforeCurrentPrompt(messages, prompt)
+      .slice(-8)
+      .map((message) => message.content)
+      .join("\n"),
+  );
+  return hasAssetTarget(recentContext);
+}
+
+function hasAssetDepositionVerb(normalizedText: string) {
+  return /(沉淀|保存|创建|新建|新增|写入|入库|正式化|转为正式|转成正式)/.test(normalizedText);
+}
+
+function hasAssetTarget(normalizedText: string) {
+  return /(资产|设定|规则|角色|地点|势力|组织|机构|事件)/.test(normalizedText);
+}
+
+function normalizePromptText(text: string) {
+  return text.replace(/\s+/g, "");
+}
+
+function buildSessionProviderPrompt(
+  prompt: string,
+  policy: PiSessionPolicy,
+  messages: AgentSessionMessageRecord[],
+) {
+  const transcript = buildRecentSessionTranscript(messages, prompt);
+
+  if (policy.kind !== "world_exploration" || policy.intent !== "asset_deposition") {
+    if (!transcript) return prompt;
+    return [
+      "这是同一个 WorldDock Agent 会话中的后续指令。",
+      "请结合最近会话上下文理解用户省略的对象、代词以及「继续」「重新」等短指令。",
+      `当前指令：${prompt}`,
+      `最近会话上下文：\n${transcript}`,
+      "请优先延续当前会话正在讨论的设定与任务；如果上下文仍不足，再提出澄清问题。",
+    ].join("\n\n");
+  }
+
+  return [
+    "当前用户明确要求沉淀一个正式世界资产。",
+    `当前指令：${prompt}`,
+    transcript ? `最近会话上下文：\n${transcript}` : "",
+    [
+      "请只沉淀一个资产。",
+      "资产标题、类型、摘要和 Markdown 正文必须来自当前指令与最近会话上下文。",
+      "如果信息足够，请调用 create_world_asset 创建正式资产；不要改用 pending suggestion。",
+      "如果信息不足，请直接说明缺少哪些字段，不要声称已经沉淀。",
+    ].join("\n"),
+  ].filter(Boolean).join("\n\n");
+}
+
+function buildRecentSessionTranscript(messages: AgentSessionMessageRecord[], currentPrompt: string) {
+  const transcript = recentMessagesBeforeCurrentPrompt(messages, currentPrompt)
+    .slice(-12)
+    .map((message) => `${sessionRoleLabel(message.role)}：${truncateForPrompt(message.content, 2_400)}`)
+    .join("\n\n");
+  return transcript.trim();
+}
+
+function recentMessagesBeforeCurrentPrompt(messages: AgentSessionMessageRecord[], currentPrompt: string) {
+  const completeMessages = messages.filter((message) => message.status === "complete");
+  const last = completeMessages[completeMessages.length - 1];
+  if (
+    last?.role === "user" &&
+    normalizePromptText(last.content) === normalizePromptText(currentPrompt)
+  ) {
+    return completeMessages.slice(0, -1);
+  }
+  return completeMessages;
+}
+
+function sessionRoleLabel(role: AgentSessionMessageRecord["role"]) {
+  if (role === "assistant") return "Agent";
+  if (role === "user") return "用户";
+  if (role === "tool") return "工具";
+  return "系统";
+}
+
+function truncateForPrompt(text: string, maxLength: number) {
+  const normalized = text.trim();
+  return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 3)}...`;
 }
 
 function loadPiSkillsForPolicy(policy: PiSessionPolicy, skillsDir?: string) {
@@ -542,13 +648,15 @@ export class AgentService {
         return;
       }
 
+      const sessionMessages = await sessions.listMessages(run.sessionId);
+      const policy = policyForSession(session, run.prompt, sessionMessages);
       const providerInput = {
-        prompt: run.prompt,
+        prompt: buildSessionProviderPrompt(run.prompt, policy, sessionMessages),
         runId: run.id,
         model: run.model,
         world: { id: world.id, name: world.name, summary: world.summary },
         context,
-        ...buildAgentProviderSessionConfig(policyForSession(session), process.env),
+        ...buildAgentProviderSessionConfig(policy, process.env),
         signal: controller.signal,
       };
       const iterator = this.provider.stream(providerInput)[Symbol.asyncIterator]();
@@ -681,24 +789,26 @@ export class AgentService {
           status: "complete",
           metadata: { runId: run.id, tokenUsage },
         });
-        try {
-          const detectedAssets = await this.potentialAssets?.analyzeCompletedRun({
-            worldId: run.worldId,
-            sessionId: run.sessionId,
-            runId: run.id,
-          }) ?? [];
-          for (const potentialAsset of detectedAssets) {
-            const currentSequence = sequence;
-            const event = await this.append(run.id, currentSequence, "potential_asset.detected", {
-              potentialAssetId: potentialAsset.id,
-              potentialAsset: serializePotentialAssetForEvent(potentialAsset),
-            });
-            sequence = currentSequence + 1;
-            yield event;
-            lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+        if (!(policy.kind === "world_exploration" && policy.intent === "asset_deposition")) {
+          try {
+            const detectedAssets = await this.potentialAssets?.analyzeCompletedRun({
+              worldId: run.worldId,
+              sessionId: run.sessionId,
+              runId: run.id,
+            }) ?? [];
+            for (const potentialAsset of detectedAssets) {
+              const currentSequence = sequence;
+              const event = await this.append(run.id, currentSequence, "potential_asset.detected", {
+                potentialAssetId: potentialAsset.id,
+                potentialAsset: serializePotentialAssetForEvent(potentialAsset),
+              });
+              sequence = currentSequence + 1;
+              yield event;
+              lastYieldedSequence = Math.max(lastYieldedSequence, event.sequence);
+            }
+          } catch {
+            // Potential asset detection must not prevent the run from reaching its terminal event.
           }
-        } catch {
-          // Potential asset detection must not prevent the run from reaching its terminal event.
         }
         const event = await this.append(run.id, sequence++, "run.completed", { tokenUsage });
         yield event;

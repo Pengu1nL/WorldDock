@@ -175,6 +175,7 @@ export type OfficialAssetsRepository = {
     worldId: string,
     query?: ListOfficialAssetsQuery,
   ): Promise<{ assets: OfficialAssetRecord[]; nextCursor: string | null }>;
+  findActiveAssetByName?(worldId: string, name: string): Promise<OfficialAssetRecord | null>;
   getAsset(worldId: string, assetId: string): Promise<OfficialAssetDetailRecord | null>;
 };
 

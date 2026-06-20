@@ -84,6 +84,34 @@ describe("OfficialAssetDetailPage", () => {
     expect(onStartEdit).toHaveBeenCalledWith("asset_1");
   });
 
+  it("keeps the detail sidebar focused on metadata and index titles", () => {
+    render(
+      <OfficialAssetDetailPage
+        detail={detail}
+        patches={[]}
+        onBack={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("元数据")).toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
+    expect(screen.queryByText("当前 v2")).not.toBeInTheDocument();
+    expect(screen.queryByText("版本 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("登记要求")).not.toBeInTheDocument();
+  });
+
+  it("renders the markdown document as an unframed reading area", () => {
+    render(
+      <OfficialAssetDetailPage
+        detail={detail}
+        patches={[]}
+        onBack={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("article", { name: "资产文档" })).not.toHaveClass("card");
+  });
+
   it("disables edit action while creating an edit session", () => {
     const onStartEdit = vi.fn();
 

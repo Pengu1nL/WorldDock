@@ -82,6 +82,208 @@ describe("PiSessionRunner", () => {
     }]);
   });
 
+  it("searches formal world assets so deposition can detect duplicate names before creation", async () => {
+    const timestamp = new Date("2026-06-20T00:00:00.000Z");
+    const registry = createWorldToolRegistry(
+      {
+        listArchiveEntries: async () => [],
+        listStorySeeds: async () => [],
+        listConflicts: async () => [],
+      } as never,
+      {
+        listAssets: async () => ({
+          assets: [{
+            id: "official_asset_existing_gravity",
+            worldId: "world_1",
+            type: "rule",
+            name: "重力",
+            summary: "已有重力规则。",
+            documentKey: "worlds/world_1/official-assets/official_asset_existing_gravity.md",
+            status: "active",
+            version: 1,
+            tags: [],
+            metadata: {},
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            archivedAt: null,
+          }],
+          nextCursor: null,
+        }),
+      } as never,
+    );
+
+    const result = await registry.execute("search_world_assets", {
+      worldId: "world_1",
+      query: "重力",
+    });
+
+    expect(result.cards).toEqual([expect.objectContaining({
+      kind: "setting",
+      title: "重力",
+      excerpt: "已有重力规则。",
+      targetId: "official_asset_existing_gravity",
+    })]);
+  });
+
+  it("reads formal asset detail by the target id returned from search", async () => {
+    const timestamp = new Date("2026-06-20T00:00:00.000Z");
+    const asset = {
+      id: "official_asset_existing_gravity",
+      worldId: "world_1",
+      type: "rule",
+      name: "重力",
+      summary: "已有重力规则。",
+      documentKey: "worlds/world_1/official-assets/official_asset_existing_gravity.md",
+      status: "active",
+      version: 1,
+      tags: [],
+      metadata: {},
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      archivedAt: null,
+    } as const;
+    const registry = createWorldToolRegistry(
+      {
+        listArchiveEntries: async () => [],
+        listStorySeeds: async () => [],
+        listConflicts: async () => [],
+      } as never,
+      {
+        listAssets: async () => ({
+          assets: [asset],
+          nextCursor: null,
+        }),
+        getAsset: async () => ({
+          asset,
+          markdown: "# 重力\n\n## 概括\n\n已有重力规则全文。",
+          indexes: [],
+          revisions: [],
+        }),
+      } as never,
+    );
+
+    const search = await registry.execute("search_world_assets", {
+      worldId: "world_1",
+      query: "重力",
+    });
+    const targetId = (search.cards as Array<{ targetId: string }>)[0]?.targetId;
+
+    const result = await registry.execute("get_asset_detail", {
+      worldId: "world_1",
+      assetId: targetId,
+    });
+
+    expect(result).toEqual({
+      found: true,
+      detail: expect.objectContaining({
+        kind: "setting",
+        title: "重力",
+        targetId,
+        body: "# 重力\n\n## 概括\n\n已有重力规则全文。",
+      }),
+    });
+  });
+
+  it("normalizes Chinese official asset type labels before creating world assets", async () => {
+    let capturedType: unknown;
+    const registry = createWorldToolRegistry(
+      {} as never,
+      {
+        createAsset: async (_worldId: string, input: { type: unknown; markdown?: string }) => {
+          capturedType = input.type;
+          const timestamp = new Date("2026-06-20T00:00:00.000Z");
+          return {
+            asset: {
+              id: "official_asset_1",
+              worldId: "world_1",
+              type: input.type,
+              name: "重力",
+              summary: "重力规则。",
+              documentKey: "worlds/world_1/official-assets/official_asset_1.md",
+              status: "active",
+              version: 1,
+              tags: [],
+              metadata: {},
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              archivedAt: null,
+            },
+            markdown: input.markdown ?? "",
+            indexes: [],
+            revisions: [],
+          };
+        },
+      } as never,
+    );
+
+    const result = await registry.execute("create_world_asset", {
+      worldId: "world_1",
+      type: "规则",
+      name: "重力",
+      summary: "重力规则。",
+      markdown: "# 重力\n\n## 概括\n\n重力规则。",
+    });
+
+    expect(capturedType).toBe("rule");
+    expect(result.asset).toMatchObject({ type: "rule", name: "重力" });
+  });
+
+  it("returns a duplicate-name prompt result instead of creating a world asset", async () => {
+    let created = false;
+    const timestamp = new Date("2026-06-20T00:00:00.000Z");
+    const registry = createWorldToolRegistry(
+      {} as never,
+      {
+        createAsset: async () => {
+          created = true;
+          throw new Error("createAsset should not be called when an asset name already exists.");
+        },
+        listAssets: async () => ({
+          assets: [{
+            id: "official_asset_existing_gravity",
+            worldId: "world_1",
+            type: "rule",
+            name: "重力",
+            summary: "已有重力规则。",
+            documentKey: "worlds/world_1/official-assets/official_asset_existing_gravity.md",
+            status: "active",
+            version: 1,
+            tags: [],
+            metadata: {},
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            archivedAt: null,
+          }],
+          nextCursor: null,
+        }),
+      } as never,
+    );
+
+    const result = await registry.execute("create_world_asset", {
+      worldId: "world_1",
+      type: "规则",
+      name: "重力",
+      summary: "重力规则。",
+      markdown: "# 重力\n\n## 概括\n\n重力规则。",
+    });
+
+    expect(created).toBe(false);
+    expect(result).toEqual({
+      needsUserDecision: true,
+      code: "OFFICIAL_ASSET_NAME_CONFLICT",
+      message: "资产库中已经存在名为「重力」的资产。请询问用户：要改用其他名称新建，还是修改当前已经存在的资产？",
+      conflict: {
+        name: "重力",
+        existingAsset: {
+          id: "official_asset_existing_gravity",
+          name: "重力",
+          type: "rule",
+          summary: "已有重力规则。",
+        },
+      },
+    });
+  });
+
   it("emits consistency issue created events from create_consistency_issue tool results", async () => {
     const createdIssue = {
       id: "issue_1",

@@ -363,6 +363,124 @@ describe("agent session run local endpoints", () => {
     }
   });
 
+  it("uses asset deposition policy for explicit world exploration deposition prompts", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const provider = createMockStreamingAgentProvider([
+      { type: "delta", text: "已准备沉淀资产。" },
+    ]);
+    const world = await worlds.createWorld({
+      name: "宇宙纪元",
+      type: "近未来硬科幻",
+      summary: "聚变能源与太空电梯开启宇宙殖民。",
+      tags: ["硬科幻"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "宇宙纪元 推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    await sessions.appendMessageAtEnd({
+      sessionId: session.id,
+      role: "assistant",
+      content: "## 重力\n无人工重力，旋转模拟重力通常不超过 1/6g。",
+      status: "complete",
+      metadata: {},
+    });
+    app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "沉淀规则类资产“重力”" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/v1/agent-session-runs/${created.body.run.id}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+
+    expect(provider.calls).toHaveLength(1);
+    const providerInput = provider.calls[0];
+    expect(providerInput.policy).toEqual({ kind: "world_exploration", intent: "asset_deposition" });
+    expect(providerInput.skills?.map((skill) => skill.name)).toEqual(["asset-deposition"]);
+    expect(providerInput.tools?.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "get_world_manifest",
+      "create_world_asset",
+    ]));
+    expect(providerInput.tools?.map((tool) => tool.name)).not.toContain("propose_setting");
+    expect(providerInput.prompt).toContain("沉淀规则类资产“重力”");
+    expect(providerInput.prompt).toContain("无人工重力");
+  });
+
+  it("uses recent session context for short re-deposition prompts", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const provider = createMockStreamingAgentProvider([
+      { type: "delta", text: "已根据前文重新沉淀重力资产。" },
+    ]);
+    const world = await worlds.createWorld({
+      name: "宇宙纪元",
+      type: "近未来硬科幻",
+      summary: "聚变能源与太空电梯开启宇宙殖民。",
+      tags: ["硬科幻"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "宇宙纪元 推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    await sessions.appendMessageAtEnd({
+      sessionId: session.id,
+      role: "user",
+      content: "沉淀规则类资产“重力”",
+      status: "complete",
+      metadata: {},
+    });
+    await sessions.appendMessageAtEnd({
+      sessionId: session.id,
+      role: "assistant",
+      content: "## 重力\n无人工重力，只有旋转模拟重力和飞船加速时产生的模拟重力。",
+      status: "complete",
+      metadata: {},
+    });
+    app = await createAgentSessionRunApp(worlds, agents, sessions, provider);
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "重新沉淀" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/v1/agent-session-runs/${created.body.run.id}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+
+    expect(provider.calls).toHaveLength(1);
+    const providerInput = provider.calls[0];
+    expect(providerInput.policy).toEqual({ kind: "world_exploration", intent: "asset_deposition" });
+    expect(providerInput.skills?.map((skill) => skill.name)).toEqual(["asset-deposition"]);
+    expect(providerInput.tools?.map((tool) => tool.name)).toEqual(expect.arrayContaining([
+      "get_world_manifest",
+      "create_world_asset",
+    ]));
+    expect(providerInput.tools?.map((tool) => tool.name)).not.toContain("propose_setting");
+    expect(providerInput.prompt).toContain("当前指令：重新沉淀");
+    expect(providerInput.prompt).toContain("沉淀规则类资产“重力”");
+    expect(providerInput.prompt).toContain("无人工重力");
+  });
+
   it("appends session messages at the end without reusing sequences", async () => {
     const sessions = createInMemoryAgentSessions();
     const session = await sessions.createSession({

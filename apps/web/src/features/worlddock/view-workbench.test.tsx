@@ -31,6 +31,37 @@ describe("WorldDock workbench message rendering", () => {
     expect(html).toContain("天梯");
   });
 
+  it("renders streaming agent markdown code, quotes, inline code, and links", () => {
+    const html = renderToStaticMarkup(
+      <Message
+        msg={{
+          id: "m1",
+          role: "agent",
+          streaming: true,
+          text: [
+            "> 保留这条规则作为后续约束。",
+            "",
+            "执行 `permit.check()` 后访问 [资产库](https://example.com/assets)。",
+            "",
+            "```ts",
+            "const permit = true;",
+            "```",
+          ].join("\n"),
+        }}
+        onOpenContext={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("<blockquote");
+    expect(html).toContain("<code");
+    expect(html).toContain("permit.check()");
+    expect(html).toContain("<a");
+    expect(html).toContain("href=\"https://example.com/assets\"");
+    expect(html).toContain("<pre");
+    expect(html).toContain("const permit = true;");
+    expect(html).toContain("caret");
+  });
+
   it("renders horizontal rules, ordered lists, and unordered lists", () => {
     const html = renderToStaticMarkup(
       <Message

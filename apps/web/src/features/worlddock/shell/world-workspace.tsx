@@ -48,6 +48,7 @@ import {
   revertConsistencyPatchBatch,
   type AgentSessionDetail,
   type AgentSessionRunEvent,
+  type OfficialWorldAsset,
   type WorldAssetDetail,
   type WorldAssetPatch,
   type WorldAssetPatchBatch,
@@ -260,6 +261,7 @@ const ExplorationWorkspace = ({
 
     const abortController = new AbortController();
     let terminalStatus: "running" | "completed" | "failed" = "running";
+    const toolLabelsByCallId = new Map<string, string>();
     abortRef.current = abortController;
     setRunState("running");
     setTokens(0);
@@ -279,48 +281,79 @@ const ExplorationWorkspace = ({
         signal: abortController.signal,
         onEvent: (event) => {
           if (abortRef.current !== abortController) return;
-          if (event.type === "message.delta") {
+          const updateAssistant = (
+            updater: (message: AgentSessionMessage) => AgentSessionMessage,
+          ) => {
             setOptimisticMessages((prev) => prev.map((message) =>
-              message.id === assistantMessage.id
-                ? { ...message, content: `${message.content}${event.payload.text}` }
-                : message,
+              message.id === assistantMessage.id ? updater(message) : message,
             ));
+          };
+          if (event.type === "message.delta") {
+            updateAssistant((message) => ({ ...message, content: `${message.content}${event.payload.text}` }));
           }
           if (event.type === "potential_asset.detected") {
             void queryClient.invalidateQueries({
               queryKey: agentSessionKeys.potentialAssetsForSession(world.id, sessionId),
             });
           }
+          if (event.type === "tool.requested") {
+            const label = toolLabelForName(event.payload.toolCall.name);
+            toolLabelsByCallId.set(event.payload.toolCall.id, label);
+            updateAssistant((message) => ({
+              ...message,
+              metadata: {
+                ...getRecordMetadata(message.metadata),
+                toolStatus: "running",
+                toolLabel: label,
+              },
+            }));
+          }
+          if (event.type === "tool.completed") {
+            const label = toolLabelsByCallId.get(event.payload.toolCallId) ?? toolLabelFromCompletedEvent(event);
+            updateAssistant((message) => ({
+              ...message,
+              metadata: {
+                ...getRecordMetadata(message.metadata),
+                toolStatus: "complete",
+                toolLabel: label,
+              },
+            }));
+            const createdAsset = getCreatedOfficialAssetFromToolCompletedEvent(event);
+            if (createdAsset && createdAsset.worldId === world.id) {
+              void queryClient.invalidateQueries({ queryKey: officialAssetsQueryKeys.lists(world.id) });
+              void queryClient.invalidateQueries({ queryKey: ["world-assets", world.id] });
+              pushToast?.({ kind: "save", text: `正式资产已创建 · ${createdAsset.name}` });
+            }
+          }
           if (event.type === "run.completed") {
             terminalStatus = "completed";
             activeSessionRunIdRef.current = null;
             setRunState("completed");
             setTokens(event.payload.tokenUsage?.totalTokens ?? 0);
-            setOptimisticMessages((prev) => prev.map((message) =>
-              message.id === assistantMessage.id
-                ? { ...message, status: "complete" }
-                : message,
-            ));
+            updateAssistant((message) => ({ ...message, status: "complete", metadata: completeRunningToolStatus(message.metadata) }));
           }
           if (event.type === "run.failed") {
             terminalStatus = "failed";
             activeSessionRunIdRef.current = null;
             setRunState("failed");
-            setOptimisticMessages((prev) => prev.map((message) =>
-              message.id === assistantMessage.id
-                ? { ...message, status: "failed", content: message.content || event.payload.message || "推演失败" }
-                : message,
-            ));
+            updateAssistant((message) => ({
+              ...message,
+              status: "failed",
+              content: message.content || event.payload.message || "推演失败",
+              metadata: failRunningToolStatus(message.metadata, event.payload.message || "推演失败", event.payload.code),
+            }));
+            pushToast?.({ kind: "warn", text: event.payload.message || "推演失败" });
           }
           if (event.type === "run.cancelled") {
             terminalStatus = "failed";
             activeSessionRunIdRef.current = null;
             setRunState("failed");
-            setOptimisticMessages((prev) => prev.map((message) =>
-              message.id === assistantMessage.id
-                ? { ...message, status: "failed", content: `${message.content || "推演已取消"}` }
-                : message,
-            ));
+            updateAssistant((message) => ({
+              ...message,
+              status: "failed",
+              content: `${message.content || "推演已取消"}`,
+              metadata: failRunningToolStatus(message.metadata, event.payload.reason || "推演已取消", "RUN_CANCELLED"),
+            }));
           }
         },
       });
@@ -372,11 +405,20 @@ const ExplorationWorkspace = ({
       setRunState("failed");
       setOptimisticMessages((prev) => prev.map((message) =>
         message.id === assistantMessage.id
-          ? { ...message, status: "failed", content: message.content || "Agent 调用失败" }
+          ? {
+            ...message,
+            status: "failed",
+            content: message.content || "Agent 调用失败",
+            metadata: failRunningToolStatus(
+              message.metadata,
+              error instanceof Error && error.message.trim() ? error.message : "Agent 调用失败",
+              "CLIENT_STREAM_FAILED",
+            ),
+          }
           : message,
       ));
     }
-  }, [cancelActiveSessionRun, createRun, queryClient, runState, sessionId, streamRun, world]);
+  }, [cancelActiveSessionRun, createRun, pushToast, queryClient, runState, sessionId, streamRun, world]);
 
   const handleSessionStop = useCallback(() => {
     cancelActiveSessionRun();
@@ -385,7 +427,12 @@ const ExplorationWorkspace = ({
     setRunState("failed");
     setOptimisticMessages((prev) => prev.map((message) =>
       message.status === "streaming"
-        ? { ...message, status: "failed", content: `${message.content || "推演已停止"}` }
+        ? {
+          ...message,
+          status: "failed",
+          content: `${message.content || "推演已停止"}`,
+          metadata: failRunningToolStatus(message.metadata, "推演已停止", "RUN_STOPPED"),
+        }
         : message,
     ));
   }, [cancelActiveSessionRun]);
@@ -926,6 +973,93 @@ function getPatchBatchFromToolCompletedEvent(
     createdAt: typeof batch.createdAt === "string" ? batch.createdAt : new Date().toISOString(),
     appliedAt: typeof batch.appliedAt === "string" ? batch.appliedAt : null,
     revertedAt: typeof batch.revertedAt === "string" ? batch.revertedAt : null,
+  };
+}
+
+function getRecordMetadata(metadata: AgentSessionMessage["metadata"]): Record<string, unknown> {
+  return isRecord(metadata) ? metadata : {};
+}
+
+function completeRunningToolStatus(metadata: AgentSessionMessage["metadata"]) {
+  const record = getRecordMetadata(metadata);
+  if (record.toolStatus !== "running") return record;
+  return { ...record, toolStatus: "complete" };
+}
+
+function failRunningToolStatus(
+  metadata: AgentSessionMessage["metadata"],
+  message: string,
+  code: string,
+) {
+  const record = getRecordMetadata(metadata);
+  return {
+    ...record,
+    toolStatus: record.toolStatus === "running" ? "failed" : record.toolStatus,
+    message,
+    code,
+  };
+}
+
+function toolLabelForName(name: string) {
+  const labels: Record<string, string> = {
+    create_world_asset: "创建正式资产",
+    apply_world_asset_patch: "应用资产补丁",
+    create_consistency_issue: "创建一致性问题",
+    propose_setting: "生成待确认设定",
+    search_world_assets: "检索世界资产",
+    get_world_manifest: "读取世界信息",
+  };
+  return labels[name] ?? "运行后台工具";
+}
+
+function toolLabelFromCompletedEvent(event: Extract<AgentSessionRunEvent, { type: "tool.completed" }>) {
+  if (getCreatedOfficialAssetFromToolCompletedEvent(event)) return "创建正式资产";
+  if (getPatchBatchFromToolCompletedEvent(event)) return "应用资产补丁";
+  return "运行后台工具";
+}
+
+function getCreatedOfficialAssetFromToolCompletedEvent(
+  event: Extract<AgentSessionRunEvent, { type: "tool.completed" }>,
+): OfficialWorldAsset | null {
+  const asset = event.payload.result.asset;
+  if (!isRecord(asset)) return null;
+  if (
+    typeof asset.id !== "string" ||
+    typeof asset.worldId !== "string" ||
+    typeof asset.name !== "string" ||
+    typeof asset.summary !== "string" ||
+    typeof asset.documentKey !== "string" ||
+    typeof asset.version !== "number" ||
+    typeof asset.createdAt !== "string" ||
+    typeof asset.updatedAt !== "string"
+  ) {
+    return null;
+  }
+  if (
+    asset.type !== "character" &&
+    asset.type !== "organization" &&
+    asset.type !== "location" &&
+    asset.type !== "event" &&
+    asset.type !== "rule"
+  ) {
+    return null;
+  }
+  if (asset.status !== "active" && asset.status !== "archived") return null;
+
+  return {
+    id: asset.id,
+    worldId: asset.worldId,
+    type: asset.type,
+    name: asset.name,
+    summary: asset.summary,
+    documentKey: asset.documentKey,
+    status: asset.status,
+    version: asset.version,
+    tags: Array.isArray(asset.tags) ? asset.tags.filter((tag): tag is string => typeof tag === "string") : [],
+    metadata: isRecord(asset.metadata) ? asset.metadata : {},
+    createdAt: asset.createdAt,
+    updatedAt: asset.updatedAt,
+    archivedAt: typeof asset.archivedAt === "string" ? asset.archivedAt : null,
   };
 }
 

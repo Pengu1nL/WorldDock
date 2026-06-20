@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { OfficialWorldAssetStatus, OfficialWorldAssetType } from "@worlddock/contract/assets";
 import { LocalStorageService } from "../local-storage/local-storage.service";
 import { WORLD_REPOSITORY, type WorldRepository } from "../worlds/world.repository";
@@ -10,6 +10,7 @@ import {
   OFFICIAL_ASSETS_REPOSITORY,
   type ListOfficialAssetsQuery,
   type OfficialAssetDetailRecord,
+  type OfficialAssetRecord,
   type OfficialAssetsRepository,
 } from "./official-assets.repository";
 
@@ -36,12 +37,15 @@ export class OfficialAssetsService {
   constructor(
     @Inject(OFFICIAL_ASSETS_REPOSITORY) private readonly officialAssets: OfficialAssetsRepository,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
-    private readonly localStorage: LocalStorageService,
-    private readonly assetLocks: OfficialAssetLockService,
+    @Inject(LocalStorageService) private readonly localStorage: LocalStorageService,
+    @Inject(OfficialAssetLockService) private readonly assetLocks: OfficialAssetLockService,
   ) {}
 
   async createAsset(worldId: string, input: CreateOfficialAssetInput): Promise<OfficialAssetDetailRecord & { markdown: string }> {
     await this.requireWorld(worldId);
+
+    const conflictingAsset = await this.findActiveAssetByName(worldId, input.name);
+    if (conflictingAsset) throw this.nameConflict(input.name, conflictingAsset);
 
     const requestedAssetId = cleanAssetId(input.id);
     const assetId = requestedAssetId ?? `official_asset_${randomUUID()}`;
@@ -113,6 +117,23 @@ export class OfficialAssetsService {
     }
   }
 
+  async findActiveAssetByName(worldId: string, name: string): Promise<OfficialAssetRecord | null> {
+    await this.requireWorld(worldId);
+    const normalizedName = normalizeAssetName(name);
+    if (!normalizedName) return null;
+
+    const finder = this.officialAssets.findActiveAssetByName;
+    if (finder) return finder.call(this.officialAssets, worldId, name);
+
+    const listAssets = (this.officialAssets as { listAssets?: OfficialAssetsRepository["listAssets"] }).listAssets;
+    if (typeof listAssets !== "function") return null;
+
+    const { assets } = await listAssets.call(this.officialAssets, worldId, { q: name, limit: 50 });
+    return assets.find((asset) =>
+      asset.status === "active" && normalizeAssetName(asset.name) === normalizedName
+    ) ?? null;
+  }
+
   async getAsset(worldId: string, assetId: string): Promise<OfficialAssetDetailRecord & { markdown: string }> {
     await this.requireWorld(worldId);
     return this.assetLocks.withAssetLock(worldId, assetId, async () => {
@@ -161,6 +182,22 @@ export class OfficialAssetsService {
       message: "Invalid official asset cursor.",
     });
   }
+
+  private nameConflict(name: string, existingAsset: OfficialAssetRecord) {
+    return new ConflictException({
+      code: "OFFICIAL_ASSET_NAME_CONFLICT",
+      message: "Official asset name already exists. Choose another name or update the existing asset.",
+      details: {
+        name,
+        existingAsset: {
+          id: existingAsset.id,
+          name: existingAsset.name,
+          type: existingAsset.type,
+          summary: existingAsset.summary,
+        },
+      },
+    });
+  }
 }
 
 function cleanAssetId(assetId: string | undefined) {
@@ -171,4 +208,8 @@ function cleanAssetId(assetId: string | undefined) {
 function documentKeyStemForAsset(assetId: string, deterministicAssetId: boolean) {
   if (!deterministicAssetId) return assetId;
   return `${assetId}-${randomUUID()}`;
+}
+
+function normalizeAssetName(name: string) {
+  return name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }

@@ -2,6 +2,15 @@
 
 日期：2026-06-20（Asia/Shanghai）
 
+## 2026-06-20 19:35 CST 复核
+
+| 命令 | 结果 | 备注 |
+| --- | --- | --- |
+| `pnpm verify` | PASS | Prisma validate、全仓 lint、全仓 test、全仓 build 均通过；本轮 web 单测为 19 files / 79 tests passed，api 单测为 21 files / 121 tests passed。 |
+| `pnpm --filter @worlddock/api test:integration` | PASS | 14 files passed, 1 skipped；110 tests passed, 1 skipped。 |
+| `pnpm --filter @worlddock/web test:e2e -- session-assets-flow.spec.ts creation-flow.spec.ts consistency-flow.spec.ts responsive.spec.ts` | PASS | 4 Playwright specs passed。 |
+| `rg -n "可保存设定\|故事种子\|冲突池\|agent-suggestions\|saveAgentSuggestion" apps/web/src apps/web/tests apps/api/src apps/api/test` | REVIEWED | 前端运行时代码未恢复旧 suggestion UI；命中项集中在负向断言、后端 legacy endpoint 覆盖和迁移期兼容读取。 |
+
 ## 已通过命令
 
 | 命令 | 结果 | 备注 |

@@ -1,7 +1,6 @@
-import type { ReactNode } from "react";
-
 import type { AgentSessionMessage } from "@worlddock/contract";
 
+import { MarkdownLite } from "../worlddock/markdown-lite";
 import { Icon } from "../worlddock/components";
 
 type SessionMessageListProps = {
@@ -32,6 +31,8 @@ export function SessionMessageList({ messages }: SessionMessageListProps) {
 function SessionMessage({ message }: { message: AgentSessionMessage }) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  const toolStatus = getToolStatus(message.metadata);
+  const failureMessage = getFailureMessage(message);
 
   if (isUser) {
     return (
@@ -87,6 +88,12 @@ function SessionMessage({ message }: { message: AgentSessionMessage }) {
             <span className="mono">streaming</span>
           </span>
         ) : null}
+        {message.status === "failed" ? (
+          <span className="row gap-2" style={{ color: "var(--brick)", fontSize: 11 }}>
+            <Icon name="consistency" size={12} />
+            <span className="mono">failed</span>
+          </span>
+        ) : null}
       </div>
       <div
         className="prose"
@@ -97,123 +104,84 @@ function SessionMessage({ message }: { message: AgentSessionMessage }) {
           overflowWrap: "anywhere",
         }}
       >
-        <MarkdownLite text={message.content} />
+        <MarkdownLite text={message.content} emptyFallback="…" />
       </div>
+      {toolStatus ? <ToolStatusNotice status={toolStatus} /> : null}
+      {failureMessage ? <FailureNotice message={failureMessage} /> : null}
     </article>
   );
 }
 
-function MarkdownLite({ text }: { text: string }) {
-  if (!text.trim()) return <p style={{ margin: 0, color: "var(--fg-3)" }}>…</p>;
+function ToolStatusNotice({ status }: { status: ToolStatus }) {
+  const isRunning = status.state === "running";
+  const isFailed = status.state === "failed";
+  return (
+    <div
+      className="row gap-2"
+      style={{
+        marginTop: 12,
+        padding: "8px 10px",
+        borderRadius: 6,
+        border: "1px solid var(--border)",
+        background: "var(--surface-2)",
+        color: isFailed ? "var(--brick)" : isRunning ? "var(--amber)" : "var(--sage)",
+        fontSize: "var(--t-12)",
+        width: "fit-content",
+      }}
+    >
+      {isRunning ? (
+        <span className="dot amber pulse" style={{ width: 5, height: 5, boxShadow: "none" }} />
+      ) : isFailed ? (
+        <Icon name="consistency" size={13} />
+      ) : (
+        <Icon name="check" size={13} />
+      )}
+      <span>{isRunning ? `正在${status.label}` : isFailed ? `${status.label}失败` : `${status.label}完成`}</span>
+    </div>
+  );
+}
 
-  const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const nodes: ReactNode[] = [];
-  let paragraph: string[] = [];
-  let listItems: string[] = [];
-  let listKind: "ul" | "ol" | null = null;
-  let codeLines: string[] = [];
-  let inCode = false;
+function FailureNotice({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "9px 10px",
+        borderRadius: 6,
+        border: "1px solid color-mix(in srgb, var(--brick) 42%, var(--border))",
+        background: "color-mix(in srgb, var(--brick) 8%, var(--surface))",
+        color: "var(--brick)",
+        fontSize: "var(--t-12)",
+        lineHeight: 1.5,
+      }}
+    >
+      运行失败：{message}
+    </div>
+  );
+}
 
-  const flushParagraph = () => {
-    if (paragraph.length === 0) return;
-    nodes.push(
-      <p key={`p-${nodes.length}`} style={{ margin: "0 0 10px" }}>
-        {paragraph.join(" ")}
-      </p>,
-    );
-    paragraph = [];
-  };
+type ToolStatus = {
+  state: "running" | "complete" | "failed";
+  label: string;
+};
 
-  const flushList = () => {
-    if (listItems.length === 0) return;
-    const ListTag = listKind === "ol" ? "ol" : "ul";
-    nodes.push(
-      <ListTag key={`list-${nodes.length}`} style={{ margin: "4px 0 12px", paddingLeft: 20 }}>
-        {listItems.map((item, index) => (
-          <li key={`${index}-${item}`} style={{ marginBottom: 4 }}>
-            {item}
-          </li>
-        ))}
-      </ListTag>,
-    );
-    listItems = [];
-    listKind = null;
-  };
+function getToolStatus(metadata: AgentSessionMessage["metadata"]): ToolStatus | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const state = metadata.toolStatus;
+  if (state !== "running" && state !== "complete" && state !== "failed") return null;
+  const label = typeof metadata.toolLabel === "string" && metadata.toolLabel.trim()
+    ? metadata.toolLabel.trim()
+    : "后台工具";
+  return { state, label };
+}
 
-  const flushCode = () => {
-    nodes.push(
-      <pre
-        key={`code-${nodes.length}`}
-        style={{
-          margin: "8px 0 12px",
-          padding: "10px 12px",
-          border: "1px solid var(--hairline)",
-          borderRadius: 4,
-          background: "var(--bg-1)",
-          overflowX: "auto",
-        }}
-      >
-        <code className="mono" style={{ fontSize: 12, color: "var(--fg-1)" }}>
-          {codeLines.join("\n")}
-        </code>
-      </pre>,
-    );
-    codeLines = [];
-  };
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith("```")) {
-      if (inCode) {
-        flushCode();
-        inCode = false;
-      } else {
-        flushParagraph();
-        flushList();
-        inCode = true;
-      }
-      continue;
-    }
-
-    if (inCode) {
-      codeLines.push(line);
-      continue;
-    }
-
-    if (!trimmed) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    const unordered = trimmed.match(/^[-*]\s+(.+)$/);
-    if (unordered) {
-      flushParagraph();
-      if (listKind === "ol") flushList();
-      listKind = "ul";
-      listItems.push(unordered[1]);
-      continue;
-    }
-
-    const ordered = trimmed.match(/^\d+\.\s+(.+)$/);
-    if (ordered) {
-      flushParagraph();
-      if (listKind === "ul") flushList();
-      listKind = "ol";
-      listItems.push(ordered[1]);
-      continue;
-    }
-
-    flushList();
-    paragraph.push(trimmed);
+function getFailureMessage(message: AgentSessionMessage) {
+  if (message.status !== "failed") return null;
+  const metadata = message.metadata;
+  if (metadata && typeof metadata === "object" && typeof metadata.message === "string" && metadata.message.trim()) {
+    return metadata.message.trim();
   }
-
-  if (inCode) flushCode();
-  flushParagraph();
-  flushList();
-
-  return nodes;
+  return "Agent 调用失败，请稍后重试。";
 }
 
 function roleLabel(role: AgentSessionMessage["role"]) {

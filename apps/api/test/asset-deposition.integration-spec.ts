@@ -324,6 +324,33 @@ describe("asset deposition local endpoints", () => {
     expect(countDepositionRuns(agents)).toBe(0);
   });
 
+  it("returns 409 when the requested official asset name already exists", async () => {
+    const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
+    const officialAssets = createInMemoryOfficialAssets();
+    seedOfficialAsset(officialAssets, world.id, "official_asset_existing_memory_license", potentialAsset.title);
+    app = await createAssetDepositionApp(worlds, agents, sessions, potentialAssets, officialAssets);
+
+    const duplicateName = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/potential-assets/${potentialAsset.id}/promote`)
+      .send({})
+      .expect(409);
+
+    expect(duplicateName.body).toMatchObject({
+      code: "OFFICIAL_ASSET_NAME_CONFLICT",
+      message: "Official asset name already exists. Choose another name or update the existing asset.",
+      details: {
+        name: potentialAsset.title,
+        existingAsset: {
+          id: "official_asset_existing_memory_license",
+          name: potentialAsset.title,
+        },
+      },
+    });
+    expect((await potentialAssets.findById(world.id, potentialAsset.id))?.status).toBe("active");
+    expect(officialAssets.stores.assets.size).toBe(1);
+    expect(countDepositionRuns(agents)).toBe(0);
+  });
+
   it("returns 409 when promoting a dismissed potential asset", async () => {
     const { worlds, agents, sessions, potentialAssets, world, potentialAsset } = await createPromotionFixture();
     const officialAssets = createInMemoryOfficialAssets();
@@ -456,13 +483,18 @@ function countDepositionRuns(agents: InMemoryAgents) {
     .length;
 }
 
-function seedOfficialAsset(officialAssets: InMemoryOfficialAssets, worldId: string, assetId: string) {
+function seedOfficialAsset(
+  officialAssets: InMemoryOfficialAssets,
+  worldId: string,
+  assetId: string,
+  name = "已有正式资产",
+) {
   const timestamp = new Date();
   officialAssets.stores.assets.set(assetId, {
     id: assetId,
     worldId,
     type: "rule",
-    name: "已有正式资产",
+    name,
     summary: "并发请求已创建的正式资产。",
     documentKey: `worlds/${worldId}/official-assets/${assetId}.md`,
     status: "active",

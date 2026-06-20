@@ -1,6 +1,5 @@
 import type {
   WorldAssetIndex,
-  WorldAssetRevision,
 } from "@worlddock/contract";
 import type {
   OfficialWorldAsset,
@@ -91,11 +90,13 @@ export function OfficialAssetDetailPage({
           padding: "20px 32px 40px",
         }}
       >
-        <main
-          className="card"
+        <article
+          aria-label="资产文档"
           style={{
             minHeight: 360,
-            padding: "22px 24px",
+            minWidth: 0,
+            overflow: "visible",
+            padding: "0 8px 56px 0",
           }}
         >
           {error && !detail ? (
@@ -112,11 +113,10 @@ export function OfficialAssetDetailPage({
               请选择一个官方资产。
             </div>
           )}
-        </main>
+        </article>
 
         <aside className="col gap-3" style={{ minWidth: 0 }}>
           <AssetMetadataCard asset={asset} />
-          <AssetRevisionCard revisions={detail?.revisions ?? []} currentVersion={asset?.version} />
           <AssetIndexCard indexes={detail?.indexes ?? []} />
           <AssetPatchList
             error={patchesError}
@@ -178,7 +178,7 @@ function AssetMetadataCard({ asset }: { asset?: OfficialWorldAsset }) {
       <div className="row gap-2" style={{ alignItems: "center", marginBottom: 10 }}>
         <Icon name="book" size={13} style={{ color: "var(--fg-2)" }} />
         <span style={{ color: "var(--fg)", fontSize: "var(--t-13)", fontWeight: 650 }}>
-          Metadata
+          元数据
         </span>
       </div>
 
@@ -210,58 +210,6 @@ function AssetMetadataCard({ asset }: { asset?: OfficialWorldAsset }) {
   );
 }
 
-function AssetRevisionCard({
-  revisions,
-  currentVersion,
-}: {
-  revisions: WorldAssetRevision[];
-  currentVersion?: number;
-}) {
-  return (
-    <section className="card" style={{ padding: 14 }}>
-      <div className="row gap-2" style={{ alignItems: "center", marginBottom: 10 }}>
-        <Icon name="branch" size={13} style={{ color: "var(--fg-2)" }} />
-        <span style={{ color: "var(--fg)", fontSize: "var(--t-13)", fontWeight: 650 }}>
-          版本
-        </span>
-        <div className="flex" />
-        {currentVersion ? (
-          <span className="mono" style={{ color: "var(--fg)", fontSize: 11 }}>
-            当前 v{currentVersion}
-          </span>
-        ) : null}
-      </div>
-
-      {revisions.length === 0 ? (
-        <div className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
-          暂无修订记录
-        </div>
-      ) : (
-        <div className="col gap-2">
-          {revisions.map((revision) => (
-            <div
-              className="row gap-2"
-              key={revision.id}
-              style={{
-                alignItems: "center",
-                borderTop: "1px solid var(--hairline)",
-                paddingTop: 8,
-              }}
-            >
-              <span className="mono" style={{ color: "var(--fg)", fontSize: 11 }}>
-                版本 {revision.version}
-              </span>
-              <span style={{ color: "var(--fg-3)", fontSize: 11 }}>
-                {formatCompactDate(revision.createdAt)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function AssetIndexCard({ indexes }: { indexes: WorldAssetIndex[] }) {
   return (
     <section className="card" style={{ padding: 14 }}>
@@ -269,10 +217,6 @@ function AssetIndexCard({ indexes }: { indexes: WorldAssetIndex[] }) {
         <Icon name="layers" size={13} style={{ color: "var(--fg-2)" }} />
         <span style={{ color: "var(--fg)", fontSize: "var(--t-13)", fontWeight: 650 }}>
           索引
-        </span>
-        <div className="flex" />
-        <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
-          {indexes.length}
         </span>
       </div>
 
@@ -293,11 +237,6 @@ function AssetIndexCard({ indexes }: { indexes: WorldAssetIndex[] }) {
               <div style={{ color: "var(--fg)", fontSize: "var(--t-12)", fontWeight: 600 }}>
                 {getIndexTitle(index)}
               </div>
-              {index.summary ? (
-                <div className="prose" style={{ color: "var(--fg-3)", fontSize: 11, lineHeight: 1.45, marginTop: 3 }}>
-                  {index.summary}
-                </div>
-              ) : null}
             </div>
           ))}
         </div>
@@ -349,13 +288,6 @@ function getIndexTitle(index: WorldAssetIndex) {
 
 function getIndexKey(index: WorldAssetIndex, itemIndex: number) {
   return index.id ?? `${getIndexTitle(index)}-${itemIndex}`;
-}
-
-function formatCompactDate(value?: string | null) {
-  if (!value) return "未记录时间";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
 }
 
 function getErrorMessage(error: unknown) {

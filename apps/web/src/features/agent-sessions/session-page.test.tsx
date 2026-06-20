@@ -113,6 +113,56 @@ describe("SessionPage", () => {
     expect(screen.getByText("const permit = true;")).toBeInTheDocument();
     expect(screen.getByText("streaming")).toBeInTheDocument();
   });
+
+  it("renders streaming session markdown headings and inline formatting", () => {
+    renderSessionPage({
+      messages: [
+        {
+          id: "msg_streaming",
+          role: "assistant",
+          content: "## 修复建议\n\n**许可制度** 调用 `permit.check()`，详见 [资产库](https://example.com/assets)。",
+          status: "streaming",
+          createdAt: "2026-06-14T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(screen.getByRole("heading", { name: "修复建议" })).toBeInTheDocument();
+    expect(screen.getByText("许可制度").tagName).toBe("STRONG");
+    expect(screen.getByText("permit.check()").tagName).toBe("CODE");
+    expect(screen.getByRole("link", { name: "资产库" })).toHaveAttribute("href", "https://example.com/assets");
+  });
+
+  it("shows background tool progress and failures on assistant messages", () => {
+    renderSessionPage({
+      messages: [
+        {
+          id: "msg_tool",
+          role: "assistant",
+          content: "信息充足，现在我来直接创建正式资产。",
+          status: "streaming",
+          metadata: { toolStatus: "running", toolLabel: "创建正式资产" },
+          createdAt: "2026-06-14T00:00:00.000Z",
+        },
+        {
+          id: "msg_failed",
+          role: "assistant",
+          content: "信息充足，现在我来直接创建正式资产。",
+          status: "failed",
+          metadata: {
+            toolStatus: "failed",
+            toolLabel: "创建正式资产",
+            message: "WorldDock tool create_world_asset failed.",
+          },
+          createdAt: "2026-06-14T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(screen.getByText("正在创建正式资产")).toBeInTheDocument();
+    expect(screen.getByText("创建正式资产失败")).toBeInTheDocument();
+    expect(screen.getByText("运行失败：WorldDock tool create_world_asset failed.")).toBeInTheDocument();
+  });
 });
 
 function renderSessionPage(overrides: Record<string, unknown> = {}) {
