@@ -51,28 +51,15 @@ docs/
 
 准备 Node.js、Docker 和 pnpm。仓库声明的包管理器版本是 `pnpm@10.33.0`。
 
-首次启动必须先准备包管理器、依赖、环境变量、数据库和 Prisma Client：
+首次启动：
 
 ```bash
-corepack enable
 pnpm install
-cp .env.example .env
-docker compose up -d postgres
-pnpm --filter @worlddock/db prisma:generate
-pnpm --filter @worlddock/db prisma:migrate:deploy
+pnpm run setup
+pnpm dev
 ```
 
-之后分别在两个终端启动 API 和 Web。终端一：
-
-```bash
-pnpm --filter @worlddock/api dev
-```
-
-终端二：
-
-```bash
-pnpm --filter @worlddock/web dev
-```
+`pnpm run setup` 会在缺少 `.env` 时从 `.env.example` 复制一份，启动本地 postgres，生成 Prisma Client，并执行数据库 migration。`pnpm dev` 会同时启动 API 和 Web。
 
 如需一次性灌入演示世界数据，只在可丢弃的本地数据库执行：
 
@@ -85,12 +72,12 @@ ALLOW_DEMO_SEED=true pnpm --filter @worlddock/db seed
 - Web：`http://localhost:3000`
 - API：`http://localhost:4000/v1`
 
-本地工作台无需登录；连接 WorldHub 的发布、拉取等可选能力需要 Personal Access Token。根目录 `pnpm dev` 目前只启动 Web。完整本地联调需要另开终端启动 API。
+本地工作台无需登录；连接 WorldHub 的发布、拉取等可选能力需要 Personal Access Token。
 
 ## 常用命令
 
 ```bash
-pnpm dev                         # 启动 Web
+pnpm dev                         # 同时启动 API 和 Web
 pnpm --filter @worlddock/api dev # 启动 API
 pnpm build                       # 构建所有 workspace
 pnpm lint                        # 类型检查 / lint
