@@ -20,9 +20,6 @@ describe("WorldDock workbench message rendering", () => {
           role: "agent",
           text: "## 扩写完成\n\n- 世界规则：**天梯**连接地月轨道。\n- 后果：债务成为通行权。",
         }}
-        savedIds={[]}
-        onSave={() => undefined}
-        onOpenDetail={() => undefined}
         onOpenContext={() => undefined}
       />,
     );
@@ -52,9 +49,6 @@ describe("WorldDock workbench message rendering", () => {
             "- 轨道工业公司",
           ].join("\n"),
         }}
-        savedIds={[]}
-        onSave={() => undefined}
-        onOpenDetail={() => undefined}
         onOpenContext={() => undefined}
       />,
     );
@@ -76,9 +70,6 @@ describe("WorldDock workbench message rendering", () => {
           suggestions: [],
           contextRefs: 0,
         }}
-        savedIds={[]}
-        onSave={() => undefined}
-        onOpenDetail={() => undefined}
         onOpenContext={() => undefined}
       />,
     );
@@ -124,9 +115,6 @@ describe("WorldDock workbench message rendering", () => {
             },
           ],
         }}
-        savedIds={[]}
-        onSave={() => undefined}
-        onOpenDetail={() => undefined}
         onOpenContext={() => undefined}
       />,
     );
@@ -172,9 +160,6 @@ describe("WorldDock workbench message rendering", () => {
             },
           ],
         }}
-        savedIds={["ags_1"]}
-        onSave={() => undefined}
-        onOpenDetail={() => undefined}
         onOpenContext={() => undefined}
       />,
     );

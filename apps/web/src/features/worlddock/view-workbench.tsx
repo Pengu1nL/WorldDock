@@ -255,7 +255,7 @@ const renderInlineMarkdown = (text: string) => {
 };
 
 // ────────── Composer ──────────
-export const Composer = ({ onSend, busy, onStop, pendingCount, onOpenSuggestions, onOpenContext, contextRefs = 0 }: any) => {
+export const Composer = ({ onSend, busy, onStop, onOpenContext, contextRefs = 0 }: any) => {
   const [val, setVal] = useStateWB("");
   const send = () => {
     if (!val.trim() || busy) return;
@@ -296,13 +296,6 @@ export const Composer = ({ onSend, busy, onStop, pendingCount, onOpenSuggestions
               <Icon name="layers" size={11}/>
               <span>上下文</span>
               <span className="mono sb-dim">{contextRefs || 0}</span>
-            </button>
-            <button className="sb-btn" onClick={onOpenSuggestions} title="待处理建议">
-              <Icon name="bell" size={11}/>
-              <span>待处理</span>
-              {pendingCount > 0 && (
-                <span className="mono" style={{ color: "var(--amber)" }}>{pendingCount}</span>
-              )}
             </button>
             <div style={{ flex: 1 }}/>
             {busy ? (
@@ -567,34 +560,6 @@ export const ContextDrawer = () => (
     ))}
     <div className="hr" style={{ margin: "4px 0" }}/>
     <button className="btn ghost"><Icon name="plus" size={12}/><span>手动追加上下文</span></button>
-  </div>
-);
-
-// ────────── Pending suggestions drawer ──────────
-export const PendingDrawer = ({ pendingItems, onSave, onOpenDetail, onDiscard }: any) => (
-  <div className="col" style={{ gap: 10 }}>
-    {pendingItems.length === 0 ? (
-      <div style={{ textAlign: "center", padding: 30, color: "var(--fg-3)" }}>
-        <Icon name="check" size={24} style={{ color: "var(--sage)", opacity: 0.4 }}/>
-        <p style={{ marginTop: 10, fontSize: 13 }}>没有待处理建议</p>
-      </div>
-    ) : (
-      pendingItems.map((s: any, index: number) => (
-        <div key={getSuggestionRenderKey(s, index)} className="card" style={{ padding: 10 }}>
-          <div className="row gap-2" style={{ marginBottom: 4 }}>
-            <span className={"tag " + (s.kind === "setting" ? "sage" : s.kind === "conflict" ? "brick" : "violet")}>{s.category}</span>
-          </div>
-          <div style={{ fontSize: "var(--t-13)", fontWeight: 500, marginBottom: 4 }}>{s.title}</div>
-          <p className="prose" style={{ fontSize: 12, color: "var(--fg-1)", lineHeight: 1.5 }}>{getSuggestionPreviewText(s)}</p>
-          <div className="row gap-2" style={{ marginTop: 8 }}>
-            <button className="btn sm" onClick={() => onOpenDetail(normalizeSuggestionForSave(s))}><Icon name="eye" size={11}/><span>查看</span></button>
-            <button className="btn primary sm" onClick={() => onSave(normalizeSuggestionForSave(s))}><Icon name="save" size={11}/><span>保存</span></button>
-            <div className="flex"/>
-            <button className="btn ghost sm" onClick={() => onDiscard(s)}><Icon name="x" size={11}/></button>
-          </div>
-        </div>
-      ))
-    )}
   </div>
 );
 

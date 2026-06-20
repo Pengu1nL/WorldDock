@@ -155,7 +155,7 @@ describe("exploration session helpers", () => {
     );
 
     await act(async () => {
-      await result.current.mutateAsync();
+      await result.current.mutateAsync(undefined);
     });
 
     expect(api.createAgentSession).toHaveBeenCalledWith("world_1", {

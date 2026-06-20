@@ -53,7 +53,6 @@ import {
   type WorldAssetPatchBatch,
 } from "../api";
 import { Icon } from "../components";
-import { getSuggestionKey } from "../suggestion-utils";
 import { ArchiveView } from "../view-archive";
 import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
@@ -63,8 +62,6 @@ import type { WorldDockView } from "./world-navigation";
 export type WorldDockRuntimeState = {
   messages: any[];
   agentBusy: boolean;
-  savedIds: any[];
-  pendingItems: any[];
   savedSettings: any[];
   savedSeeds: any[];
   savedConflicts: any[];
@@ -76,7 +73,6 @@ export type WorldDockActions = {
   setMessages: any;
   startAgentRun: (text: string) => void;
   stopAgent: () => void;
-  handleSave: (item: any) => void;
   setDrawerOpen: any;
   setView: (view: WorldDockView) => void;
   openAssetEditor: (kind: "setting" | "seed" | "conflict", asset?: any) => void;
@@ -108,8 +104,6 @@ export function WorldWorkspace({
   const {
     messages,
     agentBusy,
-    savedIds,
-    pendingItems,
     savedSettings,
     savedSeeds,
     savedConflicts,
@@ -120,7 +114,6 @@ export function WorldWorkspace({
     setMessages,
     startAgentRun,
     stopAgent,
-    handleSave,
     setDrawerOpen,
     setView,
     openAssetEditor,
@@ -137,12 +130,9 @@ export function WorldWorkspace({
           world={currentWorld}
           messages={messages}
           agentBusy={agentBusy}
-          savedIds={savedIds}
-          pendingCount={pendingItems.length}
           setMessages={setMessages}
           startAgentRun={startAgentRun}
           stopAgent={stopAgent}
-          handleSave={handleSave}
           setDrawerOpen={setDrawerOpen}
           pushToast={pushToast}
         />
@@ -192,12 +182,9 @@ const ExplorationWorkspace = ({
   world,
   messages,
   agentBusy,
-  savedIds,
-  pendingCount,
   setMessages,
   startAgentRun,
   stopAgent,
-  handleSave,
   setDrawerOpen,
   pushToast,
 }: any) => {
@@ -267,12 +254,9 @@ const ExplorationWorkspace = ({
       world={world}
       messages={messages}
       agentBusy={agentBusy}
-      savedIds={savedIds}
-      pendingCount={pendingCount}
       setMessages={setMessages}
       startAgentRun={startAgentRun}
       stopAgent={stopAgent}
-      handleSave={handleSave}
       setDrawerOpen={setDrawerOpen}
     />
   );
@@ -547,30 +531,22 @@ const LegacyExplorationWorkspace = ({
   world,
   messages,
   agentBusy,
-  savedIds,
-  pendingCount,
   setMessages,
   startAgentRun,
   stopAgent,
-  handleSave,
   setDrawerOpen,
 }: any) => (
   <Workbench
     world={world}
     messages={messages}
     agentBusy={agentBusy}
-    savedIds={savedIds}
-    pendingCount={pendingCount}
     contextRefs={getLatestCompletedContextRefs(messages)}
     onSend={(text: string) => {
       setMessages((prev: any[]) => [...prev, { id: "u_" + Date.now(), role: "user", text }]);
       setTimeout(() => startAgentRun(text), 200);
     }}
     onStop={stopAgent}
-    onSave={handleSave}
-    onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s })}
     onOpenContext={(snapshot?: any) => setDrawerOpen({ kind: "context", snapshot })}
-    onOpenSuggestions={() => setDrawerOpen({ kind: "pending" })}
   />
 );
 
@@ -1382,9 +1358,9 @@ function AssetEditSessionPanel({
 }
 
 const Workbench = ({
-  world, messages, agentBusy, savedIds, pendingCount,
-  onSend, onStop, onSave, onOpenDetail,
-  onOpenContext, onOpenSuggestions, contextRefs,
+  world, messages, agentBusy,
+  onSend, onStop,
+  onOpenContext, contextRefs,
 }: any) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -1409,9 +1385,9 @@ const Workbench = ({
               </span>
             </div>
             {messages.map((m: any) => (
-              <Message key={m.id} msg={m} savedIds={getMessageSavedSuggestionIds(m, savedIds)}
-                onSave={onSave}
-                onOpenDetail={onOpenDetail}
+              <Message
+                key={m.id}
+                msg={m}
                 onOpenContext={() => onOpenContext(m.contextSnapshot)}
               />
             ))}
@@ -1422,9 +1398,7 @@ const Workbench = ({
         onSend={onSend}
         busy={agentBusy}
         onStop={onStop}
-        pendingCount={pendingCount}
         contextRefs={contextRefs}
-        onOpenSuggestions={onOpenSuggestions}
         onOpenContext={() => onOpenContext()}
       />
     </div>
@@ -1461,11 +1435,4 @@ function getLatestCompletedContextRefs(messages: any[]) {
     if (message.role === "agent" && !message.streaming && message.contextRefs) return message.contextRefs;
   }
   return 0;
-}
-
-function getMessageSavedSuggestionIds(message: any, savedSuggestionKeys: any[]) {
-  if (!message.suggestions) return [];
-  return message.suggestions
-    .filter((suggestion: any) => savedSuggestionKeys.includes(getSuggestionKey(suggestion)))
-    .map((suggestion: any) => getSuggestionKey(suggestion));
 }

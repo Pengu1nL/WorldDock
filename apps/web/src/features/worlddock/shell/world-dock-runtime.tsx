@@ -11,13 +11,11 @@ import {
   createWorldAsset,
   deleteWorldAsset,
   deleteWorld as deleteWorldRequest,
-  discardAgentSuggestion,
   duplicateWorld as duplicateWorldRequest,
   listWorldAssets,
   listWorlds,
   relateWorldAssets,
   reorderWorldAssets,
-  saveAgentSuggestion,
   streamAgentEvents,
   unrelateWorldAssets,
   updateWorldAsset,
@@ -48,10 +46,8 @@ import {
 } from "./world-workspace";
 import {
   IssuesDrawer,
-  PendingDrawer,
   SuggestionDetail,
 } from "../view-workbench";
-import { getSuggestionKey, normalizeSuggestionForSave } from "../suggestion-utils";
 import { CreateView, WorldsView } from "../view-worlds";
 import { getWorldStoredSummary } from "../world-summary";
 
@@ -84,12 +80,11 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
   // Workbench state — per current world (live copies for the open world; archived in worldStatesRef)
   const [messages, setMessages] = useState<any[]>([]);
   const [agentBusy, setAgentBusy] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState<any>(null);  // { kind: 'detail'|'context'|'pending', item, readonly? }
+  const [drawerOpen, setDrawerOpen] = useState<any>(null);  // { kind: 'detail'|'context'|'issues', item, readonly? }
   const [savedSettings, setSavedSettings] = useState<any[]>([]);
   const [savedSeeds, setSavedSeeds] = useState<any[]>([]);
   const [savedConflicts, setSavedConflicts] = useState<any[]>([]);
   const [savedIssues, setSavedIssues] = useState<any[]>([]);   // 一致性问题（待修矛盾）
-  const [savedIds, setSavedIds] = useState<any[]>([]);
   const [toasts, setToasts] = useState<any[]>([]);
   const [runTokens, setRunTokens] = useState(0);
   const [activeAgentRunId, setActiveAgentRunId] = useState<string | null>(null);
@@ -106,7 +101,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
 
   const agentAbortRef = useRef<AbortController | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
-  // worldId → { messages, savedSettings, savedSeeds, savedConflicts, savedIds }
+  // worldId → { messages, savedSettings, savedSeeds, savedConflicts }
   const worldStatesRef = useRef<any>({});
 
   const worldsQuery = useQuery({
@@ -196,7 +191,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
   useEffect(() => {
     if (!currentWorld) return;
     worldStatesRef.current[currentWorld.id] = {
-      messages, savedSettings, savedSeeds, savedConflicts, savedIssues, savedIds,
+      messages, savedSettings, savedSeeds, savedConflicts, savedIssues,
       agentContextRefs, agentToolEvents, agentRunStatus, runTokens,
     };
   }, [
@@ -206,7 +201,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     savedSeeds,
     savedConflicts,
     savedIssues,
-    savedIds,
     agentContextRefs,
     agentToolEvents,
     agentRunStatus,
@@ -274,7 +268,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       let latestRunStatus: AgentRunStatus = "running";
       let streamedContextRefs: AgentContextRef[] = [];
       let streamedToolEvents: AgentToolEvent[] = [];
-      const suggestions: any[] = [];
 
       await streamAgentEvents(created.run.id, { signal: abortController.signal }, (event) => {
         if (agentAbortRef.current !== abortController) return;
@@ -316,9 +309,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
           }
           setAgentToolEvents(streamedToolEvents);
         }
-        if (event.type === "suggestion.created") {
-          suggestions.push({ ...event.payload.suggestion, agentSuggestionId: event.payload.suggestionId });
-        }
         if (event.type === "run.completed" && event.payload.tokenUsage) {
           latestRunStatus = "completed";
           latestTokens = event.payload.tokenUsage.totalTokens;
@@ -349,7 +339,7 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
         runStatus: latestRunStatus,
       };
       setMessages((prev: any[]) => prev.map((m: any) => m.id === agentMsg.id
-        ? { ...m, streaming: false, suggestions, contextRefs, contextSnapshot }
+        ? { ...m, streaming: false, contextRefs, contextSnapshot }
         : m));
       if (agentAbortRef.current === abortController) agentAbortRef.current = null;
       setAgentBusy(false);
@@ -416,7 +406,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
           savedSeeds,
           savedConflicts,
           savedIssues,
-          savedIds,
           agentContextRefs,
           agentToolEvents,
           agentRunStatus: "failed",
@@ -439,7 +428,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       setSavedSeeds(saved.savedSeeds || []);
       setSavedConflicts(saved.savedConflicts || []);
       setSavedIssues(saved.savedIssues || []);
-      setSavedIds(saved.savedIds || []);
       setAgentContextRefs(saved.agentContextRefs || []);
       setAgentToolEvents(saved.agentToolEvents || []);
       setAgentRunStatus(saved.agentRunStatus || "idle");
@@ -450,7 +438,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       setSavedSeeds([]);
       setSavedConflicts([]);
       setSavedIssues([]);
-      setSavedIds([]);
       setAgentContextRefs([]);
       setAgentToolEvents([]);
       setAgentRunStatus("idle");
@@ -503,7 +490,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       setSavedSeeds([]);
       setSavedConflicts([]);
       setSavedIssues([]);
-      setSavedIds([]);
       setAgentContextRefs([]);
       setAgentToolEvents([]);
       setAgentRunStatus("idle");
@@ -513,73 +499,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     } catch {
       pushToast({ kind: "warn", text: "创建世界失败 · 请检查本地 API 服务" });
     }
-  };
-
-  // Save suggestion handler
-  const handleSave = async (item: any) => {
-    const worldId = currentWorld?.id;
-    const normalizedItem = normalizeSuggestionForSave(item);
-    const suggestionKey = getSuggestionKey(normalizedItem);
-    if (savedIds.includes(suggestionKey)) return;
-    let savedItem = normalizedItem;
-    let appendSavedItem = true;
-    if (normalizedItem.agentSuggestionId) {
-      try {
-        const saved = await saveAgentSuggestion(normalizedItem.agentSuggestionId);
-        const returnedAsset = saved.asset ?? saved.savedAsset ?? saved.suggestion?.asset ?? saved.suggestion?.savedAsset;
-        if (returnedAsset) savedItem = fromWorldAsset(returnedAsset);
-        else appendSavedItem = false;
-        if (worldId) invalidateWorldAssets(worldId);
-      } catch {
-        pushToast({ kind: "warn", text: "保存失败 · 请检查本地 API 服务" });
-        return;
-      }
-    } else if (worldId) {
-      try {
-        const created = await createWorldAsset(worldId, toWorldAssetInput(normalizedItem));
-        savedItem = fromWorldAsset(created.asset);
-        invalidateWorldAssets(worldId);
-      } catch {
-        pushToast({ kind: "warn", text: "资产保存失败 · 请检查本地 API 服务" });
-        return;
-      }
-    }
-    setSavedIds((prev: any[]) => [...new Set([...prev, suggestionKey].filter(Boolean))]);
-    if (appendSavedItem) {
-      if (savedItem.kind === "setting") setSavedSettings((prev: any[]) => [...prev, savedItem]);
-      if (savedItem.kind === "seed") setSavedSeeds((prev: any[]) => [...prev, savedItem]);
-      if (savedItem.kind === "conflict") setSavedConflicts((prev: any[]) => [...prev, savedItem]);
-    }
-    if (savedItem.kind === "setting") {
-      pushToast({ kind: "save", text: `已保存到档案 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("asset-library") } });
-    } else if (savedItem.kind === "seed") {
-      pushToast({ kind: "save", text: `已保存到种子池 · ${savedItem.title}`, action: { label: "查看", onClick: () => setView("asset-library") } });
-    } else if (savedItem.kind === "conflict") {
-      pushToast({ kind: "save", text: `已记入冲突池 · ${savedItem.title}` });
-    }
-    if (currentWorld) {
-      setCurrentWorld((prev: any) => ({
-        ...prev,
-        hasUnsaved: false,
-      }));
-    }
-    // Auto-close drawer
-    setDrawerOpen(null);
-  };
-
-  const handleDiscard = async (item: any) => {
-    const suggestionKey = getSuggestionKey(item);
-    if (item.agentSuggestionId) {
-      try {
-        await discardAgentSuggestion(item.agentSuggestionId);
-      } catch {
-        pushToast({ kind: "warn", text: "丢弃失败 · 请检查本地 API 服务" });
-        return;
-      }
-    }
-    setSavedIds((prev: any[]) => [...new Set([...prev, suggestionKey].filter(Boolean))]);
-    pushToast({ kind: "warn", text: `已丢弃 · ${item.title}` });
-    setDrawerOpen(null);
   };
 
   const openAssetEditor = (kind: "setting" | "seed" | "conflict", asset?: any) => {
@@ -792,15 +711,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     pushToast({ kind: "warn", text: `已忽略 · ${issue.title}` });
   };
 
-  // Pending items in current message stream
-  const allSuggestions = useMemo(() => {
-    const set = new Map<string, any>();
-    for (const m of messages) {
-      if (m.suggestions) for (const s of m.suggestions) set.set(getSuggestionKey(s), s);
-    }
-    return [...set.values()];
-  }, [messages]);
-  const pendingItems = useMemo(() => allSuggestions.filter((s: any) => !savedIds.includes(getSuggestionKey(s))), [allSuggestions, savedIds]);
   const consistencyIssuesQuery = useConsistencyIssues(currentWorld?.id, { status: "open", limit: 50 });
   const openConsistencyIssueBadge = getLoadedConsistencyIssueBadge(consistencyIssuesQuery.data);
 
@@ -826,7 +736,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
             }
           }}
           world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
-          pendingCount={pendingItems.length}
           consistencyIssueBadge={openConsistencyIssueBadge}
         />
         <main className="app-main" ref={mainRef} style={{ position: "relative", overflow: "hidden" }}>
@@ -857,8 +766,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
             worldState={{
               messages,
               agentBusy,
-              savedIds,
-              pendingItems,
               savedSettings,
               savedSeeds,
               savedConflicts,
@@ -869,7 +776,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
               setMessages,
               startAgentRun,
               stopAgent,
-              handleSave,
               setDrawerOpen,
               setView,
               openAssetEditor,
@@ -888,17 +794,15 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
             title={
               drawerOpen?.kind === "asset-editor" ? (drawerOpen.item?.id ? "编辑资产" : "新建资产") :
               drawerOpen?.kind === "asset-relation" ? "关联资产" :
-              drawerOpen?.kind === "detail" ? "编辑并确认" :
+              drawerOpen?.kind === "detail" ? "资产详情" :
               drawerOpen?.kind === "context" ? "本轮上下文" :
-              drawerOpen?.kind === "pending" ? `待处理建议 · ${pendingItems.length}` :
               drawerOpen?.kind === "issues" ? `一致性问题 · ${savedIssues.length}` : ""
             }
             subtitle={
               drawerOpen?.kind === "asset-editor" ? "直接创建或更新世界资产" :
               drawerOpen?.kind === "asset-relation" ? "选择一个目标资产建立关联" :
-              drawerOpen?.kind === "detail" ? "确认后会成为世界资产" :
+              drawerOpen?.kind === "detail" ? "已沉淀资产的只读视图" :
               drawerOpen?.kind === "context" ? "Agent 本轮使用了哪些已确认资料" :
-              drawerOpen?.kind === "pending" ? "保存有价值的，丢弃无关的" :
               drawerOpen?.kind === "issues" ? "Agent 发现的待修矛盾 · 三选一：修 / 留为冲突 / 弃" : ""
             }
           >
@@ -962,11 +866,9 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
             {drawerOpen?.kind === "detail" && drawerOpen.item && (
               <SuggestionDetail
                 item={drawerOpen.item}
-                readonly={!!drawerOpen.readonly}
+                readonly={drawerOpen.readonly ?? true}
                 allSavedSeeds={savedSeeds}
                 allSavedConflicts={savedConflicts}
-                onSave={handleSave}
-                onDiscard={handleDiscard}
                 onClose={() => setDrawerOpen(null)}
                 onBackToWorkbench={() => { setDrawerOpen(null); setView("exploration"); }}
                 onJumpToItem={(targetItem: any) => {
@@ -982,12 +884,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
               <AgentContextDrawer
                 snapshot={drawerOpen.snapshot ?? latestContextSnapshot}
               />
-            )}
-            {drawerOpen?.kind === "pending" && (
-              <PendingDrawer pendingItems={pendingItems}
-                onSave={handleSave}
-                onDiscard={handleDiscard}
-                onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s })}/>
             )}
             {drawerOpen?.kind === "issues" && (
               <IssuesDrawer
