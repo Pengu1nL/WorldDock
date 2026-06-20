@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { generateWorldDraft, type GenerateWorldDraftResponse, type WorldCreationDraft, type WorldDraftTool } from "./api";
 import { Icon, Maturity } from "./components";
+import { PageBody, PageHeader, PageShell, PageToolbar } from "./layout/page-shell";
 import { formatWorldUpdatedDate, getWorldCardSummary } from "./world-summary";
 
 const DRAFT_GENERATION_TOOLS: WorldDraftTool[] = [
@@ -146,6 +147,40 @@ const EmptyWorldCard = ({ inspirations, onPick }: any) => (
 );
 
 // ────────── Worlds list view ──────────
+const WorldsOverview = ({ worlds }: { worlds: any[] }) => {
+  const changed = worlds.filter((world) => world.hasUnsaved || world.hasUnpushed).length;
+  const unpublished = worlds.filter((world) => world.status !== "published").length;
+  const conflictCount = worlds.reduce((sum, world) => sum + Number(world.conflicts ?? 0), 0);
+  const averageMaturity = worlds.length
+    ? Math.round(worlds.reduce((sum, world) => sum + Number(world.maturity ?? 0), 0) / worlds.length)
+    : 0;
+
+  const items = [
+    { label: "全部世界", value: worlds.length, tone: "slate" },
+    { label: "未处理改动", value: changed, tone: changed ? "amber" : "sage" },
+    { label: "待发布", value: unpublished, tone: unpublished ? "amber" : "sage" },
+    { label: "矛盾线索", value: conflictCount, tone: conflictCount ? "brick" : "sage" },
+    { label: "平均成熟度", value: `${averageMaturity}%`, tone: "slate" },
+  ];
+
+  return (
+    <section className="card" aria-label="工作台概览" style={{ padding: 14, marginBottom: 14 }}>
+      <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+        <h2 className="title-font" style={{ fontSize: "var(--t-15)" }}>工作台概览</h2>
+        <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>overview</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 8 }}>
+        {items.map((item) => (
+          <div key={item.label} style={{ padding: "10px 12px", border: "1px solid var(--hairline)", borderRadius: 10, background: "var(--surface-2)" }}>
+            <div className={`badge ${item.tone}`}>{item.label}</div>
+            <div className="mono" style={{ marginTop: 8, color: "var(--fg)", fontSize: "var(--t-18)", fontWeight: 650 }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDraft, onDelete, onDuplicate, hideDraftFromList, worldsState = "ready" }: any) => {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
@@ -169,14 +204,13 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
   const showWorldsState = worldsState === "loading" || worldsState === "error" || (worldsState === "ready" && worlds.length === 0);
 
   return (
-    <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
-      <div className="page-head">
-        <div className="col">
-          <div className="crumb">/ ren / worlds</div>
-          <h1>我的世界</h1>
-          <div className="sub">{worlds.length} 个世界 · {worlds.filter((w: any) => w.status === "published").length} 个已公开 · {worlds.filter((w: any) => w.hasUnsaved || w.hasUnpushed).length} 个有未处理改动</div>
-        </div>
-        <div className="row gap-2">
+    <PageShell>
+      <PageHeader
+        breadcrumb="/ ren / worlds"
+        title="我的世界"
+        subtitle={`${worlds.length} 个世界 · ${worlds.filter((w: any) => w.status === "published").length} 个已公开 · ${worlds.filter((w: any) => w.hasUnsaved || w.hasUnpushed).length} 个有未处理改动`}
+        actions={(
+          <>
           <div style={{ position: "relative" }}>
             <Icon name="explore" size={13} style={{ position: "absolute", left: 9, top: 9, color: "var(--fg-3)" }}/>
             <input className="input" placeholder="搜索世界、标签、设定…"
@@ -187,13 +221,11 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
             <Icon name="plus" size={13}/>
             <span>新建世界</span>
           </button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div style={{
-        padding: "12px 32px", display: "flex", alignItems: "center", gap: 12,
-        borderBottom: "1px solid var(--hairline)",
-      }}>
+      <PageToolbar>
         {[
           { id: "all", label: "全部", n: worlds.length },
           { id: "published", label: "已公开", n: worlds.filter((w: any) => w.status === "published").length },
@@ -209,67 +241,69 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
         <div className="flex"/>
         <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>updated</span>
         <Icon name="chevdown" size={11} style={{ color: "var(--fg-3)" }}/>
-      </div>
+      </PageToolbar>
 
-      <div style={{
-        padding: "20px 32px 40px",
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-        gap: 14,
-      }}>
-        {worldsState === "loading" && (
-          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
-            正在读取本地世界...
-          </div>
-        )}
-        {worldsState === "error" && (
-          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
-            本地世界暂不可用，请检查 API 服务。
-          </div>
-        )}
-        {worldsState === "ready" && worlds.length === 0 && (
-          <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
-            还没有世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个</a>
-          </div>
-        )}
-        {savedDraft && (
-          <button className="card hover" onClick={onContinueDraft}
-            style={{
-              textAlign: "left", padding: 0, cursor: "pointer", minHeight: 184,
-              borderColor: "var(--sage-dim)", background: "linear-gradient(to bottom, var(--sage-bg), var(--surface))",
-              display: "flex", flexDirection: "column",
-            }}>
-            <div style={{ padding: "14px 16px", flex: 1 }}>
-              <div className="row gap-2" style={{ marginBottom: 8 }}>
-                <span className="badge sage">刚刚创建</span>
-                <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>just now</span>
-              </div>
-              <div className="title-font" style={{ fontSize: "var(--t-16)", fontWeight: 600, marginBottom: 6 }}>
-                {savedDraft.name}
-              </div>
-              <p className="prose" style={{ fontSize: "var(--t-13)", color: "var(--fg-1)" }}>
-                {savedDraft.coreSetting}
-              </p>
+      <PageBody width="work">
+        <WorldsOverview worlds={worlds} />
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+          gap: 14,
+        }}>
+          {worldsState === "loading" && (
+            <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+              正在读取本地世界...
             </div>
-            <div style={{
-              padding: "10px 16px", borderTop: "1px solid var(--sage-dim)",
-              fontSize: 12, color: "var(--sage)", display: "flex", alignItems: "center", gap: 6,
-            }}>
-              <Icon name="spark" size={12}/>
-              <span>进入工作台继续推演</span>
-              <Icon name="chevron" size={12} style={{ marginLeft: "auto" }}/>
+          )}
+          {worldsState === "error" && (
+            <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+              本地世界暂不可用，请检查 API 服务。
             </div>
-          </button>
-        )}
-        {filtered.map((w: any) => <WorldCard key={w.id} world={w} onOpen={onOpen} onDelete={onDelete} onDuplicate={onDuplicate}/>)}
-        {!savedDraft && filtered.length === 0 && !showWorldsState && (
-          <div style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
-            没有匹配的世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个 →</a>
-          </div>
-        )}
-        {!savedDraft && filtered.length > 0 && filter === "all" && <EmptyWorldCard inspirations={inspirations} onPick={(s: any) => onCreate(s)}/>}
-      </div>
-    </div>
+          )}
+          {worldsState === "ready" && worlds.length === 0 && (
+            <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+              还没有世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个</a>
+            </div>
+          )}
+          {savedDraft && (
+            <button className="card hover" onClick={onContinueDraft}
+              style={{
+                textAlign: "left", padding: 0, cursor: "pointer", minHeight: 184,
+                borderColor: "var(--sage-dim)", background: "linear-gradient(to bottom, var(--sage-bg), var(--surface))",
+                display: "flex", flexDirection: "column",
+              }}>
+              <div style={{ padding: "14px 16px", flex: 1 }}>
+                <div className="row gap-2" style={{ marginBottom: 8 }}>
+                  <span className="badge sage">刚刚创建</span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>just now</span>
+                </div>
+                <div className="title-font" style={{ fontSize: "var(--t-16)", fontWeight: 600, marginBottom: 6 }}>
+                  {savedDraft.name}
+                </div>
+                <p className="prose" style={{ fontSize: "var(--t-13)", color: "var(--fg-1)" }}>
+                  {savedDraft.coreSetting}
+                </p>
+              </div>
+              <div style={{
+                padding: "10px 16px", borderTop: "1px solid var(--sage-dim)",
+                fontSize: 12, color: "var(--sage)", display: "flex", alignItems: "center", gap: 6,
+              }}>
+                <Icon name="spark" size={12}/>
+                <span>进入工作台继续推演</span>
+                <Icon name="chevron" size={12} style={{ marginLeft: "auto" }}/>
+              </div>
+            </button>
+          )}
+          {filtered.map((w: any) => <WorldCard key={w.id} world={w} onOpen={onOpen} onDelete={onDelete} onDuplicate={onDuplicate}/>)}
+          {!savedDraft && filtered.length === 0 && !showWorldsState && (
+            <div style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
+              没有匹配的世界。<a onClick={() => onCreate()} style={{ color: "var(--sage)", cursor: "pointer" }}>新建一个 →</a>
+            </div>
+          )}
+          {!savedDraft && filtered.length > 0 && filter === "all" && <EmptyWorldCard inspirations={inspirations} onPick={(s: any) => onCreate(s)}/>}
+        </div>
+      </PageBody>
+    </PageShell>
   );
 };
 
@@ -537,7 +571,6 @@ const ConfirmCard = ({ seed, overrideName, overrideType, tokenUsage, onRegenerat
           <span>重新生成</span>
         </button>
         <div className="row gap-2">
-          <button className="btn">编辑后创建</button>
           <button className="btn primary lg" onClick={() => onConfirm(name)}>
             <span>确认并进入工作台</span>
             <Icon name="chevron" size={13}/>
