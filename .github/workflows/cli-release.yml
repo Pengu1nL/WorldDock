@@ -1,15 +1,15 @@
-name: Contract Release
+name: CLI Release
 
 on:
   push:
     tags:
-      - "contract-v*"
+      - "cli-v*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: contract-release-${{ github.ref }}
+  group: cli-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -26,13 +26,12 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @worlddock/contract lint
-      - run: pnpm --filter @worlddock/contract test
-      - run: pnpm --filter @worlddock/contract build
       - run: pnpm --filter @worlddock/contract test:pack
-      - name: Verify contract tag matches package version
-        run: test "${GITHUB_REF_NAME#contract-v}" = "$(node -p "require('./packages/contract/package.json').version")"
-      - run: pnpm publish --access public --no-git-checks
-        working-directory: packages/contract
+      - run: pnpm --filter @worlddock/cli lint
+      - run: pnpm --filter @worlddock/cli test
+      - run: pnpm --filter @worlddock/cli test:pack
+      - name: Verify CLI tag matches package version
+        run: test "${GITHUB_REF_NAME#cli-v}" = "$(node -p "require('./packages/worlddock-cli/package.json').version")"
+      - run: pnpm --filter @worlddock/cli publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
