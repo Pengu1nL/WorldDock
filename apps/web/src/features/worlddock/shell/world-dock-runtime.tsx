@@ -24,6 +24,7 @@ import {
 } from "../api";
 import { AgentRunPanel } from "../../agent/agent-run-panel";
 import { ContextInspector } from "../../agent/context-inspector";
+import { agentSessionsFeatureEnabled } from "../../agent-sessions/use-agent-session";
 import {
   getLoadedConsistencyIssueBadge,
   useConsistencyIssues,
@@ -494,7 +495,9 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       setAgentRunStatus("idle");
       setRunTokens(0);
       setView("exploration");
-      setTimeout(() => startAgentRun(inspiration, newWorld), 200);
+      if (!agentSessionsFeatureEnabled()) {
+        setTimeout(() => startAgentRun(inspiration, newWorld), 200);
+      }
     } catch {
       pushToast({ kind: "warn", text: "创建世界失败 · 请检查本地 API 服务" });
     }

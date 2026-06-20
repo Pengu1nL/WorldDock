@@ -2,7 +2,10 @@ import { expect, test } from "playwright/test";
 import { installApiMocks, installSessionAssetMocks } from "./helpers";
 
 test("creator can create a world and promote a session potential asset", async ({ page }) => {
-  await installApiMocks(page);
+  const legacyAgentRuns: Array<{ worldId: string; input: Record<string, any> }> = [];
+  await installApiMocks(page, {
+    onLegacyAgentRun: (run) => legacyAgentRuns.push(run),
+  });
   const sessionMocks = await installSessionAssetMocks(page);
   await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
@@ -27,4 +30,5 @@ test("creator can create a world and promote a session potential asset", async (
 
   await page.getByRole("button", { name: /资产库/ }).click();
   await expect(page.locator("main").getByText("《记忆交易法》", { exact: true })).toBeVisible();
+  expect(legacyAgentRuns).toEqual([]);
 });

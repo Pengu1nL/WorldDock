@@ -14,6 +14,7 @@
 | `pnpm --filter @worlddock/api test:integration` | PASS | 14 files passed, 1 skipped；109 tests passed, 1 skipped。 |
 | `pnpm --filter @worlddock/api build` | PASS | `tsc -p tsconfig.build.json` passed。 |
 | `pnpm verify` | PASS | Prisma validate、整仓 lint、整仓 test、整仓 build passed。 |
+| `pnpm --filter @worlddock/web test:e2e -- creation-flow.spec.ts session-assets-flow.spec.ts` | PASS | 验证创建世界的 session 主路径不调用 legacy `/v1/worlds/:worldId/agent-runs`。 |
 | `pnpm --filter @worlddock/web test:e2e -- session-assets-flow.spec.ts creation-flow.spec.ts consistency-flow.spec.ts responsive.spec.ts` | PASS | 4 Playwright specs passed，用作最终 smoke 证据。 |
 
 ## 本轮退场范围
@@ -55,3 +56,4 @@
 - 一致性路径：通过 E2E `consistency-flow.spec.ts` 验证一致性问题查看和修复入口。
 - 移动端路径：通过 E2E `responsive.spec.ts` 验证核心创建路径无水平溢出。
 - 旧页面退场：静态扫描确认 `ArchiveView`、`SeedsView`、`ConflictsView`、`suggestion-utils`、`saveAgentSuggestion`、`discardAgentSuggestion`、`agent-suggestions` 以及旧 suggestion UI 文案在前端运行时代码中已移除；剩余命中仅为负向断言。
+- Legacy run 退场：`creation-flow.spec.ts` 和 `session-assets-flow.spec.ts` 计数 legacy `POST /v1/worlds/:worldId/agent-runs`，确认 session 主路径创建世界后未触发旧 agent run。

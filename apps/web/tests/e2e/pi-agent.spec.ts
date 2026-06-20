@@ -8,6 +8,8 @@ test("pi agent smoke keeps the creation run inspectable", async ({ page }) => {
   await page.getByRole("button", { name: /开始推演/ }).click();
   await expect(page.getByText("雏形已生成")).toBeVisible();
   await page.getByRole("button", { name: /确认并进入工作台/ }).click();
+  await page.getByLabel("继续推演").fill("继续推演记忆交易的制度边界。");
+  await page.getByRole("button", { name: /发送/ }).click();
 
   const contextButton = page.getByRole("button", { name: "上下文 2" });
   await expect(contextButton).toBeVisible({ timeout: 15_000 });

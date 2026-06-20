@@ -2,7 +2,10 @@ import { expect, test } from "playwright/test";
 import { installApiMocks, installSessionAssetMocks } from "./helpers";
 
 test("creator can promote a session potential asset into the official asset library", async ({ page }) => {
-  await installApiMocks(page);
+  const legacyAgentRuns: Array<{ worldId: string; input: Record<string, any> }> = [];
+  await installApiMocks(page, {
+    onLegacyAgentRun: (run) => legacyAgentRuns.push(run),
+  });
   const sessionMocks = await installSessionAssetMocks(page);
   await page.goto("/app");
   await page.getByRole("heading", { name: "我的世界" }).waitFor();
@@ -32,4 +35,5 @@ test("creator can promote a session potential asset into the official asset libr
   await expect(page.getByRole("heading", { name: "资产详情" })).toBeVisible();
   await expect(page.getByText("亲属记忆交易必须经过七日冷静期")).toBeVisible();
   await expect(page.getByRole("button", { name: "编辑" })).toBeVisible();
+  expect(legacyAgentRuns).toEqual([]);
 });

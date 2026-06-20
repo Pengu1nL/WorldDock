@@ -179,6 +179,7 @@ const tideConsistencyRepairSession = {
 };
 
 type ApiMockOptions = {
+  onLegacyAgentRun?: (run: { worldId: string; input: Record<string, any> }) => void;
   onPushWorld?: (push: { worldId: string; input: Record<string, any> }) => void;
 };
 
@@ -507,6 +508,7 @@ export async function installApiMocks(page: Page, options: ApiMockOptions = {}) 
     }
 
     if (method === "POST" && /\/v1\/worlds\/[^/]+\/agent-runs$/.test(path)) {
+      options.onLegacyAgentRun?.({ worldId: path.split("/")[3] ?? "", input: postData(request) });
       return json(route, { run: { id: "run_e2e" }, suggestions: [] });
     }
 
