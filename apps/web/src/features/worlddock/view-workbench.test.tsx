@@ -1,9 +1,14 @@
+// @vitest-environment jsdom
+
+import "@testing-library/jest-dom/vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Message } from "./view-workbench";
 
 describe("WorldDock workbench message rendering", () => {
   afterEach(() => {
+    cleanup();
     vi.restoreAllMocks();
   });
 
@@ -83,7 +88,55 @@ describe("WorldDock workbench message rendering", () => {
     expect(html).not.toContain("本轮引用了 0 项上下文");
   });
 
-  it("uses agent suggestion ids for duplicate-safe keys and saved state", () => {
+  it("does not render legacy inline suggestion groups for normal workbench messages", () => {
+    render(
+      <Message
+        msg={{
+          id: "m1",
+          role: "agent",
+          text: "建议已经进入潜在资产流程。",
+          streaming: false,
+          suggestions: [
+            {
+              id: "setting_1",
+              kind: "setting",
+              category: "制度规则",
+              title: "记忆许可",
+              summary: "记忆交易需要许可。",
+            },
+            {
+              id: "conflict_1",
+              kind: "conflict",
+              category: "核心矛盾",
+              title: "许可与人格",
+              summary: "人格是否可以被监管。",
+            },
+            {
+              id: "seed_1",
+              kind: "seed",
+              category: "剧情钩子",
+              title: "失效许可",
+              hook: "主角的许可在关键时刻失效。",
+              trigger: "一次例行审查。",
+              conflict: "自由与债务。",
+              protagonists: "陆远",
+              questions: [],
+            },
+          ],
+        }}
+        savedIds={[]}
+        onSave={() => undefined}
+        onOpenDetail={() => undefined}
+        onOpenContext={() => undefined}
+      />,
+    );
+
+    expect(screen.queryByText("可保存设定")).not.toBeInTheDocument();
+    expect(screen.queryByText("故事种子")).not.toBeInTheDocument();
+    expect(screen.queryByText("戏剧张力 · 入冲突池")).not.toBeInTheDocument();
+  });
+
+  it("ignores duplicate legacy suggestion payloads in message rendering", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const html = renderToStaticMarkup(
@@ -126,9 +179,10 @@ describe("WorldDock workbench message rendering", () => {
       />,
     );
 
-    expect(html).toContain("已保存");
+    expect(html).toContain("建议如下。");
+    expect(html).not.toContain("已保存");
     expect(html).not.toContain("aria-label=\"保存 天梯搬运工\"");
-    expect(html).toContain("aria-label=\"保存 静海城的空气\"");
+    expect(html).not.toContain("aria-label=\"保存 静海城的空气\"");
     expect(consoleError).not.toHaveBeenCalledWith(
       expect.stringContaining("Encountered two children with the same key"),
       expect.anything(),

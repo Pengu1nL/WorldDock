@@ -1,105 +1,11 @@
 // view-workbench.tsx — The main conversation-first workbench
-// Streaming agent, inline suggestion cards, right drawer (collapsed by default)
+// Streaming agent, context drawer, right drawer (collapsed by default)
 
 import React, { useState as useStateWB } from "react";
 import { Icon } from "./components";
-import {
-  getSuggestionKey,
-  getSuggestionPreviewText,
-  getSuggestionRenderKey,
-  normalizeSuggestionForSave,
-} from "./suggestion-utils";
-
-// ────────── Inline suggestion card (inside agent message) ──────────
-const InlineSuggestionsBlock = ({ suggestions, savedIds, onSave, onOpenDetail }: any) => {
-  const settings  = suggestions.filter((s: any) => s.kind === "setting");
-  const conflicts = suggestions.filter((s: any) => s.kind === "conflict");
-  const seeds     = suggestions.filter((s: any) => s.kind === "seed");
-  return (
-    <div className="col gap-2" style={{ gap: 8, marginTop: 14 }}>
-      <div className="row gap-2 mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
-        <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
-          本轮发现 {suggestions.length - savedIds.length} 项待处理 · {savedIds.length} 已保存
-        </span>
-      </div>
-      {settings.length > 0 && <SuggestionGroup title="可保存设定" kind="setting" items={settings} savedIds={savedIds} onSave={onSave} onOpenDetail={onOpenDetail}/>}
-      {conflicts.length > 0 && <SuggestionGroup title="戏剧张力 · 入冲突池" kind="conflict" items={conflicts} savedIds={savedIds} onSave={onSave} onOpenDetail={onOpenDetail}/>}
-      {seeds.length > 0 && <SuggestionGroup title="故事种子" kind="seed" items={seeds} savedIds={savedIds} onSave={onSave} onOpenDetail={onOpenDetail}/>}
-    </div>
-  );
-};
-
-const SuggestionGroup = ({ title, kind, items, savedIds, onSave, onOpenDetail }: any) => {
-  const [collapsed, setCollapsed] = useStateWB(false);
-  const accentClass = kind === "setting" ? "sage" : kind === "conflict" ? "brick" : "violet";
-  const accent = kind === "setting" ? "var(--sage)" : kind === "conflict" ? "var(--brick)" : "var(--violet)";
-
-  return (
-    <div style={{
-      border: "1px solid var(--border)",
-      borderRadius: 4, background: "var(--surface)",
-      borderLeft: `2px solid ${accent}`,
-    }}>
-      <button onClick={() => setCollapsed(!collapsed)} style={{
-        background: "transparent", border: 0, width: "100%",
-        padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-      }}>
-        <Icon name={collapsed ? "chevron" : "chevdown"} size={11} style={{ color: "var(--fg-3)" }}/>
-        <span style={{ fontSize: "var(--t-12)", color: "var(--fg)", fontWeight: 500 }}>{title}</span>
-        <span className="mono" style={{ fontSize: 10.5, color: "var(--fg-3)" }}>{items.length}</span>
-      </button>
-      {!collapsed && (
-        <div className="col" style={{ padding: "0 8px 8px" }}>
-          {items.map((s: any, index: number) => (
-            <SuggestionRow key={getSuggestionRenderKey(s, index)} item={s} accentClass={accentClass} saved={savedIds.includes(getSuggestionKey(s))}
-              onSave={() => onSave(normalizeSuggestionForSave(s))} onOpenDetail={() => onOpenDetail(normalizeSuggestionForSave(s))}/>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const SuggestionRow = ({ item, accentClass, saved, onSave, onOpenDetail }: any) => (
-  <div style={{
-    padding: "8px 8px 8px 10px", borderRadius: 3,
-    background: saved ? "var(--sage-bg)" : "transparent",
-    transition: "background .15s",
-  }} className="row gap-2">
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div className="row gap-2" style={{ alignItems: "baseline" }}>
-        <span className={"tag " + accentClass} style={{ height: 16, fontSize: 9.5 }}>{item.category}</span>
-        <span style={{ fontSize: "var(--t-13)", fontWeight: 500, color: "var(--fg)" }}>{item.title}</span>
-      </div>
-      <div className="prose" style={{
-        fontSize: "var(--t-12)", color: "var(--fg-1)", marginTop: 3,
-        lineHeight: 1.5,
-      }}>
-        {getSuggestionPreviewText(item)}
-      </div>
-    </div>
-    <div className="row gap-2" style={{ flex: "none", alignSelf: "flex-start" }}>
-      {saved ? (
-        <span className="badge sage" style={{ height: 18 }}><Icon name="check" size={10}/>&nbsp;已保存</span>
-      ) : (
-        <>
-          <button className="btn ghost sm" onClick={onOpenDetail} title="查看 / 编辑">
-            <Icon name="eye" size={11}/>
-          </button>
-          <button aria-label={`保存 ${item.title}`} className="btn sm" onClick={onSave} style={{
-            background: "var(--surface-2)", borderColor: "var(--border-2)",
-          }}>
-            <Icon name="save" size={11}/>
-            <span>保存</span>
-          </button>
-        </>
-      )}
-    </div>
-  </div>
-);
 
 // ────────── Single message bubble ──────────
-export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: any) => {
+export const Message = ({ msg, onOpenContext }: any) => {
   if (msg.role === "user") {
     return (
       <div style={{ maxWidth: "var(--max-chat)", margin: "0 auto", padding: "0 24px", marginTop: 28 }}>
@@ -119,7 +25,6 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
 
   // Agent message
   const isStreaming = msg.streaming;
-  const showSuggestions = !isStreaming && Boolean(msg.suggestions?.length);
   const showContextLink = !isStreaming && Boolean(msg.contextRefs);
 
   return (
@@ -170,11 +75,6 @@ export const Message = ({ msg, savedIds, onSave, onOpenDetail, onOpenContext }: 
         {renderMarkdownish(msg.text)}
         {isStreaming && <span className="caret"/>}
       </div>
-
-      {showSuggestions && (
-        <InlineSuggestionsBlock suggestions={msg.suggestions} savedIds={savedIds}
-          onSave={onSave} onOpenDetail={onOpenDetail}/>
-      )}
 
       {showContextLink && (
         <button onClick={() => onOpenContext(msg.contextSnapshot)} className="row gap-2" style={{
