@@ -482,7 +482,7 @@ export const SuggestionDetail = ({ item, onSave, onClose, onDiscard, onBackToWor
                 padding: "10px 12px", fontSize: 12, color: "var(--fg-2)",
                 background: "var(--bg-1)", border: "1px dashed var(--hairline)", borderRadius: 4, lineHeight: 1.6,
               }}>
-                这道张力还没有具体故事种子。回工作台继续推演，让它孵化第一个。
+                这道张力还没有具体叙事素材。回工作台继续推演，让它孵化第一个。
               </div>
             ) : (
               <div className="col" style={{ gap: 6 }}>
@@ -608,8 +608,8 @@ export const IssuesDrawer = ({ issues, savedSettings, focusEntryId, onResolve, o
       )}
 
       <div style={{ fontSize: 12, color: "var(--fg-2)", lineHeight: 1.55, padding: "0 2px" }}>
-        每条问题可以三选一：<strong style={{ color: "var(--sage)" }}>修</strong>（去 Archive 改设定）/
-        <strong style={{ color: "var(--brick)" }}> 留为冲突</strong>（升入冲突池作戏剧引擎）/
+        每条问题可以三选一：<strong style={{ color: "var(--sage)" }}>修</strong>（去资产库改资产）/
+        <strong style={{ color: "var(--brick)" }}> 留为冲突</strong>（沉淀为戏剧张力资产）/
         <strong style={{ color: "var(--fg-2)" }}> 弃</strong>。
       </div>
 

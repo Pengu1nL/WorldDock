@@ -6,7 +6,7 @@
 
 | 命令 | 结果 | 备注 |
 | --- | --- | --- |
-| `rg -n "ArchiveView|SeedsView|ConflictsView|suggestion-utils|saveAgentSuggestion|discardAgentSuggestion|agent-suggestions|可保存设定|故事种子|冲突池" apps/web/src apps/web/tests` | PASS | 旧页面、旧工具和 save/discard client wrapper 已无命中；剩余命中为负向断言、mock 文案或非旧页面主路径文案。 |
+| `rg -n "ArchiveView|SeedsView|ConflictsView|suggestion-utils|saveAgentSuggestion|discardAgentSuggestion|agent-suggestions|可保存设定|故事种子|冲突池" apps/web/src apps/web/tests` | PASS | 旧页面、旧工具、save/discard client wrapper 和运行时旧文案已无命中；剩余命中仅为测试中的负向断言。 |
 | `pnpm --filter @worlddock/web test` | PASS | 19 files, 77 tests passed。 |
 | `pnpm --filter @worlddock/web lint` | PASS | 无错误、无警告。 |
 | `pnpm --filter @worlddock/web build` | PASS | Next.js production build passed。 |
@@ -54,4 +54,4 @@
 - 创建路径：通过 E2E `creation-flow.spec.ts` 验证创建世界后进入 session/potential asset 流程。
 - 一致性路径：通过 E2E `consistency-flow.spec.ts` 验证一致性问题查看和修复入口。
 - 移动端路径：通过 E2E `responsive.spec.ts` 验证核心创建路径无水平溢出。
-- 旧页面退场：静态扫描确认 `ArchiveView`、`SeedsView`、`ConflictsView`、`suggestion-utils`、`saveAgentSuggestion`、`discardAgentSuggestion` 和 `agent-suggestions` 前端引用已移除。
+- 旧页面退场：静态扫描确认 `ArchiveView`、`SeedsView`、`ConflictsView`、`suggestion-utils`、`saveAgentSuggestion`、`discardAgentSuggestion`、`agent-suggestions` 以及旧 suggestion UI 文案在前端运行时代码中已移除；剩余命中仅为负向断言。

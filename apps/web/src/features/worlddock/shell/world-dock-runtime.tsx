@@ -634,8 +634,8 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
 
   // ────────── Issue triage (一致性问题) ──────────
   // 一条 issue 进入三选一：
-  //   - 修：用户在 Archive 里去改对应设定，issue 标记为已解决
-  //   - 留为冲突：issue 升格为冲突池里的「戏剧张力」
+  //   - 修：用户在资产库里改对应资产，issue 标记为已解决
+  //   - 留为冲突：issue 沉淀为「戏剧张力」资产
   //   - 弃：直接关闭，不再提示
   const handleResolveIssue = (issue: any) => {
     setSavedIssues((prev: any[]) => prev.filter((x: any) => x.id !== issue.id));
