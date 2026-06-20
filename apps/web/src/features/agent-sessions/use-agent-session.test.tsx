@@ -114,15 +114,18 @@ describe("agentSessionsFeatureEnabled", () => {
     }
   });
 
-  it("requires the agent sessions feature flag to be explicitly enabled", () => {
+  it("defaults agent sessions on unless explicitly disabled", () => {
     delete process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS;
-    expect(agentSessionsFeatureEnabled()).toBe(false);
+    expect(agentSessionsFeatureEnabled()).toBe(true);
 
     process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS = "0";
     expect(agentSessionsFeatureEnabled()).toBe(false);
 
     process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS = "1";
     expect(agentSessionsFeatureEnabled()).toBe(true);
+
+    process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS = "false";
+    expect(agentSessionsFeatureEnabled()).toBe(false);
   });
 });
 

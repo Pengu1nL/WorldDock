@@ -65,7 +65,8 @@ export const agentSessionKeys = {
 };
 
 export function agentSessionsFeatureEnabled() {
-  return process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS === "1";
+  const flag = process.env.NEXT_PUBLIC_WORLD_DOCK_AGENT_SESSIONS?.trim().toLowerCase();
+  return flag !== "0" && flag !== "false";
 }
 
 export function useAgentSessionDetail(worldId: string | null | undefined, sessionId: string | null | undefined) {
