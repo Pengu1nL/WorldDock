@@ -11,9 +11,6 @@ export type WorldDockView =
 
 export type LegacyWorldDockView =
   | WorldDockView
-  | "archive"
-  | "seeds"
-  | "conflicts"
   | "workbench";
 
 export type WorldNavigationItem = {
@@ -24,9 +21,6 @@ export type WorldNavigationItem = {
 };
 
 const LEGACY_VIEW_MAP: Record<Exclude<LegacyWorldDockView, WorldDockView>, WorldDockView> = {
-  archive: "asset-library",
-  seeds: "asset-library",
-  conflicts: "asset-library",
   workbench: "exploration",
 };
 

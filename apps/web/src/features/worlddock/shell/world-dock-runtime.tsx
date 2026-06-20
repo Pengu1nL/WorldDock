@@ -15,7 +15,6 @@ import {
   listWorldAssets,
   listWorlds,
   relateWorldAssets,
-  reorderWorldAssets,
   streamAgentEvents,
   unrelateWorldAssets,
   updateWorldAsset,
@@ -501,26 +500,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     }
   };
 
-  const openAssetEditor = (kind: "setting" | "seed" | "conflict", asset?: any) => {
-    setAssetSaving(false);
-    setDrawerOpen({
-      kind: "asset-editor",
-      item: asset ?? {
-        kind,
-        title: "",
-        category: kind === "setting" ? "世界规则" : kind === "seed" ? "故事种子" : "冲突",
-        summary: "",
-        body: "",
-        payload: {},
-      },
-    });
-  };
-
-  const openAssetRelation = (asset: any) => {
-    setAssetRelationQuery("");
-    setDrawerOpen({ kind: "asset-relation", item: asset });
-  };
-
   const saveEditedAsset = async (draft: any) => {
     const worldId = currentWorld?.id;
     if (!worldId) {
@@ -562,24 +541,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
       pushToast({ kind: "warn", text: "资产删除失败 · 请检查本地 API 服务" });
     } finally {
       setAssetSaving(false);
-    }
-  };
-
-  const reorderAssets = async (assetIds: string[]) => {
-    const worldId = currentWorld?.id;
-    if (!worldId) {
-      pushToast({ kind: "warn", text: "请先打开一个世界" });
-      return;
-    }
-    if (assetIds.length === 0) {
-      pushToast({ kind: "warn", text: "缺少资产，无法排序" });
-      return;
-    }
-    try {
-      await reorderWorldAssets(worldId, assetIds);
-      invalidateWorldAssets(worldId);
-    } catch {
-      pushToast({ kind: "warn", text: "资产排序失败 · 请检查本地 API 服务" });
     }
   };
 
@@ -766,10 +727,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
             worldState={{
               messages,
               agentBusy,
-              savedSettings,
-              savedSeeds,
-              savedConflicts,
-              savedIssues,
               allSavedAssets,
             } satisfies WorldDockRuntimeState}
             actions={{
@@ -778,10 +735,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
               stopAgent,
               setDrawerOpen,
               setView,
-              openAssetEditor,
-              removeEditedAsset,
-              reorderAssets,
-              openAssetRelation,
               pushToast,
             } satisfies WorldDockActions}
           />

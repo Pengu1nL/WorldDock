@@ -192,17 +192,6 @@ export type AgentSessionRunEvent = AgentEvent | (AgentEventBase & {
   };
 });
 
-export type SaveAgentSuggestionResponse = {
-  suggestion?: {
-    savedAssetId?: string | null;
-    asset?: WorldAsset;
-    savedAsset?: WorldAsset;
-    [key: string]: unknown;
-  };
-  asset?: WorldAsset;
-  savedAsset?: WorldAsset;
-};
-
 export type ExportSummary = {
   id: string;
   kind: "world";
@@ -983,23 +972,6 @@ async function streamSseEvents<TEvent extends AgentEventBase>(response: Response
 
 export async function cancelAgentRun(runId: string, options: ApiClientOptions = {}) {
   return requestJson(`/v1/agent-runs/${runId}/cancel`, {
-    method: "POST",
-    ...options,
-  });
-}
-
-export async function saveAgentSuggestion(
-  suggestionId: string,
-  options: ApiClientOptions = {},
-): Promise<SaveAgentSuggestionResponse> {
-  return requestJson<SaveAgentSuggestionResponse>(`/v1/agent-suggestions/${suggestionId}/save`, {
-    method: "POST",
-    ...options,
-  });
-}
-
-export async function discardAgentSuggestion(suggestionId: string, options: ApiClientOptions = {}) {
-  return requestJson(`/v1/agent-suggestions/${suggestionId}/discard`, {
     method: "POST",
     ...options,
   });

@@ -39,12 +39,11 @@ describe("world navigation", () => {
 
   it("normalizes legacy view ids", () => {
     expect(normalizeWorldDockView("workbench")).toBe("exploration");
-    expect(normalizeWorldDockView("archive")).toBe("asset-library");
-    expect(normalizeWorldDockView("seeds")).toBe("asset-library");
   });
 
-  it("keeps legacy conflicts events on asset-library during the transition", () => {
-    // Phase 9.2 keeps old conflicts events compatible while the new consistency page settles.
-    expect(normalizeWorldDockView("conflicts")).toBe("asset-library");
+  it("does not map retired pool view ids", () => {
+    expect(normalizeWorldDockView("archive")).toBe("worlds");
+    expect(normalizeWorldDockView("seeds")).toBe("worlds");
+    expect(normalizeWorldDockView("conflicts")).toBe("worlds");
   });
 });

@@ -32,7 +32,6 @@ import {
   pushWorldRelease,
   relateWorldAssets,
   reorderWorldAssets,
-  saveAgentSuggestion,
   saveHubConnection,
   streamAgentEvents,
   streamAgentSessionRunEvents,
@@ -175,7 +174,7 @@ describe("worlddock local API client", () => {
     });
   });
 
-  it("creates agent runs, parses SSE events, and saves suggestions", async () => {
+  it("creates legacy agent runs and parses SSE events", async () => {
     const fetcher = vi
       .fn(async () => jsonResponse({}))
       .mockResolvedValueOnce(jsonResponse({ run: { id: "run_1" }, suggestions: [] }))
@@ -193,12 +192,10 @@ describe("worlddock local API client", () => {
           "data: {\"type\":\"suggestion.created\",\"payload\":{\"suggestionId\":\"ags_1\",\"suggestion\":{\"id\":\"s1\",\"kind\":\"setting\",\"category\":\"世界规则\",\"title\":\"规则\",\"summary\":\"摘要\",\"body\":\"正文\"}}}",
           "",
         ].join("\n"),
-      } as Response)
-      .mockResolvedValueOnce(jsonResponse({ suggestion: { id: "ags_1", status: "saved" } }));
+      } as Response);
 
     await createAgentRun("world_1", { prompt: "继续推演" }, { fetcher });
     const events = await fetchAgentEvents("run_1", { fetcher });
-    await saveAgentSuggestion("ags_1", { fetcher });
 
     expect(events.map((event) => event.type)).toEqual(["context.used", "message.delta", "suggestion.created"]);
     const contextEvent = events.find((event) => event.type === "context.used");
@@ -206,7 +203,6 @@ describe("worlddock local API client", () => {
     expect(contextEvent.payload.contextItemId).toBe("ctx_item_1");
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/agent-runs", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/agent-runs/run_1/events", expect.objectContaining({ method: "GET" }));
-    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/agent-suggestions/ags_1/save", expect.objectContaining({ method: "POST" }));
   });
 
   it("uses agent session, potential asset, official asset, and consistency endpoints", async () => {

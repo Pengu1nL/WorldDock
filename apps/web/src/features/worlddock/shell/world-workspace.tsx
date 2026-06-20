@@ -53,7 +53,6 @@ import {
   type WorldAssetPatchBatch,
 } from "../api";
 import { Icon } from "../components";
-import { ArchiveView } from "../view-archive";
 import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
 import { Composer, Message } from "../view-workbench";
@@ -62,10 +61,6 @@ import type { WorldDockView } from "./world-navigation";
 export type WorldDockRuntimeState = {
   messages: any[];
   agentBusy: boolean;
-  savedSettings: any[];
-  savedSeeds: any[];
-  savedConflicts: any[];
-  savedIssues: any[];
   allSavedAssets: any[];
 };
 
@@ -75,10 +70,6 @@ export type WorldDockActions = {
   stopAgent: () => void;
   setDrawerOpen: any;
   setView: (view: WorldDockView) => void;
-  openAssetEditor: (kind: "setting" | "seed" | "conflict", asset?: any) => void;
-  removeEditedAsset: (asset: any) => void;
-  reorderAssets: (assetIds: string[]) => void;
-  openAssetRelation: (asset: any) => void;
   pushToast: (toast: any) => void;
 };
 
@@ -104,10 +95,6 @@ export function WorldWorkspace({
   const {
     messages,
     agentBusy,
-    savedSettings,
-    savedSeeds,
-    savedConflicts,
-    savedIssues,
     allSavedAssets,
   } = worldState;
   const {
@@ -116,10 +103,6 @@ export function WorldWorkspace({
     stopAgent,
     setDrawerOpen,
     setView,
-    openAssetEditor,
-    removeEditedAsset,
-    reorderAssets,
-    openAssetRelation,
     pushToast,
   } = actions;
 
@@ -140,16 +123,6 @@ export function WorldWorkspace({
       {view === "asset-library" && currentWorld && (
         <AssetLibraryWorkspace
           world={currentWorld}
-          savedSettings={savedSettings}
-          savedSeeds={savedSeeds}
-          savedConflicts={savedConflicts}
-          savedIssues={savedIssues}
-          setDrawerOpen={setDrawerOpen}
-          setView={setView}
-          openAssetEditor={openAssetEditor}
-          removeEditedAsset={removeEditedAsset}
-          reorderAssets={reorderAssets}
-          openAssetRelation={openAssetRelation}
           pushToast={pushToast}
         />
       )}
@@ -966,18 +939,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const AssetLibraryWorkspace = ({
   world,
-  savedSettings,
-  savedIssues,
-  setDrawerOpen,
-  setView,
-  openAssetEditor,
-  removeEditedAsset,
-  reorderAssets,
-  openAssetRelation,
   pushToast,
 }: any) => {
   const worldId = world?.id as string | undefined;
-  const [officialAssetsUnavailable, setOfficialAssetsUnavailable] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [editSessionDetail, setEditSessionDetail] = useState<AgentSessionDetail | null>(null);
   const [editOptimisticMessages, setEditOptimisticMessages] = useState<AgentSessionMessage[]>([]);
@@ -995,7 +959,7 @@ const AssetLibraryWorkspace = ({
       if (!worldId || !selectedAssetId) throw new Error("World id and asset id are required.");
       return getOfficialAsset(worldId, selectedAssetId);
     },
-    enabled: Boolean(worldId && selectedAssetId && !officialAssetsUnavailable),
+    enabled: Boolean(worldId && selectedAssetId),
     retry: false,
   });
   const patchesQuery = useOfficialAssetPatches(worldId, selectedAssetId);
@@ -1021,7 +985,6 @@ const AssetLibraryWorkspace = ({
   }, [cancelActiveEditRun]);
 
   useEffect(() => {
-    setOfficialAssetsUnavailable(false);
     setSelectedAssetId(null);
     resetEditSessionRuntime(true);
   }, [resetEditSessionRuntime, worldId]);
@@ -1212,20 +1175,6 @@ const AssetLibraryWorkspace = ({
     ));
   }, [cancelActiveEditRun]);
 
-  if (officialAssetsUnavailable) {
-    return (
-      <ArchiveView world={world} savedSettings={savedSettings} savedIssues={savedIssues}
-        onOpenDetail={(s: any) => setDrawerOpen({ kind: "detail", item: s, readonly: true })}
-        onOpenIssues={(focusEntryId: any) => setDrawerOpen({ kind: "issues", focusEntryId })}
-        onCreateAsset={openAssetEditor}
-        onEditAsset={(asset: any) => openAssetEditor(asset.kind, asset)}
-        onDeleteAsset={removeEditedAsset}
-        onReorderAssets={reorderAssets}
-        onRelateAssets={openAssetRelation}
-        onBackToWorkbench={() => setView("exploration")}/>
-    );
-  }
-
   if (selectedAssetId && editSessionDetail) {
     return (
       <SessionPage
@@ -1280,7 +1229,6 @@ const AssetLibraryWorkspace = ({
   return (
     <OfficialAssetLibraryPage
       world={world}
-      onLoadError={() => setOfficialAssetsUnavailable(true)}
       onOpenAsset={(assetId: string) => setSelectedAssetId(assetId)}
     />
   );

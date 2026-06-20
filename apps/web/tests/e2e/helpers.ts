@@ -561,17 +561,6 @@ export async function installApiMocks(page: Page, options: ApiMockOptions = {}) 
       });
     }
 
-    if (method === "POST" && /\/v1\/agent-suggestions\/[^/]+\/save$/.test(path)) {
-      return json(route, {
-        suggestion: { id: "ags_1", status: "saved", savedAssetId: memoryTradeLawAsset.id },
-        asset: memoryTradeLawAsset,
-      }, 201);
-    }
-
-    if (method === "POST" && /\/v1\/agent-suggestions\/[^/]+\/discard$/.test(path)) {
-      return json(route, { suggestion: { id: "ags_1", status: "discarded" } });
-    }
-
     return json(route, { message: `Unhandled mock route: ${method} ${path}` }, 404);
   });
 }
