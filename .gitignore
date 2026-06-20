@@ -12,6 +12,8 @@ docs/*
 .env
 .env.*
 !.env.example
+.worlddock/
+apps/*/.worlddock/
 packages/db/src/generated/
 .repo-split
 .codegraph
