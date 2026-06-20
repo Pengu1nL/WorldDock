@@ -120,26 +120,27 @@ pnpm --filter @worlddock/db seed
 
 ## CLI
 
-Alpha CLI 输出 JSON，适合导出 `.worlddock.json` 文件或接入脚本。当前源码仓库先以 `packages/worlddock-cli` 的测试和构建验证 CLI contract；发布或链接成 `worlddock` 命令后，命令形态如下：
+Alpha CLI 输出 JSON，适合导出 `.worlddock.json` 文件或接入脚本。发布包名为 `@worlddock/cli`，安装后提供 `worlddock` 命令：
 
 ```bash
-WORLD_DOCK_API_URL=http://localhost:4000 \
-WORLD_DOCK_TOKEN=wdl_... \
-worlddock worlds list
+npm install -g @worlddock/cli
+WORLD_DOCK_API_URL=http://localhost:4000 worlddock worlds list
 
 worlddock worlds export world_123
 worlddock worlds import ./memory-market.worlddock.json
-worlddock repositories pull owner/slug
+worlddock pull owner/slug
+worlddock worlds pull owner slug
 ```
 
 本仓库内验证 CLI：
 
 ```bash
-pnpm --filter @worlddock-cli test
-pnpm --filter @worlddock-cli build
+pnpm --filter @worlddock/cli test
+pnpm --filter @worlddock/cli build
+pnpm --filter @worlddock/cli test:pack
 ```
 
-Personal Access Token 范围见 `docs/product/api.md`。
+连接 WorldHub 的 Personal Access Token 范围见当前 WorldHub API 文档。
 
 ## 文档入口
 

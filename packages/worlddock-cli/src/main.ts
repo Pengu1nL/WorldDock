@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { worldPackageSchema } from "@worlddock/contract";
 
 type CliOptions = {
@@ -187,7 +188,12 @@ function isRepoPathSegment(value: string | undefined) {
   );
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function isDirectCliEntry() {
+  if (!process.argv[1]) return false;
+  return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+}
+
+if (isDirectCliEntry()) {
   runWorldDockCli().then((code) => {
     process.exitCode = code;
   });

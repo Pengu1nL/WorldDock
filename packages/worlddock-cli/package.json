@@ -1,21 +1,35 @@
 {
-  "name": "@worlddock-cli",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@worlddock/cli",
+  "version": "0.1.1",
+  "description": "WorldDock local API command line tools.",
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "bin": {
-    "worlddock": "./src/main.ts"
+    "worlddock": "./dist/main.js"
   },
   "exports": {
-    ".": "./src/main.ts"
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.json && chmod +x dist/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:pack": "pnpm build && node scripts/verify-package.mjs",
+    "prepack": "pnpm build",
+    "prepublishOnly": "pnpm lint && pnpm test && pnpm test:pack"
   },
   "dependencies": {
-    "@worlddock/contract": "workspace:*"
+    "@worlddock/contract": "workspace:^0.1.1"
   },
   "devDependencies": {
     "@types/node": "latest",
