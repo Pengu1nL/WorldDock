@@ -55,9 +55,9 @@ export function PageToolbar({ children }: PageToolbarProps) {
 
 export function PageBody({ children, width = "work", className = "" }: PageBodyProps) {
   return (
-    <main className={`page-body page-body-${width} ${className}`.trim()}>
+    <div className={`page-body page-body-${width} ${className}`.trim()}>
       {children}
-    </main>
+    </div>
   );
 }
 

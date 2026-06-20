@@ -39,6 +39,17 @@ describe("PageShell", () => {
     expect(screen.getByText("全宽内容")).toHaveClass("page-body", "page-body-fluid");
   });
 
+  it("does not add a nested main landmark when rendered inside the app main", () => {
+    const { container } = render(
+      <main>
+        <PageBody width="work">工作内容</PageBody>
+      </main>,
+    );
+
+    expect(container.querySelectorAll("main")).toHaveLength(1);
+    expect(container.querySelector(".page-body")).toHaveClass("page-body", "page-body-work");
+  });
+
   it("renders toolbar content with the shared toolbar class", () => {
     render(
       <PageToolbar>

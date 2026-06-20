@@ -245,11 +245,7 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
 
       <PageBody width="work">
         <WorldsOverview worlds={worlds} />
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-          gap: 14,
-        }}>
+        <div className="worlds-grid">
           {worldsState === "loading" && (
             <div role="status" style={{ gridColumn: "1 / -1", padding: 60, textAlign: "center", color: "var(--fg-2)" }}>
               正在读取本地世界...

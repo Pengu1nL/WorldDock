@@ -43,7 +43,7 @@ describe("WorldsView layout", () => {
   afterEach(() => cleanup());
 
   it("shows workbench summary metrics above the world grid", () => {
-    render(
+    const { container } = render(
       <WorldsView
         worlds={worlds}
         onOpen={vi.fn()}
@@ -54,6 +54,7 @@ describe("WorldsView layout", () => {
     );
 
     expect(screen.getByRole("heading", { name: "我的世界" })).toBeInTheDocument();
+    expect(container.querySelector(".worlds-grid")).toBeInTheDocument();
     expect(screen.getByText("工作台概览")).toBeInTheDocument();
     expect(screen.getByText("未处理改动")).toBeInTheDocument();
     expect(screen.getByText("待发布")).toBeInTheDocument();
