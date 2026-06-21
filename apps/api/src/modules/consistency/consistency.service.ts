@@ -23,9 +23,9 @@ export class ConsistencyService {
     @Inject(CONSISTENCY_REPOSITORY) private readonly consistencyIssues: ConsistencyRepository,
     @Inject(OFFICIAL_ASSETS_REPOSITORY) private readonly officialAssets: OfficialAssetsRepository,
     @Inject(WORLD_REPOSITORY) private readonly worlds: WorldRepository,
-    private readonly agentSessions: AgentSessionsService,
-    private readonly assetPatches: WorldAssetPatchesService,
-    private readonly checker: ConsistencyChecker,
+    @Inject(AgentSessionsService) private readonly agentSessions: AgentSessionsService,
+    @Inject(WorldAssetPatchesService) private readonly assetPatches: WorldAssetPatchesService,
+    @Inject(ConsistencyChecker) private readonly checker: ConsistencyChecker,
   ) {}
 
   async runCheck(worldId: string): Promise<{ issues: ConsistencyIssueRecord[] }> {

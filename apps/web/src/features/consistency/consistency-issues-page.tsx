@@ -30,6 +30,7 @@ type ConsistencyIssuesPageProps = {
   detailLoading?: boolean;
   actionPending?: boolean;
   actionError?: string | null;
+  actionNotice?: string | null;
   nextCursor?: string | null;
   onClearActionError?: () => void;
   onCreateRepairSession?: (issue: ConsistencyIssue) => void | Promise<void>;
@@ -98,6 +99,7 @@ function ConsistencyIssuesRemotePage({
   const [loadedIssues, setLoadedIssues] = useState<ConsistencyIssue[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [remoteActionError, setRemoteActionError] = useState<string | null>(null);
+  const [checkNotice, setCheckNotice] = useState<string | null>(null);
   const issuesQuery = useConsistencyIssues(world.id, {
     status: statusFilter,
     cursor,
@@ -134,6 +136,7 @@ function ConsistencyIssuesRemotePage({
     <ConsistencyIssuesContent
       actionPending={externalActionPending || ignoreIssue.isPending || reopenIssue.isPending}
       actionError={remoteActionError}
+      actionNotice={checkNotice}
       detailIssue={detailQuery.data ?? null}
       detailLoading={detailQuery.isLoading}
       error={loadedIssues.length === 0 ? issuesQuery.error : undefined}
@@ -142,6 +145,7 @@ function ConsistencyIssuesRemotePage({
       loadingMore={Boolean(cursor && issuesQuery.isFetching)}
       nextCursor={nextCursor}
       onIgnoreIssue={async (issueId) => {
+        setCheckNotice(null);
         await ignoreIssue.mutateAsync(issueId);
         setLoadedIssues((current) => current.filter((issue) => issue.id !== issueId));
         if (selectedIssueId === issueId) setSelectedIssueId(null);
@@ -161,19 +165,23 @@ function ConsistencyIssuesRemotePage({
         onOpenIssue?.(issueId);
       }}
       onReopenIssue={async (issueId) => {
+        setCheckNotice(null);
         await reopenIssue.mutateAsync(issueId);
         setLoadedIssues((current) => current.filter((issue) => issue.id !== issueId));
         if (selectedIssueId === issueId) setSelectedIssueId(null);
       }}
       onRunCheck={async () => {
-        await runCheck.mutateAsync();
+        setCheckNotice(null);
+        const result = await runCheck.mutateAsync();
         setSelectedIssueId(null);
         setCursor(undefined);
         setLoadedIssues([]);
         setNextCursor(null);
+        setCheckNotice(getRunCheckNotice(result.issues.length));
       }}
       onSearchChange={onSearchChange}
       onStatusFilterChange={(status) => {
+        setCheckNotice(null);
         setSelectedIssueId(null);
         setCursor(undefined);
         setLoadedIssues([]);
@@ -212,7 +220,7 @@ function ConsistencySummary({ issues }: { issues: ConsistencyIssue[] }) {
           <div className="mono" style={{ marginTop: 8, fontSize: "var(--t-18)", color: "var(--fg)" }}>{highCount}</div>
         </div>
         <div className="card" style={{ padding: 10, background: "var(--surface-2)" }}>
-          <span className="badge amber">待处理</span>
+          <StatusPill status="open" />
           <div className="mono" style={{ marginTop: 8, fontSize: "var(--t-18)", color: "var(--fg)" }}>{openCount}</div>
         </div>
         <div className="card" style={{ padding: 10, background: "var(--surface-2)" }}>
@@ -235,6 +243,7 @@ function ConsistencyIssuesContent({
   detailLoading = false,
   actionPending = false,
   actionError,
+  actionNotice,
   statusFilter,
   search,
   nextCursor,
@@ -250,6 +259,7 @@ function ConsistencyIssuesContent({
 }: ConsistencyIssuesContentProps) {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [localActionError, setLocalActionError] = useState<string | null>(null);
+  const [localActionNotice, setLocalActionNotice] = useState<string | null>(null);
   const filteredIssues = useMemo(
     () => filterIssues(issues, statusFilter, search),
     [issues, search, statusFilter],
@@ -272,12 +282,25 @@ function ConsistencyIssuesContent({
   const handleAction = (action: (() => void | Promise<void>) | undefined) => {
     if (!action) return;
     setLocalActionError(null);
+    setLocalActionNotice(null);
     onClearActionError?.();
     void Promise.resolve(action()).catch((actionErrorValue: unknown) => {
       setLocalActionError(getErrorMessage(actionErrorValue));
     });
   };
+  const handleRunCheck = () => {
+    if (!onRunCheck) return;
+    setLocalActionError(null);
+    setLocalActionNotice(null);
+    onClearActionError?.();
+    void Promise.resolve(onRunCheck())
+      .then(() => setLocalActionNotice("检查完成"))
+      .catch((actionErrorValue: unknown) => {
+        setLocalActionError(getErrorMessage(actionErrorValue));
+      });
+  };
   const visibleActionError = localActionError ?? actionError ?? null;
+  const visibleActionNotice = actionNotice ?? localActionNotice;
   const showSummary = !loading && !error;
 
   return (
@@ -295,7 +318,7 @@ function ConsistencyIssuesContent({
         <button
           className="btn"
           disabled={runningCheck || !onRunCheck}
-          onClick={() => handleAction(onRunCheck)}
+          onClick={handleRunCheck}
           type="button"
         >
           <Icon name="refresh" size={12} />
@@ -313,17 +336,20 @@ function ConsistencyIssuesContent({
           flexWrap: "wrap",
         }}
       >
-        <select
-          aria-label="状态筛选"
-          className="input"
-          onChange={(event) => onStatusFilterChange(event.target.value as ConsistencyIssueStatusFilter)}
-          style={{ width: 132, height: 28, fontSize: 12 }}
-          value={statusFilter}
-        >
+        <div aria-label="状态筛选" className="row gap-2" role="group" style={{ flexWrap: "wrap" }}>
           {STATUS_FILTERS.map((status) => (
-            <option key={status.id} value={status.id}>{status.label}</option>
+            <button
+              aria-pressed={statusFilter === status.id}
+              className={"sb-btn " + (statusFilter === status.id ? "primary" : "")}
+              key={status.id}
+              onClick={() => onStatusFilterChange(status.id)}
+              style={{ height: 28, justifyContent: "center", letterSpacing: 0, minWidth: 64 }}
+              type="button"
+            >
+              <span>{status.label}</span>
+            </button>
           ))}
-        </select>
+        </div>
         <input
           aria-label="搜索一致性问题"
           className="input"
@@ -350,6 +376,23 @@ function ConsistencyIssuesContent({
         >
           <Icon name="info" size={13} />
           <span>{visibleActionError}</span>
+        </div>
+      ) : visibleActionNotice ? (
+        <div
+          className="row gap-2"
+          role="status"
+          style={{
+            margin: "12px 32px 0",
+            padding: "10px 12px",
+            border: "1px solid var(--hairline)",
+            borderRadius: 6,
+            color: "var(--sage)",
+            background: "var(--surface-1)",
+            fontSize: "var(--t-12)",
+          }}
+        >
+          <Icon name="check" size={13} />
+          <span>{visibleActionNotice}</span>
         </div>
       ) : null}
 
@@ -434,7 +477,7 @@ function ConsistencyIssueRow({
     >
       <div className="row gap-2" style={{ alignItems: "center", marginBottom: 8 }}>
         <span className={getSeverityBadgeClass(issue.severity)}>{getSeverityLabel(issue.severity)}</span>
-        <span className="badge slate">{getStatusLabel(issue.status)}</span>
+        <StatusPill status={issue.status} />
         <span className="mono" style={{ marginLeft: "auto", color: "var(--fg-3)", fontSize: 11 }}>
           {formatUpdatedAt(issue.updatedAt)}
         </span>
@@ -596,6 +639,49 @@ function getStatusLabel(status: ConsistencyIssue["status"]) {
   };
 
   return labels[status] ?? status;
+}
+
+function StatusPill({ status }: { status: ConsistencyIssue["status"] }) {
+  const tone = getStatusTone(status);
+
+  return (
+    <span
+      style={{
+        alignItems: "center",
+        background: `var(--${tone}-bg)`,
+        borderRadius: 99,
+        color: `var(--${tone})`,
+        display: "inline-flex",
+        fontSize: 11,
+        fontWeight: 650,
+        height: 18,
+        justifyContent: "center",
+        letterSpacing: 0,
+        lineHeight: 1,
+        minWidth: 44,
+        padding: "0 7px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {getStatusLabel(status)}
+    </span>
+  );
+}
+
+function getStatusTone(status: ConsistencyIssue["status"]) {
+  const tones: Record<ConsistencyIssue["status"], "amber" | "slate" | "sage"> = {
+    open: "amber",
+    repairing: "slate",
+    resolved: "sage",
+    ignored: "slate",
+  };
+
+  return tones[status] ?? "slate";
+}
+
+function getRunCheckNotice(issueCount: number) {
+  if (issueCount === 0) return "检查完成，未发现新的待处理问题";
+  return `检查完成，发现 ${issueCount} 项待处理问题`;
 }
 
 function formatUpdatedAt(updatedAt: string | undefined) {

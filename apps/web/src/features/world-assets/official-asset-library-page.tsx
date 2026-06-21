@@ -91,9 +91,8 @@ function OfficialAssetLibraryRemotePage({
   onLoadError,
 }: OfficialAssetLibraryRemotePageProps) {
   const query = useMemo(() => ({
-    type: selectedType === "all" ? undefined : selectedType,
     q: search,
-  }), [search, selectedType]);
+  }), [search]);
   const officialAssets = useOfficialAssets(world.id, query);
 
   useEffect(() => {

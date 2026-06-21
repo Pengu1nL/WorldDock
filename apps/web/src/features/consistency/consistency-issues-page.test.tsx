@@ -16,6 +16,7 @@ vi.mock("../worlddock/api", async (importOriginal) => {
   return {
     ...actual,
     listConsistencyIssues: vi.fn(),
+    runConsistencyCheck: vi.fn(),
   };
 });
 
@@ -50,6 +51,8 @@ describe("ConsistencyIssuesPage", () => {
     );
 
     expect(screen.getByRole("button", { name: /运行检查/ })).toBeInTheDocument();
+    const statusFilter = screen.getByRole("group", { name: "状态筛选" });
+    expect(within(statusFilter).getByRole("button", { name: "待处理" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("登记口径冲突")).toBeInTheDocument();
     expect(screen.getByText("普通")).toBeInTheDocument();
   });
@@ -220,6 +223,29 @@ describe("ConsistencyIssuesPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("检查服务不可用")).toBeInTheDocument();
+    });
+  });
+
+  it("confirms when a remote consistency check completes without issues", async () => {
+    vi.mocked(api.listConsistencyIssues).mockResolvedValue({
+      issues: [],
+      nextCursor: null,
+    });
+    vi.mocked(api.runConsistencyCheck).mockResolvedValue({
+      issues: [],
+    });
+
+    render(
+      <ConsistencyIssuesPage world={{ id: "world_1", name: "潮汐之书" }} />,
+      { wrapper: createQueryWrapper().Wrapper },
+    );
+
+    expect(await screen.findByText("暂无待处理问题")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /运行检查/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("检查完成，未发现新的待处理问题");
     });
   });
 

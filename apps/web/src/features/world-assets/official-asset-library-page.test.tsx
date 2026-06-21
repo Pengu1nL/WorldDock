@@ -2,16 +2,28 @@
 
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { OfficialWorldAsset } from "../worlddock/api";
+import { listOfficialAssets, type OfficialWorldAsset } from "../worlddock/api";
 import { getOfficialAssetCardSummary } from "./official-asset-card";
 import { OfficialAssetLibraryPage } from "./official-asset-library-page";
+
+vi.mock("../worlddock/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../worlddock/api")>();
+
+  return {
+    ...actual,
+    listOfficialAssets: vi.fn(),
+  };
+});
 
 describe("OfficialAssetLibraryPage", () => {
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
   it("renders type filters and opens an asset from props", () => {
@@ -114,7 +126,52 @@ describe("OfficialAssetLibraryPage", () => {
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByText("0 项问题")).toBeInTheDocument();
   });
+
+  it("keeps remote type counts sourced from the complete asset list", async () => {
+    const assets = [
+      buildAsset({
+        id: "asset_rule_1",
+        name: "重力",
+        summary: "人工重力只能通过旋转离心力或飞船加速实现。",
+      }),
+      buildAsset({
+        id: "asset_rule_2",
+        name: "无土栽培基因风险",
+        summary: "太空无土栽培面临三大基因风险源。",
+      }),
+    ];
+
+    vi.mocked(listOfficialAssets).mockImplementation(async (_worldId, query = {}) => ({
+      assets: query.type ? assets.filter((asset) => asset.type === query.type) : assets,
+      nextCursor: null,
+    }));
+
+    renderWithQueryClient(<OfficialAssetLibraryPage world={{ id: "world_1", name: "宇宙纪元" }} />);
+
+    expect(await screen.findByRole("button", { name: "全部2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "规则2" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "角色0" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("暂无角色")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "全部2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "规则2" })).toBeInTheDocument();
+  });
 });
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 function buildAsset(overrides: Partial<OfficialWorldAsset> = {}): OfficialWorldAsset {
   return {
