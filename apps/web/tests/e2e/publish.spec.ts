@@ -13,9 +13,9 @@ test("creator can publish selected assets after confirming local findings", asyn
   await page.getByText("潮汐之书").click();
   await page.getByRole("button", { name: "发布" }).click();
 
-  await expect(page.getByRole("heading", { name: "发布" })).toBeVisible();
-  await page.getByLabel("Owner").fill("ren");
-  await page.getByLabel("Slug").fill("tide-book");
+  await expect(page.getByRole("heading", { level: 1, name: "发布", exact: true })).toBeVisible();
+  await page.getByRole("textbox", { name: "Owner", exact: true }).fill("ren");
+  await page.getByRole("textbox", { name: "Slug", exact: true }).fill("tide-book");
   await page.getByLabel("选择资产 潮汐律").uncheck();
 
   await expect(page.getByText("命中 1")).toBeVisible();
