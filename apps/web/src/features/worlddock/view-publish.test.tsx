@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WorldAsset } from "@worlddock/domain";
 import { PublishView, scanAssetsForSecrets } from "./view-publish";
@@ -9,6 +9,88 @@ import { PublishView, scanAssetsForSecrets } from "./view-publish";
 describe("PublishView", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it("shows release readiness checklist with missing publish reasons", () => {
+    const { container } = render(
+      <PublishView
+        currentWorld={{ id: "world_1", name: "潮汐之书" }}
+        assets={[]}
+        onToast={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    const readiness = screen.getByLabelText("发布准备");
+    const pageBody = container.querySelector(".page-body");
+
+    expect(within(readiness).getByText("发布准备")).toBeInTheDocument();
+    expect(within(readiness).getByRole("list")).toBeInTheDocument();
+    expect(within(readiness).getByText("1/4")).toBeInTheDocument();
+    expect(within(readiness).getAllByText("待完成")).toHaveLength(3);
+    expect(within(readiness).getAllByText("已完成")).toHaveLength(1);
+    expect(screen.getByText("填写 Owner")).toBeInTheDocument();
+    expect(screen.getByLabelText("填写 Owner，待完成")).toBeInTheDocument();
+    expect(screen.getByText("填写 Slug")).toBeInTheDocument();
+    expect(screen.getByLabelText("填写 Slug，待完成")).toBeInTheDocument();
+    expect(screen.getByText("选择至少 1 项资产")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择至少 1 项资产，待完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("敏感内容预检通过，已完成")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发布" })).toBeDisabled();
+    expect(pageBody).not.toBeNull();
+    expect(container.querySelector(".sticky-action-bar")?.closest(".page-body")).toBe(pageBody);
+  });
+
+  it("updates readiness from missing assets to ready for a safe selected asset", async () => {
+    const safeAsset = makeAsset({ id: "asset_safe", title: "潮汐律", body: "潮汐律定义文明周期。" });
+    const { rerender } = render(
+      <PublishView
+        currentWorld={{ id: "world_1", name: "潮汐之书" }}
+        assets={[]}
+        onToast={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    let readiness = screen.getByLabelText("发布准备");
+    expect(within(readiness).getByRole("list")).toBeInTheDocument();
+    expect(within(readiness).getByText("1/4")).toBeInTheDocument();
+    expect(screen.getByLabelText("填写 Owner，待完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("填写 Slug，待完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择至少 1 项资产，待完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("敏感内容预检通过，已完成")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Owner"), { target: { value: "ren" } });
+    fireEvent.change(screen.getByLabelText("Slug"), { target: { value: "tide-book" } });
+
+    readiness = screen.getByLabelText("发布准备");
+    expect(within(readiness).getByText("3/4")).toBeInTheDocument();
+    expect(within(readiness).getAllByText("已完成")).toHaveLength(3);
+    expect(within(readiness).getAllByText("待完成")).toHaveLength(1);
+    expect(screen.getByLabelText("填写 Owner，已完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("填写 Slug，已完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择至少 1 项资产，待完成")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发布" })).toBeDisabled();
+
+    rerender(
+      <PublishView
+        currentWorld={{ id: "world_1", name: "潮汐之书" }}
+        assets={[safeAsset]}
+        onToast={vi.fn()}
+        onBack={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      const nextReadiness = screen.getByLabelText("发布准备");
+      expect(within(nextReadiness).getByText("4/4")).toBeInTheDocument();
+    });
+    readiness = screen.getByLabelText("发布准备");
+    expect(within(readiness).getAllByText("已完成")).toHaveLength(4);
+    expect(within(readiness).queryByText("待完成")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("选择至少 1 项资产，已完成")).toBeInTheDocument();
+    expect(screen.getByLabelText("敏感内容预检通过，已完成")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发布" })).toBeEnabled();
   });
 
   it("requires confirmation for redacted secret findings before pushing", async () => {
@@ -42,9 +124,17 @@ describe("PublishView", () => {
     expect(await screen.findByText("命中 1")).toBeInTheDocument();
     expect(screen.getByText("Bearer <redacted>")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(secret);
+    const readiness = screen.getByLabelText("发布准备");
+    expect(within(readiness).getByRole("list")).toBeInTheDocument();
+    expect(within(readiness).getByText("3/4")).toBeInTheDocument();
+    expect(screen.getByLabelText("确认敏感内容预检，待完成")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "发布" })).toBeDisabled();
 
     fireEvent.click(screen.getByLabelText("确认允许发布疑似敏感内容"));
+    expect(screen.getByLabelText("确认敏感内容预检，已完成")).toBeInTheDocument();
+    expect(within(readiness).getByText("4/4")).toBeInTheDocument();
+    expect(within(readiness).getAllByText("已完成")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "发布" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "发布" }));
 
     await waitFor(() => expect(pushApi).toHaveBeenCalledWith("world_1", {

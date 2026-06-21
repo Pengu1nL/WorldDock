@@ -77,6 +77,12 @@ export function PublishView({
     (!needsConfirmation || allowSecretFindings) &&
     !publishing,
   );
+  const readinessItems = [
+    { label: "填写 Owner", complete: Boolean(owner.trim()) },
+    { label: "填写 Slug", complete: Boolean(slug.trim()) },
+    { label: "选择至少 1 项资产", complete: hasSelection },
+    { label: findings.length > 0 ? "确认敏感内容预检" : "敏感内容预检通过", complete: !needsConfirmation || allowSecretFindings },
+  ];
 
   const toggleAsset = (assetId: string) => {
     setRelease(null);
@@ -120,7 +126,7 @@ export function PublishView({
         <button className="btn ghost" onClick={onBack}>返回</button>
       </div>
 
-      <div style={{ padding: "20px 32px 40px", maxWidth: 980 }}>
+      <div className="page-body" style={{ maxWidth: 980 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 14, alignItems: "start" }}>
           <section className="card" style={{ padding: 18 }}>
             <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 14 }}>
@@ -211,6 +217,8 @@ export function PublishView({
               </div>
             )}
           </section>
+
+          <PublishReadiness items={readinessItems} />
         </div>
 
         <section className="card" style={{ padding: 18, marginTop: 14 }}>
@@ -255,7 +263,7 @@ export function PublishView({
           )}
         </section>
 
-        <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
+        <div className="row gap-2 sticky-action-bar" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
           {release ? (
             <a
               href={release.url}
@@ -274,6 +282,41 @@ export function PublishView({
         </div>
       </div>
     </div>
+  );
+}
+
+function PublishReadiness({ items }: { items: Array<{ label: string; complete: boolean }> }) {
+  return (
+    <section className="card" aria-label="发布准备" style={{ padding: 18 }}>
+      <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 14 }}>
+        <h2 className="title-font" style={{ marginTop: 0 }}>发布准备</h2>
+        <span className="badge slate">{items.filter((item) => item.complete).length}/{items.length}</span>
+      </div>
+      <ul className="col gap-2" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {items.map((item) => (
+          <li
+            key={item.label}
+            className="row gap-2"
+            aria-label={`${item.label}，${item.complete ? "已完成" : "待完成"}`}
+            style={{
+              color: item.complete ? "var(--sage)" : "var(--fg-2)",
+              fontSize: "var(--t-13)",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span className="row gap-2" style={{ minWidth: 0, flex: "1 1 160px" }}>
+              <Icon name={item.complete ? "check" : "info"} size={13} />
+              <span>{item.label}</span>
+            </span>
+            <span className={`badge ${item.complete ? "sage" : "slate"}`}>
+              {item.complete ? "已完成" : "待完成"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
