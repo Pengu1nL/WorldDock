@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PiRuntimeClient, PiSessionInput } from "./pi-runtime.client";
 import { PiSessionRunner } from "./pi-session-runner";
 import { SafetyGate } from "./safety-gate";
-import { createWorldToolRegistry } from "./world-tools";
+import { buildDisclosureBriefs, buildDisclosureCards, createWorldToolRegistry } from "./world-tools";
 import { WorldToolRegistry } from "./world-tool-registry";
 
 const BASE_INPUT: PiSessionInput = {
@@ -123,6 +123,83 @@ describe("PiSessionRunner", () => {
       excerpt: "已有重力规则。",
       targetId: "official_asset_existing_gravity",
     })]);
+  });
+
+  it("includes formal world assets in world manifest disclosures", async () => {
+    const timestamp = new Date("2026-06-20T00:00:00.000Z");
+    const world = {
+      id: "world_1",
+      name: "宇宙纪元",
+      type: "近未来硬科幻",
+      summary: "聚变能源与太空电梯开启宇宙殖民。",
+      tags: ["硬科幻"],
+      status: "draft",
+      visibility: "private",
+      mode: "local",
+      maturity: 20,
+      coverObjectId: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deletedAt: null,
+    } as const;
+    const officialAssets = {
+      listAssets: async () => ({
+        assets: [{
+          id: "official_asset_existing_gravity",
+          worldId: "world_1",
+          type: "rule",
+          name: "重力",
+          summary: "已有重力规则。",
+          documentKey: "worlds/world_1/official-assets/official_asset_existing_gravity.md",
+          status: "active",
+          version: 1,
+          tags: [],
+          metadata: {},
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          archivedAt: null,
+        }],
+        nextCursor: null,
+      }),
+    } as never;
+    const worlds = {
+      findWorldById: async () => world,
+      countAssets: async () => ({ archive: 0, seeds: 0, conflicts: 0 }),
+      listArchiveEntries: async () => [],
+      listStorySeeds: async () => [],
+      listConflicts: async () => [],
+    } as never;
+    const registry = createWorldToolRegistry(worlds, officialAssets);
+
+    const result = await registry.execute("get_world_manifest", { worldId: "world_1" });
+
+    expect(result).toEqual(expect.objectContaining({
+      found: true,
+      manifest: expect.objectContaining({
+        assetCounts: { archive: 0, seeds: 0, conflicts: 0, official: 1, total: 1 },
+        recentChanges: ["setting: 重力"],
+        index: [expect.objectContaining({
+          kind: "setting",
+          title: "重力",
+          excerpt: "已有重力规则。",
+          targetId: "official_asset_existing_gravity",
+        })],
+      }),
+    }));
+
+    await expect(buildDisclosureCards(worlds, "world_1", officialAssets)).resolves.toEqual([
+      expect.objectContaining({
+        title: "重力",
+        targetId: "official_asset_existing_gravity",
+      }),
+    ]);
+    await expect(buildDisclosureBriefs(worlds, "world_1", officialAssets)).resolves.toEqual([
+      expect.objectContaining({
+        title: "重力",
+        summary: "已有重力规则。",
+        sourcePointers: ["setting:official_asset_existing_gravity"],
+      }),
+    ]);
   });
 
   it("reads formal asset detail by the target id returned from search", async () => {

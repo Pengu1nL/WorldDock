@@ -45,6 +45,8 @@ export const worldManifestSchema = z.object({
     archive: z.number().int().nonnegative(),
     seeds: z.number().int().nonnegative(),
     conflicts: z.number().int().nonnegative(),
+    official: z.number().int().nonnegative().optional(),
+    total: z.number().int().nonnegative().optional(),
   }),
   recentChanges: z.array(z.string()).default([]),
   index: z.array(worldAssetCardSchema).default([]),

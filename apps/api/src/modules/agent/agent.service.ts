@@ -404,9 +404,9 @@ export class AgentService {
     try {
       const context = selectInitialWorldContext({
         prompt: run.prompt,
-        manifest: await buildDisclosureManifest(this.worlds, world),
-        cards: await buildDisclosureCards(this.worlds, world.id),
-        briefs: await buildDisclosureBriefs(this.worlds, world.id),
+        manifest: await buildDisclosureManifest(this.worlds, world, this.officialAssets),
+        cards: await buildDisclosureCards(this.worlds, world.id, this.officialAssets),
+        briefs: await buildDisclosureBriefs(this.worlds, world.id, this.officialAssets),
         maxCards: 8,
         maxBriefs: 3,
       });
@@ -632,9 +632,9 @@ export class AgentService {
 
       const context = selectInitialWorldContext({
         prompt: run.prompt,
-        manifest: await buildDisclosureManifest(this.worlds, world),
-        cards: await buildDisclosureCards(this.worlds, world.id),
-        briefs: await buildDisclosureBriefs(this.worlds, world.id),
+        manifest: await buildDisclosureManifest(this.worlds, world, this.officialAssets),
+        cards: await buildDisclosureCards(this.worlds, world.id, this.officialAssets),
+        briefs: await buildDisclosureBriefs(this.worlds, world.id, this.officialAssets),
         maxCards: 8,
         maxBriefs: 3,
       });

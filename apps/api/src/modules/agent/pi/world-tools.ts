@@ -20,6 +20,11 @@ export type DisclosureAsset = {
   updatedAt: Date;
 };
 
+type DisclosureAssetCounts = Awaited<ReturnType<WorldRepository["countAssets"]>> & {
+  official?: number;
+  total?: number;
+};
+
 export function createWorldToolRegistry(
   worlds: WorldRepository,
   officialAssets?: OfficialAssetsService,
@@ -31,7 +36,7 @@ export function createWorldToolRegistry(
   registry.register("get_world_manifest", async (input) => {
     const world = await worlds.findWorldById(String(input.worldId ?? ""));
     if (!world) return { found: false };
-    return { found: true, manifest: await buildDisclosureManifest(worlds, world) };
+    return { found: true, manifest: await buildDisclosureManifest(worlds, world, officialAssets) };
   });
 
   registry.register("search_world_assets", async (input) => {
@@ -465,7 +470,7 @@ export function toBrief(asset: DisclosureAsset) {
   };
 }
 
-export function toManifest(world: WorldRecord, counts: Awaited<ReturnType<WorldRepository["countAssets"]>>, assets: DisclosureAsset[]) {
+export function toManifest(world: WorldRecord, counts: DisclosureAssetCounts, assets: DisclosureAsset[]) {
   return {
     worldId: world.id,
     name: world.name,
@@ -483,17 +488,39 @@ export function toManifest(world: WorldRecord, counts: Awaited<ReturnType<WorldR
   };
 }
 
-export async function buildDisclosureManifest(worlds: WorldRepository, world: WorldRecord) {
-  const [counts, assets] = await Promise.all([worlds.countAssets(world.id), listDisclosureAssets(worlds, world.id)]);
+export async function buildDisclosureManifest(
+  worlds: WorldRepository,
+  world: WorldRecord,
+  officialAssets?: OfficialAssetsService,
+) {
+  const [legacyCounts, legacyAssets, formalAssets] = await Promise.all([
+    worlds.countAssets(world.id),
+    listDisclosureAssets(worlds, world.id),
+    listFormalDisclosureAssets(officialAssets, world.id),
+  ]);
+  const assets = [...formalAssets, ...legacyAssets];
+  const counts = {
+    ...legacyCounts,
+    official: formalAssets.length,
+    total: legacyCounts.archive + legacyCounts.seeds + legacyCounts.conflicts + formalAssets.length,
+  };
   return toManifest(world, counts, assets);
 }
 
-export async function buildDisclosureCards(worlds: WorldRepository, worldId: string) {
-  return (await listDisclosureAssets(worlds, worldId)).map(toCard);
+export async function buildDisclosureCards(
+  worlds: WorldRepository,
+  worldId: string,
+  officialAssets?: OfficialAssetsService,
+) {
+  return (await listSearchableAssets(worlds, officialAssets, worldId)).map(toCard);
 }
 
-export async function buildDisclosureBriefs(worlds: WorldRepository, worldId: string) {
-  return (await listDisclosureAssets(worlds, worldId)).map(toBrief);
+export async function buildDisclosureBriefs(
+  worlds: WorldRepository,
+  worldId: string,
+  officialAssets?: OfficialAssetsService,
+) {
+  return (await listSearchableAssets(worlds, officialAssets, worldId)).map(toBrief);
 }
 
 function archiveToAsset(entry: ArchiveEntryRecord): DisclosureAsset {

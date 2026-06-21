@@ -8,6 +8,7 @@ import { AgentController } from "../src/modules/agent/agent.controller";
 import { AGENT_PROVIDER, type AgentProvider, type AgentProviderChunk, type AgentProviderInput } from "../src/modules/agent/agent.provider";
 import { AGENT_REPOSITORY } from "../src/modules/agent/agent.repository";
 import { AgentService } from "../src/modules/agent/agent.service";
+import { OfficialAssetsService } from "../src/modules/official-assets/official-assets.service";
 import { WORLD_REPOSITORY } from "../src/modules/worlds/world.repository";
 import {
   createHttpTestApp,
@@ -121,6 +122,77 @@ describe("agent session run local endpoints", () => {
       contextItemId: detail.body.contextItems[0].id,
       contextRef: expect.objectContaining({ title: "回忆所 · 世界摘要", source: "initial" }),
     }));
+  });
+
+  it("passes formal assets into the provider initial context for session runs", async () => {
+    const worlds = createInMemoryWorlds();
+    const agents = createInMemoryAgents();
+    const sessions = createInMemoryAgentSessions();
+    const provider = createMockStreamingAgentProvider([
+      { type: "delta", text: "继续推演现有资产。" },
+    ]);
+    const timestamp = new Date("2026-06-20T00:00:00.000Z");
+    const world = await worlds.createWorld({
+      name: "宇宙纪元",
+      type: "近未来硬科幻",
+      summary: "聚变能源与太空电梯开启宇宙殖民。",
+      tags: ["硬科幻"],
+      mode: "local",
+      maturity: 20,
+    });
+    const session = await sessions.createSession({
+      worldId: world.id,
+      kind: "world_exploration",
+      title: "宇宙纪元 推演",
+      status: "active",
+      current: true,
+      metadata: {},
+    });
+    app = await createAgentSessionRunApp(worlds, agents, sessions, provider, {
+      listAssets: async () => ({
+        assets: [{
+          id: "official_asset_existing_gravity",
+          worldId: world.id,
+          type: "rule",
+          name: "重力",
+          summary: "已有重力规则。",
+          documentKey: `worlds/${world.id}/official-assets/official_asset_existing_gravity.md`,
+          status: "active",
+          version: 1,
+          tags: [],
+          metadata: {},
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          archivedAt: null,
+        }],
+        nextCursor: null,
+      }),
+    });
+
+    const created = await request(app.getHttpServer())
+      .post(`/v1/worlds/${world.id}/agent-sessions/${session.id}/runs`)
+      .send({ prompt: "继续推演" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/v1/agent-session-runs/${created.body.run.id}/events`)
+      .set("accept", "text/event-stream")
+      .expect(200);
+
+    expect(provider.calls[0].context).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        kind: "setting",
+        level: "card",
+        title: "重力",
+        targetId: "official_asset_existing_gravity",
+      }),
+      expect.objectContaining({
+        kind: "setting",
+        level: "brief",
+        title: "重力",
+        targetId: "official_asset_existing_gravity",
+      }),
+    ]));
   });
 
   it("persists default provider context as source fragments", async () => {
@@ -682,6 +754,7 @@ async function createAgentSessionRunApp(
   agents: InMemoryAgents,
   sessions: InMemoryAgentSessions,
   provider: AgentProvider = createMockStreamingAgentProvider(),
+  officialAssets?: Pick<OfficialAssetsService, "listAssets">,
 ) {
   return createHttpTestApp({
     controllers: [AgentController, AgentSessionsController],
@@ -692,6 +765,7 @@ async function createAgentSessionRunApp(
       { provide: AGENT_REPOSITORY, useValue: agents },
       { provide: AGENT_SESSIONS_REPOSITORY, useValue: sessions },
       { provide: AGENT_PROVIDER, useValue: provider },
+      ...(officialAssets ? [{ provide: OfficialAssetsService, useValue: officialAssets }] : []),
     ],
   });
 }
