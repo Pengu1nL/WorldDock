@@ -69,6 +69,16 @@ describe("SessionPage", () => {
     expect(screen.getByLabelText("推演信息面板")).toBeInTheDocument();
   });
 
+  it("can hide the right information panel and render floating controls", () => {
+    renderSessionPage({
+      rightSlot: null,
+      floatingSlot: <button type="button">推演历史</button>,
+    });
+
+    expect(screen.queryByLabelText("推演信息面板")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "推演历史" })).toBeInTheDocument();
+  });
+
   it("opens potential assets from the header badge", () => {
     const onOpenPotentialAssets = vi.fn();
     renderSessionPage({

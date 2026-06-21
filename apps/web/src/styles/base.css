@@ -46,11 +46,16 @@ a:hover { color: var(--fg); }
 }
 
 .session-layout {
+  position: relative;
   height: 100%;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
   background: var(--bg);
+}
+
+.session-layout.without-aside {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .session-main {
@@ -67,6 +72,47 @@ a:hover { color: var(--fg); }
   border-left: 1px solid var(--border);
   background: var(--surface);
   padding: 18px 18px 22px;
+}
+
+.session-floating-layer {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  z-index: 9;
+  display: flex;
+  justify-content: flex-end;
+  max-width: calc(100% - 36px);
+  pointer-events: none;
+}
+
+.session-floating-layer > * {
+  pointer-events: auto;
+}
+
+.session-history-float {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.session-history-trigger {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 8px 24px rgba(23, 26, 33, .09);
+  backdrop-filter: blur(10px);
+}
+
+.session-history-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(360px, calc(100vw - 96px));
+  max-height: min(620px, calc(100vh - var(--statusbar-h) - 116px));
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-4);
+  background: var(--surface);
+  box-shadow: 0 18px 50px rgba(23, 26, 33, .16);
 }
 
 /* ────────── Status Bar (top, VS-Code-ish) ────────── */
@@ -817,6 +863,10 @@ p  { margin: 0; }
     border-left: 0;
     border-top: 1px solid var(--border);
     max-height: 42vh;
+  }
+
+  .session-floating-layer {
+    top: 44px;
   }
 
   .rail {

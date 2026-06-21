@@ -1,6 +1,6 @@
 "use client";
 
-import type { AgentSessionMessage } from "@worlddock/contract";
+import type { AgentSession, AgentSessionMessage } from "@worlddock/contract";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SessionHistoryPanel } from "../../agent-sessions/session-history-panel";
@@ -522,8 +522,9 @@ const ExplorationWorkspace = ({
         potentialAssetCount={potentialAssets.length}
         activePotentialAssetCount={activePotentialAssetCount}
         onOpenPotentialAssets={() => setPotentialAssetDrawerOpen(true)}
-        rightSlot={(
-          <SessionHistoryPanel
+        rightSlot={null}
+        floatingSlot={(
+          <FloatingSessionHistory
             sessions={historyQuery.data ?? []}
             activeSessionId={sessionId}
             isLoading={historyQuery.isPending}
@@ -546,6 +547,91 @@ const ExplorationWorkspace = ({
     </>
   );
 };
+
+type FloatingSessionHistoryProps = {
+  sessions: AgentSession[];
+  activeSessionId?: string | null;
+  isLoading?: boolean;
+  isCreating?: boolean;
+  onCreate: () => void;
+  onOpen: (sessionId: string) => void;
+  onArchive: (sessionId: string) => void;
+};
+
+function FloatingSessionHistory({
+  sessions,
+  activeSessionId,
+  isLoading = false,
+  isCreating = false,
+  onCreate,
+  onOpen,
+  onArchive,
+}: FloatingSessionHistoryProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && containerRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const handleCreate = () => {
+    onCreate();
+    setOpen(false);
+  };
+  const handleOpen = (sessionId: string) => {
+    onOpen(sessionId);
+    setOpen(false);
+  };
+
+  return (
+    <div className="session-history-float" ref={containerRef}>
+      <button
+        aria-controls={open ? "session-history-floating-panel" : undefined}
+        aria-expanded={open}
+        className="btn sm session-history-trigger"
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <Icon name="history" size={13} />
+        <span>推演历史</span>
+      </button>
+      {open ? (
+        <div
+          aria-label="推演历史浮窗"
+          className="session-history-popover"
+          id="session-history-floating-panel"
+          role="dialog"
+        >
+          <SessionHistoryPanel
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            isLoading={isLoading}
+            isCreating={isCreating}
+            onCreate={handleCreate}
+            onOpen={handleOpen}
+            onArchive={onArchive}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 const LegacyExplorationWorkspace = ({
   world,

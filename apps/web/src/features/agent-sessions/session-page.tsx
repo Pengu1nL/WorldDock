@@ -25,7 +25,8 @@ export type SessionPageProps = {
   onStop: () => void;
   onBack?: () => void;
   backLabel?: string;
-  rightSlot?: ReactNode;
+  rightSlot?: ReactNode | null;
+  floatingSlot?: ReactNode;
   potentialAssetCount?: number;
   activePotentialAssetCount?: number;
   onOpenPotentialAssets?: () => void;
@@ -42,17 +43,19 @@ export function SessionPage({
   onBack,
   backLabel = "返回",
   rightSlot,
+  floatingSlot,
   potentialAssetCount = 0,
   activePotentialAssetCount,
   onOpenPotentialAssets,
 }: SessionPageProps) {
-  const aside = rightSlot ?? <SessionContextPanel subjects={subjects} contextItems={contextItems} />;
+  const hasAside = rightSlot !== null;
+  const aside = rightSlot === undefined ? <SessionContextPanel subjects={subjects} contextItems={contextItems} /> : rightSlot;
   const potentialAssetBadgeText = typeof activePotentialAssetCount === "number" && activePotentialAssetCount !== potentialAssetCount
     ? `${activePotentialAssetCount}/${potentialAssetCount}`
     : String(potentialAssetCount);
 
   return (
-    <div className="session-layout">
+    <div className={`session-layout${hasAside ? "" : " without-aside"}`}>
       <main className="session-main">
         <header
           style={{
@@ -112,9 +115,17 @@ export function SessionPage({
         />
       </main>
 
-      <aside aria-label="推演信息面板" className="session-aside">
-        {aside}
-      </aside>
+      {floatingSlot ? (
+        <div className="session-floating-layer">
+          {floatingSlot}
+        </div>
+      ) : null}
+
+      {hasAside ? (
+        <aside aria-label="推演信息面板" className="session-aside">
+          {aside}
+        </aside>
+      ) : null}
     </div>
   );
 }
