@@ -166,6 +166,9 @@ function loadPiSkillsForPolicy(policy: PiSessionPolicy, skillsDir?: string) {
   if (policy.kind === "consistency_repair") {
     return loadSessionPiSkills({ kind: "consistency_repair", skillsDir });
   }
+  if (policy.kind === "story_progression") {
+    return [];
+  }
   return loadSessionPiSkills({ kind: "world_exploration", intent: policy.intent, skillsDir });
 }
 

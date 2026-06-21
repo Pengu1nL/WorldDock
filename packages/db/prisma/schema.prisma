@@ -8,29 +8,30 @@ datasource db {
 }
 
 model World {
-  id                String             @id @default(cuid())
-  name              String
-  type              String
-  summary           String
-  tags              String[]           @default([])
-  status            String             @default("draft")
-  visibility        String             @default("private")
-  mode              String             @default("local")
-  maturity          Int                @default(0)
-  coverObjectId     String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  deletedAt         DateTime?
-  archiveEntries    ArchiveEntry[]
-  storySeeds        StorySeed[]
-  conflicts         Conflict[]
-  consistencyIssues ConsistencyIssue[]
-  assetRelations    WorldAssetRelation[]
-  agentRuns         AgentRun[]
-  agentSuggestions  AgentSuggestion[]
-  agentSessions     AgentSession[]
-  potentialAssets   PotentialAsset[]
-  officialAssets    OfficialWorldAsset[]
+  id                     String                       @id @default(cuid())
+  name                   String
+  type                   String
+  summary                String
+  tags                   String[]                     @default([])
+  status                 String                       @default("draft")
+  visibility             String                       @default("private")
+  mode                   String                       @default("local")
+  maturity               Int                          @default(0)
+  coverObjectId          String?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  deletedAt              DateTime?
+  archiveEntries         ArchiveEntry[]
+  storySeeds             StorySeed[]
+  conflicts              Conflict[]
+  consistencyIssues      ConsistencyIssue[]
+  assetRelations         WorldAssetRelation[]
+  agentRuns              AgentRun[]
+  agentSuggestions       AgentSuggestion[]
+  agentSessions          AgentSession[]
+  potentialAssets        PotentialAsset[]
+  narratives             Narrative[]
+  officialAssets         OfficialWorldAsset[]
   officialAssetRevisions OfficialWorldAssetRevision[]
   officialAssetIndexes   OfficialWorldAssetIndex[]
   officialAssetPatches   WorldAssetPatch[]
@@ -129,27 +130,27 @@ model WorldAssetRelation {
 }
 
 model AgentRun {
-  id           String            @id @default(cuid())
-  worldId      String
-  sessionId    String?
-  status       String            @default("running")
-  mode         String
-  prompt       String
-  model        String?
-  provider     String            @default("pi")
-  piSessionId  String?
-  tokenUsage   Json?
-  errorCode    String?
-  errorMessage String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  completedAt  DateTime?
-  failedAt     DateTime?
-  cancelledAt  DateTime?
-  world        World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  events       AgentEvent[]
-  suggestions  AgentSuggestion[]
-  contextRefs  ContextRef[]
+  id              String            @id @default(cuid())
+  worldId         String
+  sessionId       String?
+  status          String            @default("running")
+  mode            String
+  prompt          String
+  model           String?
+  provider        String            @default("pi")
+  piSessionId     String?
+  tokenUsage      Json?
+  errorCode       String?
+  errorMessage    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  completedAt     DateTime?
+  failedAt        DateTime?
+  cancelledAt     DateTime?
+  world           World             @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  events          AgentEvent[]
+  suggestions     AgentSuggestion[]
+  contextRefs     ContextRef[]
   potentialAssets PotentialAsset[]
 
   @@index([worldId])
@@ -206,9 +207,112 @@ model ContextRef {
   @@map("context_refs")
 }
 
+model Narrative {
+  id             String                   @id @default(cuid())
+  worldId        String?
+  title          String
+  synopsis       String?
+  status         String                   @default("draft")
+  metadata       Json                     @default("{}")
+  visualStyle    Json                     @default("{}")
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  world          World?                   @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  chapters       Chapter[]
+  assets         NarrativeAsset[]
+  assetRelations NarrativeAssetRelation[]
+  sessions       AgentSession[]
+
+  @@index([worldId])
+  @@index([status])
+  @@map("narratives")
+}
+
+model Chapter {
+  id          String                  @id @default(cuid())
+  narrativeId String
+  order       Int
+  title       String
+  content     String
+  wordCount   Int                     @default(0)
+  status      String                  @default("draft")
+  metadata    Json                    @default("{}")
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  narrative   Narrative               @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  versions    NarrativeAssetVersion[]
+  sessions    AgentSession[]
+
+  @@unique([narrativeId, order])
+  @@index([narrativeId])
+  @@index([narrativeId, status])
+  @@map("chapters")
+}
+
+model NarrativeAsset {
+  id            String                   @id @default(cuid())
+  narrativeId   String
+  kind          String
+  name          String
+  summary       String
+  body          String?
+  tags          String[]                 @default([])
+  appearance    String?
+  mood          String?
+  visualPrompt  String?
+  nameEmbedding Json?
+  metadata      Json                     @default("{}")
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  narrative     Narrative                @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  versions      NarrativeAssetVersion[]
+  relationsFrom NarrativeAssetRelation[] @relation("NarrativeAssetRelationSource")
+  relationsTo   NarrativeAssetRelation[] @relation("NarrativeAssetRelationTarget")
+
+  @@index([narrativeId])
+  @@index([narrativeId, kind])
+  @@index([narrativeId, name])
+  @@map("narrative_assets")
+}
+
+model NarrativeAssetVersion {
+  id        String         @id @default(cuid())
+  assetId   String
+  chapterId String
+  snapshot  Json
+  diff      Json?
+  createdAt DateTime       @default(now())
+  asset     NarrativeAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  chapter   Chapter        @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([chapterId])
+  @@map("narrative_asset_versions")
+}
+
+model NarrativeAssetRelation {
+  id            String         @id @default(cuid())
+  narrativeId   String
+  sourceAssetId String
+  targetAssetId String
+  relationType  String
+  description   String?
+  createdAt     DateTime       @default(now())
+  narrative     Narrative      @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  source        NarrativeAsset @relation("NarrativeAssetRelationSource", fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  target        NarrativeAsset @relation("NarrativeAssetRelationTarget", fields: [targetAssetId], references: [id], onDelete: Cascade)
+
+  @@index([narrativeId])
+  @@index([sourceAssetId])
+  @@index([targetAssetId])
+  @@map("narrative_asset_relations")
+}
+
 model AgentSession {
   id              String                    @id @default(cuid())
   worldId         String
+  narrativeId     String?
+  chapterId       String?
   kind            String
   title           String
   status          String                    @default("active")
@@ -217,6 +321,8 @@ model AgentSession {
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   world           World                     @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  narrative       Narrative?                @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  chapter         Chapter?                  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
   subjects        AgentSessionSubject[]
   contextItems    AgentSessionContextItem[]
   messages        AgentSessionMessage[]
@@ -224,6 +330,8 @@ model AgentSession {
   patchBatches    WorldAssetPatchBatch[]
 
   @@index([worldId, kind, status])
+  @@index([worldId, narrativeId])
+  @@index([worldId, chapterId])
   @@index([worldId, current])
   @@index([worldId, updatedAt(sort: Desc), id])
   @@map("agent_sessions")
@@ -305,24 +413,24 @@ model PotentialAsset {
 }
 
 model OfficialWorldAsset {
-  id                       String                       @id @default(cuid())
-  worldId                  String
-  type                     String
-  name                     String
-  summary                  String
-  documentKey              String
-  status                   String                       @default("active")
-  version                  Int                          @default(1)
-  tags                     String[]                     @default([])
-  metadata                 Json                         @default("{}")
-  createdAt                DateTime                     @default(now())
-  updatedAt                DateTime                     @updatedAt
-  archivedAt               DateTime?
-  world                    World                        @relation(fields: [worldId], references: [id], onDelete: Cascade)
-  revisions                OfficialWorldAssetRevision[]
-  indexes                  OfficialWorldAssetIndex[]
-  patches                  WorldAssetPatch[]
-  promotedPotentialAssets  PotentialAsset[]             @relation("PromotedPotentialAssets")
+  id                      String                       @id @default(cuid())
+  worldId                 String
+  type                    String
+  name                    String
+  summary                 String
+  documentKey             String
+  status                  String                       @default("active")
+  version                 Int                          @default(1)
+  tags                    String[]                     @default([])
+  metadata                Json                         @default("{}")
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  archivedAt              DateTime?
+  world                   World                        @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  revisions               OfficialWorldAssetRevision[]
+  indexes                 OfficialWorldAssetIndex[]
+  patches                 WorldAssetPatch[]
+  promotedPotentialAssets PotentialAsset[]             @relation("PromotedPotentialAssets")
 
   @@unique([worldId, documentKey])
   @@index([worldId, type, status])

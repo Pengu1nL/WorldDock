@@ -4,6 +4,7 @@ export const agentSessionKindSchema = z.enum([
   "world_exploration",
   "asset_edit",
   "consistency_repair",
+  "story_progression",
 ]);
 
 export const agentSessionStatusSchema = z.enum([
@@ -18,6 +19,8 @@ export const agentSessionSubjectKindSchema = z.enum([
   "asset",
   "consistency_issue",
   "potential_asset",
+  "narrative",
+  "chapter",
 ]);
 
 export const agentSessionSubjectRoleSchema = z.enum([
@@ -33,6 +36,8 @@ export const agentSessionContextItemKindSchema = z.enum([
   "source_fragment",
   "potential_asset",
   "consistency_issue",
+  "chapter",
+  "narrative_asset",
 ]);
 
 export const agentSessionMessageRoleSchema = z.enum([
@@ -76,6 +81,8 @@ export const agentSessionContextItemSchema = z.object({
 export const agentSessionSchema = z.object({
   id: z.string().min(1),
   worldId: z.string().min(1),
+  narrativeId: z.string().min(1).nullable().optional(),
+  chapterId: z.string().min(1).nullable().optional(),
   kind: agentSessionKindSchema,
   title: z.string().min(1),
   status: agentSessionStatusSchema,
@@ -101,6 +108,8 @@ export const agentSessionMessageSchema = z.object({
 export const createAgentSessionInputSchema = z.object({
   worldId: z.string().min(1),
   kind: agentSessionKindSchema,
+  narrativeId: z.string().min(1).optional(),
+  chapterId: z.string().min(1).optional(),
   title: z.string().min(1).optional(),
   subjects: z.array(agentSessionSubjectSchema).default([]),
   contextItems: z.array(agentSessionContextItemSchema).default([]),

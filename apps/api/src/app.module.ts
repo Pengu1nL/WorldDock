@@ -7,6 +7,7 @@ import { ConnectionsModule } from "./modules/connections/connections.module";
 import { ConsistencyModule } from "./modules/consistency/consistency.module";
 import { ExportsModule } from "./modules/exports/exports.module";
 import { LocalStorageModule } from "./modules/local-storage/local-storage.module";
+import { NarrativesModule } from "./modules/narratives/narratives.module";
 import { OfficialAssetsModule } from "./modules/official-assets/official-assets.module";
 import { PotentialAssetsModule } from "./modules/potential-assets/potential-assets.module";
 import { SystemModule } from "./modules/system/system.module";
@@ -21,6 +22,7 @@ import { WorldsModule } from "./modules/worlds/worlds.module";
     ConsistencyModule,
     ExportsModule,
     LocalStorageModule,
+    NarrativesModule,
     OfficialAssetsModule,
     PotentialAssetsModule,
     SystemModule,

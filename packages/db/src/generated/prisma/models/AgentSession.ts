@@ -27,6 +27,8 @@ export type AggregateAgentSession = {
 export type AgentSessionMinAggregateOutputType = {
   id: string | null
   worldId: string | null
+  narrativeId: string | null
+  chapterId: string | null
   kind: string | null
   title: string | null
   status: string | null
@@ -38,6 +40,8 @@ export type AgentSessionMinAggregateOutputType = {
 export type AgentSessionMaxAggregateOutputType = {
   id: string | null
   worldId: string | null
+  narrativeId: string | null
+  chapterId: string | null
   kind: string | null
   title: string | null
   status: string | null
@@ -49,6 +53,8 @@ export type AgentSessionMaxAggregateOutputType = {
 export type AgentSessionCountAggregateOutputType = {
   id: number
   worldId: number
+  narrativeId: number
+  chapterId: number
   kind: number
   title: number
   status: number
@@ -63,6 +69,8 @@ export type AgentSessionCountAggregateOutputType = {
 export type AgentSessionMinAggregateInputType = {
   id?: true
   worldId?: true
+  narrativeId?: true
+  chapterId?: true
   kind?: true
   title?: true
   status?: true
@@ -74,6 +82,8 @@ export type AgentSessionMinAggregateInputType = {
 export type AgentSessionMaxAggregateInputType = {
   id?: true
   worldId?: true
+  narrativeId?: true
+  chapterId?: true
   kind?: true
   title?: true
   status?: true
@@ -85,6 +95,8 @@ export type AgentSessionMaxAggregateInputType = {
 export type AgentSessionCountAggregateInputType = {
   id?: true
   worldId?: true
+  narrativeId?: true
+  chapterId?: true
   kind?: true
   title?: true
   status?: true
@@ -170,6 +182,8 @@ export type AgentSessionGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
 export type AgentSessionGroupByOutputType = {
   id: string
   worldId: string
+  narrativeId: string | null
+  chapterId: string | null
   kind: string
   title: string
   status: string
@@ -203,6 +217,8 @@ export type AgentSessionWhereInput = {
   NOT?: Prisma.AgentSessionWhereInput | Prisma.AgentSessionWhereInput[]
   id?: Prisma.StringFilter<"AgentSession"> | string
   worldId?: Prisma.StringFilter<"AgentSession"> | string
+  narrativeId?: Prisma.StringNullableFilter<"AgentSession"> | string | null
+  chapterId?: Prisma.StringNullableFilter<"AgentSession"> | string | null
   kind?: Prisma.StringFilter<"AgentSession"> | string
   title?: Prisma.StringFilter<"AgentSession"> | string
   status?: Prisma.StringFilter<"AgentSession"> | string
@@ -211,6 +227,8 @@ export type AgentSessionWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"AgentSession"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AgentSession"> | Date | string
   world?: Prisma.XOR<Prisma.WorldScalarRelationFilter, Prisma.WorldWhereInput>
+  narrative?: Prisma.XOR<Prisma.NarrativeNullableScalarRelationFilter, Prisma.NarrativeWhereInput> | null
+  chapter?: Prisma.XOR<Prisma.ChapterNullableScalarRelationFilter, Prisma.ChapterWhereInput> | null
   subjects?: Prisma.AgentSessionSubjectListRelationFilter
   contextItems?: Prisma.AgentSessionContextItemListRelationFilter
   messages?: Prisma.AgentSessionMessageListRelationFilter
@@ -221,6 +239,8 @@ export type AgentSessionWhereInput = {
 export type AgentSessionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  narrativeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  chapterId?: Prisma.SortOrderInput | Prisma.SortOrder
   kind?: Prisma.SortOrder
   title?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -229,6 +249,8 @@ export type AgentSessionOrderByWithRelationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   world?: Prisma.WorldOrderByWithRelationInput
+  narrative?: Prisma.NarrativeOrderByWithRelationInput
+  chapter?: Prisma.ChapterOrderByWithRelationInput
   subjects?: Prisma.AgentSessionSubjectOrderByRelationAggregateInput
   contextItems?: Prisma.AgentSessionContextItemOrderByRelationAggregateInput
   messages?: Prisma.AgentSessionMessageOrderByRelationAggregateInput
@@ -242,6 +264,8 @@ export type AgentSessionWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.AgentSessionWhereInput[]
   NOT?: Prisma.AgentSessionWhereInput | Prisma.AgentSessionWhereInput[]
   worldId?: Prisma.StringFilter<"AgentSession"> | string
+  narrativeId?: Prisma.StringNullableFilter<"AgentSession"> | string | null
+  chapterId?: Prisma.StringNullableFilter<"AgentSession"> | string | null
   kind?: Prisma.StringFilter<"AgentSession"> | string
   title?: Prisma.StringFilter<"AgentSession"> | string
   status?: Prisma.StringFilter<"AgentSession"> | string
@@ -250,6 +274,8 @@ export type AgentSessionWhereUniqueInput = Prisma.AtLeast<{
   createdAt?: Prisma.DateTimeFilter<"AgentSession"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AgentSession"> | Date | string
   world?: Prisma.XOR<Prisma.WorldScalarRelationFilter, Prisma.WorldWhereInput>
+  narrative?: Prisma.XOR<Prisma.NarrativeNullableScalarRelationFilter, Prisma.NarrativeWhereInput> | null
+  chapter?: Prisma.XOR<Prisma.ChapterNullableScalarRelationFilter, Prisma.ChapterWhereInput> | null
   subjects?: Prisma.AgentSessionSubjectListRelationFilter
   contextItems?: Prisma.AgentSessionContextItemListRelationFilter
   messages?: Prisma.AgentSessionMessageListRelationFilter
@@ -260,6 +286,8 @@ export type AgentSessionWhereUniqueInput = Prisma.AtLeast<{
 export type AgentSessionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  narrativeId?: Prisma.SortOrderInput | Prisma.SortOrder
+  chapterId?: Prisma.SortOrderInput | Prisma.SortOrder
   kind?: Prisma.SortOrder
   title?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -278,6 +306,8 @@ export type AgentSessionScalarWhereWithAggregatesInput = {
   NOT?: Prisma.AgentSessionScalarWhereWithAggregatesInput | Prisma.AgentSessionScalarWhereWithAggregatesInput[]
   id?: Prisma.StringWithAggregatesFilter<"AgentSession"> | string
   worldId?: Prisma.StringWithAggregatesFilter<"AgentSession"> | string
+  narrativeId?: Prisma.StringNullableWithAggregatesFilter<"AgentSession"> | string | null
+  chapterId?: Prisma.StringNullableWithAggregatesFilter<"AgentSession"> | string | null
   kind?: Prisma.StringWithAggregatesFilter<"AgentSession"> | string
   title?: Prisma.StringWithAggregatesFilter<"AgentSession"> | string
   status?: Prisma.StringWithAggregatesFilter<"AgentSession"> | string
@@ -297,6 +327,8 @@ export type AgentSessionCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
   contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
   messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
@@ -307,6 +339,8 @@ export type AgentSessionCreateInput = {
 export type AgentSessionUncheckedCreateInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -331,6 +365,8 @@ export type AgentSessionUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
   contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
   messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
@@ -341,6 +377,8 @@ export type AgentSessionUpdateInput = {
 export type AgentSessionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -358,6 +396,8 @@ export type AgentSessionUncheckedUpdateInput = {
 export type AgentSessionCreateManyInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -381,6 +421,8 @@ export type AgentSessionUpdateManyMutationInput = {
 export type AgentSessionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -403,6 +445,8 @@ export type AgentSessionOrderByRelationAggregateInput = {
 export type AgentSessionCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  narrativeId?: Prisma.SortOrder
+  chapterId?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   title?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -415,6 +459,8 @@ export type AgentSessionCountOrderByAggregateInput = {
 export type AgentSessionMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  narrativeId?: Prisma.SortOrder
+  chapterId?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   title?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -426,6 +472,8 @@ export type AgentSessionMaxOrderByAggregateInput = {
 export type AgentSessionMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   worldId?: Prisma.SortOrder
+  narrativeId?: Prisma.SortOrder
+  chapterId?: Prisma.SortOrder
   kind?: Prisma.SortOrder
   title?: Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -478,6 +526,90 @@ export type AgentSessionUncheckedUpdateManyWithoutWorldNestedInput = {
   connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
   update?: Prisma.AgentSessionUpdateWithWhereUniqueWithoutWorldInput | Prisma.AgentSessionUpdateWithWhereUniqueWithoutWorldInput[]
   updateMany?: Prisma.AgentSessionUpdateManyWithWhereWithoutWorldInput | Prisma.AgentSessionUpdateManyWithWhereWithoutWorldInput[]
+  deleteMany?: Prisma.AgentSessionScalarWhereInput | Prisma.AgentSessionScalarWhereInput[]
+}
+
+export type AgentSessionCreateNestedManyWithoutNarrativeInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutNarrativeInput, Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput> | Prisma.AgentSessionCreateWithoutNarrativeInput[] | Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput | Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput[]
+  createMany?: Prisma.AgentSessionCreateManyNarrativeInputEnvelope
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+}
+
+export type AgentSessionUncheckedCreateNestedManyWithoutNarrativeInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutNarrativeInput, Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput> | Prisma.AgentSessionCreateWithoutNarrativeInput[] | Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput | Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput[]
+  createMany?: Prisma.AgentSessionCreateManyNarrativeInputEnvelope
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+}
+
+export type AgentSessionUpdateManyWithoutNarrativeNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutNarrativeInput, Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput> | Prisma.AgentSessionCreateWithoutNarrativeInput[] | Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput | Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput[]
+  upsert?: Prisma.AgentSessionUpsertWithWhereUniqueWithoutNarrativeInput | Prisma.AgentSessionUpsertWithWhereUniqueWithoutNarrativeInput[]
+  createMany?: Prisma.AgentSessionCreateManyNarrativeInputEnvelope
+  set?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  disconnect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  delete?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  update?: Prisma.AgentSessionUpdateWithWhereUniqueWithoutNarrativeInput | Prisma.AgentSessionUpdateWithWhereUniqueWithoutNarrativeInput[]
+  updateMany?: Prisma.AgentSessionUpdateManyWithWhereWithoutNarrativeInput | Prisma.AgentSessionUpdateManyWithWhereWithoutNarrativeInput[]
+  deleteMany?: Prisma.AgentSessionScalarWhereInput | Prisma.AgentSessionScalarWhereInput[]
+}
+
+export type AgentSessionUncheckedUpdateManyWithoutNarrativeNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutNarrativeInput, Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput> | Prisma.AgentSessionCreateWithoutNarrativeInput[] | Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput | Prisma.AgentSessionCreateOrConnectWithoutNarrativeInput[]
+  upsert?: Prisma.AgentSessionUpsertWithWhereUniqueWithoutNarrativeInput | Prisma.AgentSessionUpsertWithWhereUniqueWithoutNarrativeInput[]
+  createMany?: Prisma.AgentSessionCreateManyNarrativeInputEnvelope
+  set?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  disconnect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  delete?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  update?: Prisma.AgentSessionUpdateWithWhereUniqueWithoutNarrativeInput | Prisma.AgentSessionUpdateWithWhereUniqueWithoutNarrativeInput[]
+  updateMany?: Prisma.AgentSessionUpdateManyWithWhereWithoutNarrativeInput | Prisma.AgentSessionUpdateManyWithWhereWithoutNarrativeInput[]
+  deleteMany?: Prisma.AgentSessionScalarWhereInput | Prisma.AgentSessionScalarWhereInput[]
+}
+
+export type AgentSessionCreateNestedManyWithoutChapterInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutChapterInput, Prisma.AgentSessionUncheckedCreateWithoutChapterInput> | Prisma.AgentSessionCreateWithoutChapterInput[] | Prisma.AgentSessionUncheckedCreateWithoutChapterInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutChapterInput | Prisma.AgentSessionCreateOrConnectWithoutChapterInput[]
+  createMany?: Prisma.AgentSessionCreateManyChapterInputEnvelope
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+}
+
+export type AgentSessionUncheckedCreateNestedManyWithoutChapterInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutChapterInput, Prisma.AgentSessionUncheckedCreateWithoutChapterInput> | Prisma.AgentSessionCreateWithoutChapterInput[] | Prisma.AgentSessionUncheckedCreateWithoutChapterInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutChapterInput | Prisma.AgentSessionCreateOrConnectWithoutChapterInput[]
+  createMany?: Prisma.AgentSessionCreateManyChapterInputEnvelope
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+}
+
+export type AgentSessionUpdateManyWithoutChapterNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutChapterInput, Prisma.AgentSessionUncheckedCreateWithoutChapterInput> | Prisma.AgentSessionCreateWithoutChapterInput[] | Prisma.AgentSessionUncheckedCreateWithoutChapterInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutChapterInput | Prisma.AgentSessionCreateOrConnectWithoutChapterInput[]
+  upsert?: Prisma.AgentSessionUpsertWithWhereUniqueWithoutChapterInput | Prisma.AgentSessionUpsertWithWhereUniqueWithoutChapterInput[]
+  createMany?: Prisma.AgentSessionCreateManyChapterInputEnvelope
+  set?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  disconnect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  delete?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  update?: Prisma.AgentSessionUpdateWithWhereUniqueWithoutChapterInput | Prisma.AgentSessionUpdateWithWhereUniqueWithoutChapterInput[]
+  updateMany?: Prisma.AgentSessionUpdateManyWithWhereWithoutChapterInput | Prisma.AgentSessionUpdateManyWithWhereWithoutChapterInput[]
+  deleteMany?: Prisma.AgentSessionScalarWhereInput | Prisma.AgentSessionScalarWhereInput[]
+}
+
+export type AgentSessionUncheckedUpdateManyWithoutChapterNestedInput = {
+  create?: Prisma.XOR<Prisma.AgentSessionCreateWithoutChapterInput, Prisma.AgentSessionUncheckedCreateWithoutChapterInput> | Prisma.AgentSessionCreateWithoutChapterInput[] | Prisma.AgentSessionUncheckedCreateWithoutChapterInput[]
+  connectOrCreate?: Prisma.AgentSessionCreateOrConnectWithoutChapterInput | Prisma.AgentSessionCreateOrConnectWithoutChapterInput[]
+  upsert?: Prisma.AgentSessionUpsertWithWhereUniqueWithoutChapterInput | Prisma.AgentSessionUpsertWithWhereUniqueWithoutChapterInput[]
+  createMany?: Prisma.AgentSessionCreateManyChapterInputEnvelope
+  set?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  disconnect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  delete?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  connect?: Prisma.AgentSessionWhereUniqueInput | Prisma.AgentSessionWhereUniqueInput[]
+  update?: Prisma.AgentSessionUpdateWithWhereUniqueWithoutChapterInput | Prisma.AgentSessionUpdateWithWhereUniqueWithoutChapterInput[]
+  updateMany?: Prisma.AgentSessionUpdateManyWithWhereWithoutChapterInput | Prisma.AgentSessionUpdateManyWithWhereWithoutChapterInput[]
   deleteMany?: Prisma.AgentSessionScalarWhereInput | Prisma.AgentSessionScalarWhereInput[]
 }
 
@@ -564,6 +696,8 @@ export type AgentSessionCreateWithoutWorldInput = {
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
   contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
   messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
@@ -573,6 +707,8 @@ export type AgentSessionCreateWithoutWorldInput = {
 
 export type AgentSessionUncheckedCreateWithoutWorldInput = {
   id?: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -619,6 +755,8 @@ export type AgentSessionScalarWhereInput = {
   NOT?: Prisma.AgentSessionScalarWhereInput | Prisma.AgentSessionScalarWhereInput[]
   id?: Prisma.StringFilter<"AgentSession"> | string
   worldId?: Prisma.StringFilter<"AgentSession"> | string
+  narrativeId?: Prisma.StringNullableFilter<"AgentSession"> | string | null
+  chapterId?: Prisma.StringNullableFilter<"AgentSession"> | string | null
   kind?: Prisma.StringFilter<"AgentSession"> | string
   title?: Prisma.StringFilter<"AgentSession"> | string
   status?: Prisma.StringFilter<"AgentSession"> | string
@@ -626,6 +764,130 @@ export type AgentSessionScalarWhereInput = {
   metadata?: Prisma.JsonFilter<"AgentSession">
   createdAt?: Prisma.DateTimeFilter<"AgentSession"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"AgentSession"> | Date | string
+}
+
+export type AgentSessionCreateWithoutNarrativeInput = {
+  id?: string
+  kind: string
+  title: string
+  status?: string
+  current?: boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
+  subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
+  contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
+  messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
+  potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutSessionInput
+  patchBatches?: Prisma.WorldAssetPatchBatchCreateNestedManyWithoutSessionInput
+}
+
+export type AgentSessionUncheckedCreateWithoutNarrativeInput = {
+  id?: string
+  worldId: string
+  chapterId?: string | null
+  kind: string
+  title: string
+  status?: string
+  current?: boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  subjects?: Prisma.AgentSessionSubjectUncheckedCreateNestedManyWithoutSessionInput
+  contextItems?: Prisma.AgentSessionContextItemUncheckedCreateNestedManyWithoutSessionInput
+  messages?: Prisma.AgentSessionMessageUncheckedCreateNestedManyWithoutSessionInput
+  potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutSessionInput
+  patchBatches?: Prisma.WorldAssetPatchBatchUncheckedCreateNestedManyWithoutSessionInput
+}
+
+export type AgentSessionCreateOrConnectWithoutNarrativeInput = {
+  where: Prisma.AgentSessionWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentSessionCreateWithoutNarrativeInput, Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput>
+}
+
+export type AgentSessionCreateManyNarrativeInputEnvelope = {
+  data: Prisma.AgentSessionCreateManyNarrativeInput | Prisma.AgentSessionCreateManyNarrativeInput[]
+  skipDuplicates?: boolean
+}
+
+export type AgentSessionUpsertWithWhereUniqueWithoutNarrativeInput = {
+  where: Prisma.AgentSessionWhereUniqueInput
+  update: Prisma.XOR<Prisma.AgentSessionUpdateWithoutNarrativeInput, Prisma.AgentSessionUncheckedUpdateWithoutNarrativeInput>
+  create: Prisma.XOR<Prisma.AgentSessionCreateWithoutNarrativeInput, Prisma.AgentSessionUncheckedCreateWithoutNarrativeInput>
+}
+
+export type AgentSessionUpdateWithWhereUniqueWithoutNarrativeInput = {
+  where: Prisma.AgentSessionWhereUniqueInput
+  data: Prisma.XOR<Prisma.AgentSessionUpdateWithoutNarrativeInput, Prisma.AgentSessionUncheckedUpdateWithoutNarrativeInput>
+}
+
+export type AgentSessionUpdateManyWithWhereWithoutNarrativeInput = {
+  where: Prisma.AgentSessionScalarWhereInput
+  data: Prisma.XOR<Prisma.AgentSessionUpdateManyMutationInput, Prisma.AgentSessionUncheckedUpdateManyWithoutNarrativeInput>
+}
+
+export type AgentSessionCreateWithoutChapterInput = {
+  id?: string
+  kind: string
+  title: string
+  status?: string
+  current?: boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
+  contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
+  messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
+  potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutSessionInput
+  patchBatches?: Prisma.WorldAssetPatchBatchCreateNestedManyWithoutSessionInput
+}
+
+export type AgentSessionUncheckedCreateWithoutChapterInput = {
+  id?: string
+  worldId: string
+  narrativeId?: string | null
+  kind: string
+  title: string
+  status?: string
+  current?: boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  subjects?: Prisma.AgentSessionSubjectUncheckedCreateNestedManyWithoutSessionInput
+  contextItems?: Prisma.AgentSessionContextItemUncheckedCreateNestedManyWithoutSessionInput
+  messages?: Prisma.AgentSessionMessageUncheckedCreateNestedManyWithoutSessionInput
+  potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutSessionInput
+  patchBatches?: Prisma.WorldAssetPatchBatchUncheckedCreateNestedManyWithoutSessionInput
+}
+
+export type AgentSessionCreateOrConnectWithoutChapterInput = {
+  where: Prisma.AgentSessionWhereUniqueInput
+  create: Prisma.XOR<Prisma.AgentSessionCreateWithoutChapterInput, Prisma.AgentSessionUncheckedCreateWithoutChapterInput>
+}
+
+export type AgentSessionCreateManyChapterInputEnvelope = {
+  data: Prisma.AgentSessionCreateManyChapterInput | Prisma.AgentSessionCreateManyChapterInput[]
+  skipDuplicates?: boolean
+}
+
+export type AgentSessionUpsertWithWhereUniqueWithoutChapterInput = {
+  where: Prisma.AgentSessionWhereUniqueInput
+  update: Prisma.XOR<Prisma.AgentSessionUpdateWithoutChapterInput, Prisma.AgentSessionUncheckedUpdateWithoutChapterInput>
+  create: Prisma.XOR<Prisma.AgentSessionCreateWithoutChapterInput, Prisma.AgentSessionUncheckedCreateWithoutChapterInput>
+}
+
+export type AgentSessionUpdateWithWhereUniqueWithoutChapterInput = {
+  where: Prisma.AgentSessionWhereUniqueInput
+  data: Prisma.XOR<Prisma.AgentSessionUpdateWithoutChapterInput, Prisma.AgentSessionUncheckedUpdateWithoutChapterInput>
+}
+
+export type AgentSessionUpdateManyWithWhereWithoutChapterInput = {
+  where: Prisma.AgentSessionScalarWhereInput
+  data: Prisma.XOR<Prisma.AgentSessionUpdateManyMutationInput, Prisma.AgentSessionUncheckedUpdateManyWithoutChapterInput>
 }
 
 export type AgentSessionCreateWithoutSubjectsInput = {
@@ -638,6 +900,8 @@ export type AgentSessionCreateWithoutSubjectsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
   messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutSessionInput
@@ -647,6 +911,8 @@ export type AgentSessionCreateWithoutSubjectsInput = {
 export type AgentSessionUncheckedCreateWithoutSubjectsInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -686,6 +952,8 @@ export type AgentSessionUpdateWithoutSubjectsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
   messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutSessionNestedInput
@@ -695,6 +963,8 @@ export type AgentSessionUpdateWithoutSubjectsInput = {
 export type AgentSessionUncheckedUpdateWithoutSubjectsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -718,6 +988,8 @@ export type AgentSessionCreateWithoutContextItemsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
   messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutSessionInput
@@ -727,6 +999,8 @@ export type AgentSessionCreateWithoutContextItemsInput = {
 export type AgentSessionUncheckedCreateWithoutContextItemsInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -766,6 +1040,8 @@ export type AgentSessionUpdateWithoutContextItemsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
   messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutSessionNestedInput
@@ -775,6 +1051,8 @@ export type AgentSessionUpdateWithoutContextItemsInput = {
 export type AgentSessionUncheckedUpdateWithoutContextItemsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -798,6 +1076,8 @@ export type AgentSessionCreateWithoutMessagesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
   contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutSessionInput
@@ -807,6 +1087,8 @@ export type AgentSessionCreateWithoutMessagesInput = {
 export type AgentSessionUncheckedCreateWithoutMessagesInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -846,6 +1128,8 @@ export type AgentSessionUpdateWithoutMessagesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
   contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutSessionNestedInput
@@ -855,6 +1139,8 @@ export type AgentSessionUpdateWithoutMessagesInput = {
 export type AgentSessionUncheckedUpdateWithoutMessagesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -878,6 +1164,8 @@ export type AgentSessionCreateWithoutPotentialAssetsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
   contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
   messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
@@ -887,6 +1175,8 @@ export type AgentSessionCreateWithoutPotentialAssetsInput = {
 export type AgentSessionUncheckedCreateWithoutPotentialAssetsInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -926,6 +1216,8 @@ export type AgentSessionUpdateWithoutPotentialAssetsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
   contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
   messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
@@ -935,6 +1227,8 @@ export type AgentSessionUpdateWithoutPotentialAssetsInput = {
 export type AgentSessionUncheckedUpdateWithoutPotentialAssetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -958,6 +1252,8 @@ export type AgentSessionCreateWithoutPatchBatchesInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   world: Prisma.WorldCreateNestedOneWithoutAgentSessionsInput
+  narrative?: Prisma.NarrativeCreateNestedOneWithoutSessionsInput
+  chapter?: Prisma.ChapterCreateNestedOneWithoutSessionsInput
   subjects?: Prisma.AgentSessionSubjectCreateNestedManyWithoutSessionInput
   contextItems?: Prisma.AgentSessionContextItemCreateNestedManyWithoutSessionInput
   messages?: Prisma.AgentSessionMessageCreateNestedManyWithoutSessionInput
@@ -967,6 +1263,8 @@ export type AgentSessionCreateWithoutPatchBatchesInput = {
 export type AgentSessionUncheckedCreateWithoutPatchBatchesInput = {
   id?: string
   worldId: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -1006,6 +1304,8 @@ export type AgentSessionUpdateWithoutPatchBatchesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
   contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
   messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
@@ -1015,6 +1315,8 @@ export type AgentSessionUpdateWithoutPatchBatchesInput = {
 export type AgentSessionUncheckedUpdateWithoutPatchBatchesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1030,6 +1332,8 @@ export type AgentSessionUncheckedUpdateWithoutPatchBatchesInput = {
 
 export type AgentSessionCreateManyWorldInput = {
   id?: string
+  narrativeId?: string | null
+  chapterId?: string | null
   kind: string
   title: string
   status?: string
@@ -1048,6 +1352,8 @@ export type AgentSessionUpdateWithoutWorldInput = {
   metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
   subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
   contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
   messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
@@ -1057,6 +1363,8 @@ export type AgentSessionUpdateWithoutWorldInput = {
 
 export type AgentSessionUncheckedUpdateWithoutWorldInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1073,6 +1381,132 @@ export type AgentSessionUncheckedUpdateWithoutWorldInput = {
 
 export type AgentSessionUncheckedUpdateManyWithoutWorldInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type AgentSessionCreateManyNarrativeInput = {
+  id?: string
+  worldId: string
+  chapterId?: string | null
+  kind: string
+  title: string
+  status?: string
+  current?: boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type AgentSessionUpdateWithoutNarrativeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  chapter?: Prisma.ChapterUpdateOneWithoutSessionsNestedInput
+  subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
+  contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
+  messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
+  potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutSessionNestedInput
+  patchBatches?: Prisma.WorldAssetPatchBatchUpdateManyWithoutSessionNestedInput
+}
+
+export type AgentSessionUncheckedUpdateWithoutNarrativeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  subjects?: Prisma.AgentSessionSubjectUncheckedUpdateManyWithoutSessionNestedInput
+  contextItems?: Prisma.AgentSessionContextItemUncheckedUpdateManyWithoutSessionNestedInput
+  messages?: Prisma.AgentSessionMessageUncheckedUpdateManyWithoutSessionNestedInput
+  potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutSessionNestedInput
+  patchBatches?: Prisma.WorldAssetPatchBatchUncheckedUpdateManyWithoutSessionNestedInput
+}
+
+export type AgentSessionUncheckedUpdateManyWithoutNarrativeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  chapterId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type AgentSessionCreateManyChapterInput = {
+  id?: string
+  worldId: string
+  narrativeId?: string | null
+  kind: string
+  title: string
+  status?: string
+  current?: boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type AgentSessionUpdateWithoutChapterInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  world?: Prisma.WorldUpdateOneRequiredWithoutAgentSessionsNestedInput
+  narrative?: Prisma.NarrativeUpdateOneWithoutSessionsNestedInput
+  subjects?: Prisma.AgentSessionSubjectUpdateManyWithoutSessionNestedInput
+  contextItems?: Prisma.AgentSessionContextItemUpdateManyWithoutSessionNestedInput
+  messages?: Prisma.AgentSessionMessageUpdateManyWithoutSessionNestedInput
+  potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutSessionNestedInput
+  patchBatches?: Prisma.WorldAssetPatchBatchUpdateManyWithoutSessionNestedInput
+}
+
+export type AgentSessionUncheckedUpdateWithoutChapterInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  kind?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  subjects?: Prisma.AgentSessionSubjectUncheckedUpdateManyWithoutSessionNestedInput
+  contextItems?: Prisma.AgentSessionContextItemUncheckedUpdateManyWithoutSessionNestedInput
+  messages?: Prisma.AgentSessionMessageUncheckedUpdateManyWithoutSessionNestedInput
+  potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutSessionNestedInput
+  patchBatches?: Prisma.WorldAssetPatchBatchUncheckedUpdateManyWithoutSessionNestedInput
+}
+
+export type AgentSessionUncheckedUpdateManyWithoutChapterInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  worldId?: Prisma.StringFieldUpdateOperationsInput | string
+  narrativeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   kind?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1152,6 +1586,8 @@ export type AgentSessionCountOutputTypeCountPatchBatchesArgs<ExtArgs extends run
 export type AgentSessionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   worldId?: boolean
+  narrativeId?: boolean
+  chapterId?: boolean
   kind?: boolean
   title?: boolean
   status?: boolean
@@ -1160,6 +1596,8 @@ export type AgentSessionSelect<ExtArgs extends runtime.Types.Extensions.Internal
   createdAt?: boolean
   updatedAt?: boolean
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
+  narrative?: boolean | Prisma.AgentSession$narrativeArgs<ExtArgs>
+  chapter?: boolean | Prisma.AgentSession$chapterArgs<ExtArgs>
   subjects?: boolean | Prisma.AgentSession$subjectsArgs<ExtArgs>
   contextItems?: boolean | Prisma.AgentSession$contextItemsArgs<ExtArgs>
   messages?: boolean | Prisma.AgentSession$messagesArgs<ExtArgs>
@@ -1171,6 +1609,8 @@ export type AgentSessionSelect<ExtArgs extends runtime.Types.Extensions.Internal
 export type AgentSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   worldId?: boolean
+  narrativeId?: boolean
+  chapterId?: boolean
   kind?: boolean
   title?: boolean
   status?: boolean
@@ -1179,11 +1619,15 @@ export type AgentSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   createdAt?: boolean
   updatedAt?: boolean
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
+  narrative?: boolean | Prisma.AgentSession$narrativeArgs<ExtArgs>
+  chapter?: boolean | Prisma.AgentSession$chapterArgs<ExtArgs>
 }, ExtArgs["result"]["agentSession"]>
 
 export type AgentSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   worldId?: boolean
+  narrativeId?: boolean
+  chapterId?: boolean
   kind?: boolean
   title?: boolean
   status?: boolean
@@ -1192,11 +1636,15 @@ export type AgentSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   createdAt?: boolean
   updatedAt?: boolean
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
+  narrative?: boolean | Prisma.AgentSession$narrativeArgs<ExtArgs>
+  chapter?: boolean | Prisma.AgentSession$chapterArgs<ExtArgs>
 }, ExtArgs["result"]["agentSession"]>
 
 export type AgentSessionSelectScalar = {
   id?: boolean
   worldId?: boolean
+  narrativeId?: boolean
+  chapterId?: boolean
   kind?: boolean
   title?: boolean
   status?: boolean
@@ -1206,9 +1654,11 @@ export type AgentSessionSelectScalar = {
   updatedAt?: boolean
 }
 
-export type AgentSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "worldId" | "kind" | "title" | "status" | "current" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["agentSession"]>
+export type AgentSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "worldId" | "narrativeId" | "chapterId" | "kind" | "title" | "status" | "current" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["agentSession"]>
 export type AgentSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
+  narrative?: boolean | Prisma.AgentSession$narrativeArgs<ExtArgs>
+  chapter?: boolean | Prisma.AgentSession$chapterArgs<ExtArgs>
   subjects?: boolean | Prisma.AgentSession$subjectsArgs<ExtArgs>
   contextItems?: boolean | Prisma.AgentSession$contextItemsArgs<ExtArgs>
   messages?: boolean | Prisma.AgentSession$messagesArgs<ExtArgs>
@@ -1218,15 +1668,21 @@ export type AgentSessionInclude<ExtArgs extends runtime.Types.Extensions.Interna
 }
 export type AgentSessionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
+  narrative?: boolean | Prisma.AgentSession$narrativeArgs<ExtArgs>
+  chapter?: boolean | Prisma.AgentSession$chapterArgs<ExtArgs>
 }
 export type AgentSessionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   world?: boolean | Prisma.WorldDefaultArgs<ExtArgs>
+  narrative?: boolean | Prisma.AgentSession$narrativeArgs<ExtArgs>
+  chapter?: boolean | Prisma.AgentSession$chapterArgs<ExtArgs>
 }
 
 export type $AgentSessionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "AgentSession"
   objects: {
     world: Prisma.$WorldPayload<ExtArgs>
+    narrative: Prisma.$NarrativePayload<ExtArgs> | null
+    chapter: Prisma.$ChapterPayload<ExtArgs> | null
     subjects: Prisma.$AgentSessionSubjectPayload<ExtArgs>[]
     contextItems: Prisma.$AgentSessionContextItemPayload<ExtArgs>[]
     messages: Prisma.$AgentSessionMessagePayload<ExtArgs>[]
@@ -1236,6 +1692,8 @@ export type $AgentSessionPayload<ExtArgs extends runtime.Types.Extensions.Intern
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     worldId: string
+    narrativeId: string | null
+    chapterId: string | null
     kind: string
     title: string
     status: string
@@ -1638,6 +2096,8 @@ readonly fields: AgentSessionFieldRefs;
 export interface Prisma__AgentSessionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   world<T extends Prisma.WorldDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WorldDefaultArgs<ExtArgs>>): Prisma.Prisma__WorldClient<runtime.Types.Result.GetResult<Prisma.$WorldPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  narrative<T extends Prisma.AgentSession$narrativeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AgentSession$narrativeArgs<ExtArgs>>): Prisma.Prisma__NarrativeClient<runtime.Types.Result.GetResult<Prisma.$NarrativePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  chapter<T extends Prisma.AgentSession$chapterArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AgentSession$chapterArgs<ExtArgs>>): Prisma.Prisma__ChapterClient<runtime.Types.Result.GetResult<Prisma.$ChapterPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   subjects<T extends Prisma.AgentSession$subjectsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AgentSession$subjectsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentSessionSubjectPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   contextItems<T extends Prisma.AgentSession$contextItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AgentSession$contextItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentSessionContextItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   messages<T extends Prisma.AgentSession$messagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AgentSession$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentSessionMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -1674,6 +2134,8 @@ export interface Prisma__AgentSessionClient<T, Null = never, ExtArgs extends run
 export interface AgentSessionFieldRefs {
   readonly id: Prisma.FieldRef<"AgentSession", 'String'>
   readonly worldId: Prisma.FieldRef<"AgentSession", 'String'>
+  readonly narrativeId: Prisma.FieldRef<"AgentSession", 'String'>
+  readonly chapterId: Prisma.FieldRef<"AgentSession", 'String'>
   readonly kind: Prisma.FieldRef<"AgentSession", 'String'>
   readonly title: Prisma.FieldRef<"AgentSession", 'String'>
   readonly status: Prisma.FieldRef<"AgentSession", 'String'>
@@ -2079,6 +2541,44 @@ export type AgentSessionDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many AgentSessions to delete.
    */
   limit?: number
+}
+
+/**
+ * AgentSession.narrative
+ */
+export type AgentSession$narrativeArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Narrative
+   */
+  select?: Prisma.NarrativeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Narrative
+   */
+  omit?: Prisma.NarrativeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.NarrativeInclude<ExtArgs> | null
+  where?: Prisma.NarrativeWhereInput
+}
+
+/**
+ * AgentSession.chapter
+ */
+export type AgentSession$chapterArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Chapter
+   */
+  select?: Prisma.ChapterSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Chapter
+   */
+  omit?: Prisma.ChapterOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ChapterInclude<ExtArgs> | null
+  where?: Prisma.ChapterWhereInput
 }
 
 /**

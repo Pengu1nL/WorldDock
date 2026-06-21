@@ -9,7 +9,7 @@ import {
 } from "./agent-sessions.repository";
 import { AgentSessionsService } from "./agent-sessions.service";
 
-const sessionKindSchema = z.enum(["world_exploration", "asset_edit", "consistency_repair"]);
+const sessionKindSchema = z.enum(["world_exploration", "asset_edit", "consistency_repair", "story_progression"]);
 const sessionStatusSchema = z.enum(["active", "archived", "completed", "cancelled"]);
 
 const baseCreateSessionSchema = z.object({
@@ -27,6 +27,11 @@ const createSessionSchema = z.discriminatedUnion("kind", [
   baseCreateSessionSchema.extend({
     kind: z.literal("consistency_repair"),
     issueId: z.string().trim().min(1),
+  }),
+  baseCreateSessionSchema.extend({
+    kind: z.literal("story_progression"),
+    narrativeId: z.string().trim().min(1),
+    chapterId: z.string().trim().min(1),
   }),
 ]);
 

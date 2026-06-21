@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "prelint": "pnpm prisma:generate",
     "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "prisma:validate": "prisma validate --config prisma.config.ts",
     "prisma:migrate:deploy": "prisma migrate deploy --config prisma.config.ts",
@@ -27,6 +28,7 @@
     "dotenv": "latest",
     "prisma": "latest",
     "tsx": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vitest": "latest"
   }
 }

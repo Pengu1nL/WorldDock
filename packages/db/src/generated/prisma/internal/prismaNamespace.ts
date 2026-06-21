@@ -394,6 +394,11 @@ export const ModelName = {
   AgentEvent: 'AgentEvent',
   AgentSuggestion: 'AgentSuggestion',
   ContextRef: 'ContextRef',
+  Narrative: 'Narrative',
+  Chapter: 'Chapter',
+  NarrativeAsset: 'NarrativeAsset',
+  NarrativeAssetVersion: 'NarrativeAssetVersion',
+  NarrativeAssetRelation: 'NarrativeAssetRelation',
   AgentSession: 'AgentSession',
   AgentSessionSubject: 'AgentSessionSubject',
   AgentSessionContextItem: 'AgentSessionContextItem',
@@ -421,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "world" | "archiveEntry" | "storySeed" | "conflict" | "consistencyIssue" | "worldAssetRelation" | "agentRun" | "agentEvent" | "agentSuggestion" | "contextRef" | "agentSession" | "agentSessionSubject" | "agentSessionContextItem" | "agentSessionMessage" | "potentialAsset" | "officialWorldAsset" | "officialWorldAssetRevision" | "officialWorldAssetIndex" | "worldAssetPatchBatch" | "worldAssetPatch" | "localStorageObject" | "hubConnection"
+    modelProps: "world" | "archiveEntry" | "storySeed" | "conflict" | "consistencyIssue" | "worldAssetRelation" | "agentRun" | "agentEvent" | "agentSuggestion" | "contextRef" | "narrative" | "chapter" | "narrativeAsset" | "narrativeAssetVersion" | "narrativeAssetRelation" | "agentSession" | "agentSessionSubject" | "agentSessionContextItem" | "agentSessionMessage" | "potentialAsset" | "officialWorldAsset" | "officialWorldAssetRevision" | "officialWorldAssetIndex" | "worldAssetPatchBatch" | "worldAssetPatch" | "localStorageObject" | "hubConnection"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1162,6 +1167,376 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ContextRefCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ContextRefCountAggregateOutputType> | number
+        }
+      }
+    }
+    Narrative: {
+      payload: Prisma.$NarrativePayload<ExtArgs>
+      fields: Prisma.NarrativeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.NarrativeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.NarrativeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>
+        }
+        findFirst: {
+          args: Prisma.NarrativeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.NarrativeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>
+        }
+        findMany: {
+          args: Prisma.NarrativeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>[]
+        }
+        create: {
+          args: Prisma.NarrativeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>
+        }
+        createMany: {
+          args: Prisma.NarrativeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.NarrativeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>[]
+        }
+        delete: {
+          args: Prisma.NarrativeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>
+        }
+        update: {
+          args: Prisma.NarrativeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>
+        }
+        deleteMany: {
+          args: Prisma.NarrativeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.NarrativeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.NarrativeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>[]
+        }
+        upsert: {
+          args: Prisma.NarrativeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativePayload>
+        }
+        aggregate: {
+          args: Prisma.NarrativeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateNarrative>
+        }
+        groupBy: {
+          args: Prisma.NarrativeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.NarrativeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeCountAggregateOutputType> | number
+        }
+      }
+    }
+    Chapter: {
+      payload: Prisma.$ChapterPayload<ExtArgs>
+      fields: Prisma.ChapterFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ChapterFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ChapterFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>
+        }
+        findFirst: {
+          args: Prisma.ChapterFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ChapterFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>
+        }
+        findMany: {
+          args: Prisma.ChapterFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>[]
+        }
+        create: {
+          args: Prisma.ChapterCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>
+        }
+        createMany: {
+          args: Prisma.ChapterCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ChapterCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>[]
+        }
+        delete: {
+          args: Prisma.ChapterDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>
+        }
+        update: {
+          args: Prisma.ChapterUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>
+        }
+        deleteMany: {
+          args: Prisma.ChapterDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ChapterUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ChapterUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>[]
+        }
+        upsert: {
+          args: Prisma.ChapterUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ChapterPayload>
+        }
+        aggregate: {
+          args: Prisma.ChapterAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateChapter>
+        }
+        groupBy: {
+          args: Prisma.ChapterGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ChapterGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ChapterCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ChapterCountAggregateOutputType> | number
+        }
+      }
+    }
+    NarrativeAsset: {
+      payload: Prisma.$NarrativeAssetPayload<ExtArgs>
+      fields: Prisma.NarrativeAssetFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.NarrativeAssetFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.NarrativeAssetFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>
+        }
+        findFirst: {
+          args: Prisma.NarrativeAssetFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.NarrativeAssetFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>
+        }
+        findMany: {
+          args: Prisma.NarrativeAssetFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>[]
+        }
+        create: {
+          args: Prisma.NarrativeAssetCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>
+        }
+        createMany: {
+          args: Prisma.NarrativeAssetCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.NarrativeAssetCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>[]
+        }
+        delete: {
+          args: Prisma.NarrativeAssetDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>
+        }
+        update: {
+          args: Prisma.NarrativeAssetUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>
+        }
+        deleteMany: {
+          args: Prisma.NarrativeAssetDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.NarrativeAssetUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.NarrativeAssetUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>[]
+        }
+        upsert: {
+          args: Prisma.NarrativeAssetUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetPayload>
+        }
+        aggregate: {
+          args: Prisma.NarrativeAssetAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateNarrativeAsset>
+        }
+        groupBy: {
+          args: Prisma.NarrativeAssetGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeAssetGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.NarrativeAssetCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeAssetCountAggregateOutputType> | number
+        }
+      }
+    }
+    NarrativeAssetVersion: {
+      payload: Prisma.$NarrativeAssetVersionPayload<ExtArgs>
+      fields: Prisma.NarrativeAssetVersionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.NarrativeAssetVersionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.NarrativeAssetVersionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>
+        }
+        findFirst: {
+          args: Prisma.NarrativeAssetVersionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.NarrativeAssetVersionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>
+        }
+        findMany: {
+          args: Prisma.NarrativeAssetVersionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>[]
+        }
+        create: {
+          args: Prisma.NarrativeAssetVersionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>
+        }
+        createMany: {
+          args: Prisma.NarrativeAssetVersionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.NarrativeAssetVersionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>[]
+        }
+        delete: {
+          args: Prisma.NarrativeAssetVersionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>
+        }
+        update: {
+          args: Prisma.NarrativeAssetVersionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>
+        }
+        deleteMany: {
+          args: Prisma.NarrativeAssetVersionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.NarrativeAssetVersionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.NarrativeAssetVersionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>[]
+        }
+        upsert: {
+          args: Prisma.NarrativeAssetVersionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetVersionPayload>
+        }
+        aggregate: {
+          args: Prisma.NarrativeAssetVersionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateNarrativeAssetVersion>
+        }
+        groupBy: {
+          args: Prisma.NarrativeAssetVersionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeAssetVersionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.NarrativeAssetVersionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeAssetVersionCountAggregateOutputType> | number
+        }
+      }
+    }
+    NarrativeAssetRelation: {
+      payload: Prisma.$NarrativeAssetRelationPayload<ExtArgs>
+      fields: Prisma.NarrativeAssetRelationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.NarrativeAssetRelationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.NarrativeAssetRelationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>
+        }
+        findFirst: {
+          args: Prisma.NarrativeAssetRelationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.NarrativeAssetRelationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>
+        }
+        findMany: {
+          args: Prisma.NarrativeAssetRelationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>[]
+        }
+        create: {
+          args: Prisma.NarrativeAssetRelationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>
+        }
+        createMany: {
+          args: Prisma.NarrativeAssetRelationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.NarrativeAssetRelationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>[]
+        }
+        delete: {
+          args: Prisma.NarrativeAssetRelationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>
+        }
+        update: {
+          args: Prisma.NarrativeAssetRelationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>
+        }
+        deleteMany: {
+          args: Prisma.NarrativeAssetRelationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.NarrativeAssetRelationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.NarrativeAssetRelationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>[]
+        }
+        upsert: {
+          args: Prisma.NarrativeAssetRelationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$NarrativeAssetRelationPayload>
+        }
+        aggregate: {
+          args: Prisma.NarrativeAssetRelationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateNarrativeAssetRelation>
+        }
+        groupBy: {
+          args: Prisma.NarrativeAssetRelationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeAssetRelationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.NarrativeAssetRelationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.NarrativeAssetRelationCountAggregateOutputType> | number
         }
       }
     }
@@ -2254,9 +2629,87 @@ export const ContextRefScalarFieldEnum = {
 export type ContextRefScalarFieldEnum = (typeof ContextRefScalarFieldEnum)[keyof typeof ContextRefScalarFieldEnum]
 
 
+export const NarrativeScalarFieldEnum = {
+  id: 'id',
+  worldId: 'worldId',
+  title: 'title',
+  synopsis: 'synopsis',
+  status: 'status',
+  metadata: 'metadata',
+  visualStyle: 'visualStyle',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NarrativeScalarFieldEnum = (typeof NarrativeScalarFieldEnum)[keyof typeof NarrativeScalarFieldEnum]
+
+
+export const ChapterScalarFieldEnum = {
+  id: 'id',
+  narrativeId: 'narrativeId',
+  order: 'order',
+  title: 'title',
+  content: 'content',
+  wordCount: 'wordCount',
+  status: 'status',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ChapterScalarFieldEnum = (typeof ChapterScalarFieldEnum)[keyof typeof ChapterScalarFieldEnum]
+
+
+export const NarrativeAssetScalarFieldEnum = {
+  id: 'id',
+  narrativeId: 'narrativeId',
+  kind: 'kind',
+  name: 'name',
+  summary: 'summary',
+  body: 'body',
+  tags: 'tags',
+  appearance: 'appearance',
+  mood: 'mood',
+  visualPrompt: 'visualPrompt',
+  nameEmbedding: 'nameEmbedding',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NarrativeAssetScalarFieldEnum = (typeof NarrativeAssetScalarFieldEnum)[keyof typeof NarrativeAssetScalarFieldEnum]
+
+
+export const NarrativeAssetVersionScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  chapterId: 'chapterId',
+  snapshot: 'snapshot',
+  diff: 'diff',
+  createdAt: 'createdAt'
+} as const
+
+export type NarrativeAssetVersionScalarFieldEnum = (typeof NarrativeAssetVersionScalarFieldEnum)[keyof typeof NarrativeAssetVersionScalarFieldEnum]
+
+
+export const NarrativeAssetRelationScalarFieldEnum = {
+  id: 'id',
+  narrativeId: 'narrativeId',
+  sourceAssetId: 'sourceAssetId',
+  targetAssetId: 'targetAssetId',
+  relationType: 'relationType',
+  description: 'description',
+  createdAt: 'createdAt'
+} as const
+
+export type NarrativeAssetRelationScalarFieldEnum = (typeof NarrativeAssetRelationScalarFieldEnum)[keyof typeof NarrativeAssetRelationScalarFieldEnum]
+
+
 export const AgentSessionScalarFieldEnum = {
   id: 'id',
   worldId: 'worldId',
+  narrativeId: 'narrativeId',
+  chapterId: 'chapterId',
   kind: 'kind',
   title: 'title',
   status: 'status',
@@ -2695,6 +3148,11 @@ export type GlobalOmitConfig = {
   agentEvent?: Prisma.AgentEventOmit
   agentSuggestion?: Prisma.AgentSuggestionOmit
   contextRef?: Prisma.ContextRefOmit
+  narrative?: Prisma.NarrativeOmit
+  chapter?: Prisma.ChapterOmit
+  narrativeAsset?: Prisma.NarrativeAssetOmit
+  narrativeAssetVersion?: Prisma.NarrativeAssetVersionOmit
+  narrativeAssetRelation?: Prisma.NarrativeAssetRelationOmit
   agentSession?: Prisma.AgentSessionOmit
   agentSessionSubject?: Prisma.AgentSessionSubjectOmit
   agentSessionContextItem?: Prisma.AgentSessionContextItemOmit

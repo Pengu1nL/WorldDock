@@ -754,6 +754,8 @@ export function createInMemoryAgentSessions(options: InMemoryAgentSessionsOption
       const session: AgentSessionRecord = {
         id: `agent_session_${counters.session++}`,
         worldId: input.worldId,
+        narrativeId: input.narrativeId ?? null,
+        chapterId: input.chapterId ?? null,
         kind: input.kind,
         title: input.title,
         status: input.status ?? "active",
@@ -783,6 +785,8 @@ export function createInMemoryAgentSessions(options: InMemoryAgentSessionsOption
       const session: AgentSessionRecord = {
         id: `agent_session_${nextSessionCounter++}`,
         worldId: input.session.worldId,
+        narrativeId: input.session.narrativeId ?? null,
+        chapterId: input.session.chapterId ?? null,
         kind: input.session.kind,
         title: input.session.title,
         status: input.session.status ?? "active",

@@ -3,7 +3,8 @@ import type { PiToolCall, PiToolName } from "@worlddock/domain/agent/pi";
 export type PiSessionPolicy =
   | { kind: "world_exploration"; intent?: "asset_deposition" }
   | { kind: "asset_edit" }
-  | { kind: "consistency_repair" };
+  | { kind: "consistency_repair" }
+  | { kind: "story_progression" };
 
 export const DEFAULT_PI_SESSION_POLICY: PiSessionPolicy = { kind: "world_exploration" };
 
@@ -21,6 +22,12 @@ const PENDING_SUGGESTION_TOOLS = new Set<PiToolName>([
   "propose_story_seed",
   "propose_conflict",
   "propose_release_notes",
+]);
+
+const STORY_PROGRESSION_TOOLS = new Set<PiToolName>([
+  "list_characters",
+  "get_asset",
+  "get_previous_chapter_snapshot",
 ]);
 
 export class SafetyGate {
@@ -50,6 +57,7 @@ export function isToolAllowedForPolicy(
   if (PENDING_SUGGESTION_TOOLS.has(toolName)) {
     return policy.kind === "world_exploration" && policy.intent === undefined;
   }
+  if (STORY_PROGRESSION_TOOLS.has(toolName)) return policy.kind === "story_progression";
   if (toolName === "create_world_asset") return policy.kind === "world_exploration" && policy.intent === "asset_deposition";
   if (toolName === "create_consistency_issue") return policy.kind === "world_exploration" && policy.intent === undefined;
   if (toolName === "apply_world_asset_patch") return policy.kind === "asset_edit";

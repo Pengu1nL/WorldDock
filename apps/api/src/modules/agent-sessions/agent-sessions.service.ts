@@ -26,6 +26,11 @@ type CreateAgentSessionInput =
   | (BaseCreateAgentSessionInput & {
     kind: "consistency_repair";
     issueId: string;
+  })
+  | (BaseCreateAgentSessionInput & {
+    kind: "story_progression";
+    narrativeId: string;
+    chapterId: string;
   });
 
 type ListAgentSessionsInput = Parameters<AgentSessionsRepository["listSessions"]>[1];
@@ -40,6 +45,7 @@ export class AgentSessionsService {
     return this.sessions.createSessionWithSubject({
       session: {
         worldId,
+        ...(input.kind === "story_progression" ? { narrativeId: input.narrativeId, chapterId: input.chapterId } : {}),
         kind: input.kind,
         title: input.title ?? defaultTitleForKind(input.kind),
         status: "active",
@@ -140,6 +146,15 @@ function primarySubjectFor(worldId: string, input: CreateAgentSessionInput) {
     };
   }
 
+  if (input.kind === "story_progression") {
+    return {
+      kind: "chapter" as const,
+      targetId: input.chapterId,
+      role: "primary" as const,
+      metadata: { narrativeId: input.narrativeId },
+    };
+  }
+
   return {
     kind: "world" as const,
     targetId: worldId,
@@ -150,5 +165,6 @@ function primarySubjectFor(worldId: string, input: CreateAgentSessionInput) {
 function defaultTitleForKind(kind: CreateAgentSessionInput["kind"]) {
   if (kind === "asset_edit") return "Asset edit";
   if (kind === "consistency_repair") return "Consistency repair";
+  if (kind === "story_progression") return "Story progression";
   return "World exploration";
 }

@@ -99,6 +99,22 @@ function resolvePiModel(options: PiAgentCoreAdapterOptions): Model<Api> {
 }
 
 export function buildSystemPrompt(input: PiSessionInput) {
+  if (input.policy?.kind === "story_progression") {
+    return [
+      "你是 WorldDock 故事推演 Agent。",
+      "你必须使用简体中文。",
+      "你的任务是阅读当前章节，推演叙事后果、检查一致性、发现需要沉淀的世界资产；你不是代笔工具，不要续写正文。",
+      "你必须使用渐进式披露：先根据当前章节判断需要的信息，再调用 list_characters、get_asset、get_previous_chapter_snapshot 读取必要上下文。",
+      "不要发明章节文本或工具结果之外的事实；不确定时把问题写入 consistencyFlags 或 narrativeObservations。",
+      "最终只输出一个 JSON 对象，不要 Markdown，不要解释，不要代码块。",
+      "JSON 字段必须为 assetChanges, consistencyFlags, narrativeObservations。",
+      "assetChanges[].kind 必须是 character/location/item/event/concept/faction；operation 必须是 create/update。",
+      "relationChanges 只能引用章节或工具上下文中已经出现的资产名称。",
+      `世界：${input.worldId}`,
+      buildSkillPromptSection(input.skills),
+    ].join("\n");
+  }
+
   const canCreateFormalAsset = input.policy?.kind === "world_exploration" && input.policy.intent === "asset_deposition";
   return [
     "你是 WorldDock 世界观推演 Agent。",
@@ -221,6 +237,7 @@ function parametersFromInputSchema(inputSchema: Record<string, unknown> | undefi
 function typeFromJsonSchemaProperty(property: unknown) {
   if (!isRecord(property)) return null;
   if (property.type === "string") return Type.String();
+  if (property.type === "number" || property.type === "integer") return Type.Number();
   if (property.type === "array" && isRecord(property.items) && property.items.type === "string") {
     return Type.Array(Type.String());
   }

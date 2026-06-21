@@ -340,9 +340,227 @@ export type ApplyConsistencyPatchBatchInput = {
   }>;
 };
 
+export type NarrativeStatus = "draft" | "in_progress" | "completed" | "archived";
+export type ChapterStatus = "draft" | "completed" | "revised";
+export type NarrativeAssetKind = "character" | "location" | "item" | "event" | "concept" | "faction";
+export type VisualStyleGuide = {
+  artDirection?: string;
+  characterBase?: string;
+  environmentBase?: string;
+  forbidden?: string[];
+  [key: string]: unknown;
+};
+
+export type WorldSnapshot = {
+  timestamp: string;
+  activeCharacters: Array<{ name: string; location: string; status: string }>;
+  unresolvedConflicts: string[];
+  ongoingEvents: string[];
+};
+
+export type Narrative = {
+  id: string;
+  worldId: string | null;
+  title: string;
+  synopsis: string | null;
+  status: NarrativeStatus;
+  metadata: Record<string, unknown>;
+  visualStyle: VisualStyleGuide;
+  chapterCount: number;
+  assetCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Chapter = {
+  id: string;
+  narrativeId: string;
+  order: number;
+  title: string;
+  content: string;
+  wordCount: number;
+  status: ChapterStatus;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type NarrativeAsset = {
+  id: string;
+  narrativeId: string;
+  kind: NarrativeAssetKind;
+  name: string;
+  summary: string;
+  body: string | null;
+  tags: string[];
+  appearance: string | null;
+  mood: string | null;
+  visualPrompt: string | null;
+  nameEmbedding: unknown | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type NarrativeDetail = {
+  narrative: Narrative;
+  chapters: Chapter[];
+  assets: NarrativeAsset[];
+};
+
+export type CreateNarrativeInput = {
+  worldId?: string | null;
+  title: string;
+  synopsis?: string | null;
+  status?: NarrativeStatus;
+  metadata?: Record<string, unknown>;
+  visualStyle?: VisualStyleGuide;
+};
+
+export type UpdateNarrativeInput = Partial<CreateNarrativeInput>;
+
+export type CreateChapterInput = {
+  order?: number;
+  title: string;
+  content: string;
+  status?: ChapterStatus;
+  metadata?: Record<string, unknown>;
+};
+
+export type UpdateChapterInput = Partial<CreateChapterInput>;
+
+export type ProgressionOutput = {
+  assetChanges: Array<{
+    kind: NarrativeAssetKind;
+    name: string;
+    operation: "create" | "update";
+    summary: string;
+    body?: string;
+    appearance?: string;
+    mood?: string;
+    visualPrompt?: string;
+    tags?: string[];
+    relationChanges?: Array<{ targetName: string; relationType: string; description?: string }>;
+  }>;
+  consistencyFlags: Array<{
+    severity: "warning" | "error";
+    claim: string;
+    conflictWith: string;
+    suggestion: string;
+  }>;
+  narrativeObservations: Array<{
+    observation: string;
+    implication: string;
+    suggestedAction?: string;
+    arcStage?: "setup" | "rising" | "climax" | "falling" | "resolution";
+    emotionScore?: number;
+  }>;
+  worldSnapshot?: WorldSnapshot;
+};
+
+export type StartProgressionInput = Record<string, never>;
+
 export async function listWorlds(options: ApiClientOptions = {}) {
   return requestJson("/v1/worlds", {
     method: "GET",
+    ...options,
+  });
+}
+
+export async function listNarratives(
+  options: ApiClientOptions & { worldId?: string } = {},
+): Promise<{ narratives: Narrative[]; nextCursor?: string | null }> {
+  return requestJson(withQueryParams("/v1/narratives", { worldId: options.worldId }), {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function createNarrative(
+  input: CreateNarrativeInput,
+  options: ApiClientOptions = {},
+): Promise<{ narrative: Narrative }> {
+  return requestJson("/v1/narratives", {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function getNarrative(narrativeId: string, options: ApiClientOptions = {}): Promise<NarrativeDetail> {
+  return requestJson(`/v1/narratives/${narrativeId}`, {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function updateNarrative(
+  narrativeId: string,
+  input: UpdateNarrativeInput,
+  options: ApiClientOptions = {},
+): Promise<{ narrative: Narrative }> {
+  return requestJson(`/v1/narratives/${narrativeId}`, {
+    method: "PATCH",
+    body: input,
+    ...options,
+  });
+}
+
+export async function createChapter(
+  narrativeId: string,
+  input: CreateChapterInput,
+  options: ApiClientOptions = {},
+): Promise<{ chapter: Chapter }> {
+  return requestJson(`/v1/narratives/${narrativeId}/chapters`, {
+    method: "POST",
+    body: input,
+    ...options,
+  });
+}
+
+export async function updateChapter(
+  narrativeId: string,
+  chapterId: string,
+  input: UpdateChapterInput,
+  options: ApiClientOptions = {},
+): Promise<{ chapter: Chapter }> {
+  return requestJson(`/v1/narratives/${narrativeId}/chapters/${chapterId}`, {
+    method: "PATCH",
+    body: input,
+    ...options,
+  });
+}
+
+export async function startChapterProgression(
+  narrativeId: string,
+  chapterId: string,
+  input: StartProgressionInput = {},
+  options: ApiClientOptions = {},
+): Promise<{ sessionId: string; session: AgentSession }> {
+  return requestJson(`/v1/narratives/${narrativeId}/chapters/${chapterId}/progress`, {
+    method: "POST",
+    ...(Object.keys(input).length > 0 ? { body: input } : {}),
+    ...options,
+  });
+}
+
+export async function listProgressions(
+  narrativeId: string,
+  options: ApiClientOptions = {},
+): Promise<{ progressions: AgentSession[] }> {
+  return requestJson(`/v1/narratives/${narrativeId}/progressions`, {
+    method: "GET",
+    ...options,
+  });
+}
+
+export async function confirmProgression(
+  narrativeId: string,
+  sessionId: string,
+  options: ApiClientOptions = {},
+): Promise<{ session: AgentSession; appliedAssets: NarrativeAsset[] }> {
+  return requestJson(`/v1/narratives/${narrativeId}/progressions/${sessionId}/confirm`, {
+    method: "POST",
     ...options,
   });
 }

@@ -133,6 +133,7 @@ function kindLabel(kind: AgentSession["kind"]) {
   const labels: Record<AgentSession["kind"], string> = {
     asset_edit: "资产编辑",
     consistency_repair: "一致性修复",
+    story_progression: "故事推演",
     world_exploration: "世界推演",
   };
   return labels[kind];

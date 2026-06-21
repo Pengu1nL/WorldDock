@@ -20,9 +20,9 @@ import type {
   AgentSessionSubjectRole,
 } from "./agent-sessions.repository";
 
-const sessionKinds = ["world_exploration", "asset_edit", "consistency_repair"] as const;
+const sessionKinds = ["world_exploration", "asset_edit", "consistency_repair", "story_progression"] as const;
 const sessionStatuses = ["active", "archived", "completed", "cancelled"] as const;
-const subjectKinds = ["world", "asset", "consistency_issue", "potential_asset"] as const;
+const subjectKinds = ["world", "asset", "consistency_issue", "potential_asset", "narrative", "chapter"] as const;
 const subjectRoles = ["primary", "context", "repair_target"] as const;
 const contextItemKinds = [
   "asset_index",
@@ -31,6 +31,8 @@ const contextItemKinds = [
   "source_fragment",
   "potential_asset",
   "consistency_issue",
+  "chapter",
+  "narrative_asset",
 ] as const;
 const messageRoles = ["user", "assistant", "system", "tool"] as const;
 const messageStatuses = ["streaming", "complete", "failed"] as const;
@@ -46,6 +48,8 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
     const created = await this.prisma.agentSession.create({
       data: {
         worldId: input.worldId,
+        narrativeId: input.narrativeId ?? null,
+        chapterId: input.chapterId ?? null,
         kind: input.kind,
         title: input.title,
         status: input.status ?? "active",
@@ -68,6 +72,8 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
       const created = await tx.agentSession.create({
         data: {
           worldId: input.session.worldId,
+          narrativeId: input.session.narrativeId ?? null,
+          chapterId: input.session.chapterId ?? null,
           kind: input.session.kind,
           title: input.session.title,
           status: input.session.status ?? "active",
@@ -291,6 +297,8 @@ export class PrismaAgentSessionsRepository implements AgentSessionsRepository, O
 function mapSession(record: {
   id: string;
   worldId: string;
+  narrativeId: string | null;
+  chapterId: string | null;
   kind: string;
   title: string;
   status: string;
@@ -302,6 +310,8 @@ function mapSession(record: {
   return {
     id: record.id,
     worldId: record.worldId,
+    narrativeId: record.narrativeId,
+    chapterId: record.chapterId,
     kind: parseSessionKind(record.kind),
     title: record.title,
     status: parseSessionStatus(record.status),

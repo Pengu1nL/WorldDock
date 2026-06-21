@@ -3,7 +3,9 @@ export const AGENT_SESSIONS_REPOSITORY = Symbol("AGENT_SESSIONS_REPOSITORY");
 export type AgentSessionRecord = {
   id: string;
   worldId: string;
-  kind: "world_exploration" | "asset_edit" | "consistency_repair";
+  narrativeId: string | null;
+  chapterId: string | null;
+  kind: "world_exploration" | "asset_edit" | "consistency_repair" | "story_progression";
   title: string;
   status: "active" | "archived" | "completed" | "cancelled";
   current: boolean;
@@ -14,7 +16,7 @@ export type AgentSessionRecord = {
 
 export type AgentSessionKind = AgentSessionRecord["kind"];
 export type AgentSessionStatus = AgentSessionRecord["status"];
-export type AgentSessionSubjectKind = "world" | "asset" | "consistency_issue" | "potential_asset";
+export type AgentSessionSubjectKind = "world" | "asset" | "consistency_issue" | "potential_asset" | "narrative" | "chapter";
 export type AgentSessionSubjectRole = "primary" | "context" | "repair_target";
 export type AgentSessionContextItemKind =
   | "asset_index"
@@ -22,7 +24,9 @@ export type AgentSessionContextItemKind =
   | "asset_section"
   | "source_fragment"
   | "potential_asset"
-  | "consistency_issue";
+  | "consistency_issue"
+  | "chapter"
+  | "narrative_asset";
 export type AgentSessionMessageRole = "user" | "assistant" | "system" | "tool";
 export type AgentSessionMessageStatus = "streaming" | "complete" | "failed";
 
@@ -123,7 +127,7 @@ export function decodeAgentSessionListCursor(cursor: string): AgentSessionListCu
 
 export type CreateSessionWithSubjectInput = {
   session: Pick<AgentSessionRecord, "worldId" | "kind" | "title"> &
-    Partial<Pick<AgentSessionRecord, "status" | "current" | "metadata">>;
+    Partial<Pick<AgentSessionRecord, "narrativeId" | "chapterId" | "status" | "current" | "metadata">>;
   subject: Pick<AgentSessionSubjectRecord, "kind" | "targetId"> &
     Partial<Pick<AgentSessionSubjectRecord, "role" | "title" | "metadata">>;
   contextItems?: CreateAgentSessionContextItemForSessionInput[];
@@ -133,7 +137,7 @@ export type CreateSessionWithSubjectInput = {
 export type AgentSessionsRepository = {
   createSession(
     input: Pick<AgentSessionRecord, "worldId" | "kind" | "title"> &
-      Partial<Pick<AgentSessionRecord, "status" | "current" | "metadata">>,
+      Partial<Pick<AgentSessionRecord, "narrativeId" | "chapterId" | "status" | "current" | "metadata">>,
   ): Promise<AgentSessionRecord>;
   createSessionWithSubject(input: CreateSessionWithSubjectInput): Promise<AgentSessionRecord>;
   findSessionById(id: string): Promise<AgentSessionRecord | null>;

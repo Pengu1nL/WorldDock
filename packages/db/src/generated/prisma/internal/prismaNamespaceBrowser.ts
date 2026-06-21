@@ -61,6 +61,11 @@ export const ModelName = {
   AgentEvent: 'AgentEvent',
   AgentSuggestion: 'AgentSuggestion',
   ContextRef: 'ContextRef',
+  Narrative: 'Narrative',
+  Chapter: 'Chapter',
+  NarrativeAsset: 'NarrativeAsset',
+  NarrativeAssetVersion: 'NarrativeAssetVersion',
+  NarrativeAssetRelation: 'NarrativeAssetRelation',
   AgentSession: 'AgentSession',
   AgentSessionSubject: 'AgentSessionSubject',
   AgentSessionContextItem: 'AgentSessionContextItem',
@@ -253,9 +258,87 @@ export const ContextRefScalarFieldEnum = {
 export type ContextRefScalarFieldEnum = (typeof ContextRefScalarFieldEnum)[keyof typeof ContextRefScalarFieldEnum]
 
 
+export const NarrativeScalarFieldEnum = {
+  id: 'id',
+  worldId: 'worldId',
+  title: 'title',
+  synopsis: 'synopsis',
+  status: 'status',
+  metadata: 'metadata',
+  visualStyle: 'visualStyle',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NarrativeScalarFieldEnum = (typeof NarrativeScalarFieldEnum)[keyof typeof NarrativeScalarFieldEnum]
+
+
+export const ChapterScalarFieldEnum = {
+  id: 'id',
+  narrativeId: 'narrativeId',
+  order: 'order',
+  title: 'title',
+  content: 'content',
+  wordCount: 'wordCount',
+  status: 'status',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ChapterScalarFieldEnum = (typeof ChapterScalarFieldEnum)[keyof typeof ChapterScalarFieldEnum]
+
+
+export const NarrativeAssetScalarFieldEnum = {
+  id: 'id',
+  narrativeId: 'narrativeId',
+  kind: 'kind',
+  name: 'name',
+  summary: 'summary',
+  body: 'body',
+  tags: 'tags',
+  appearance: 'appearance',
+  mood: 'mood',
+  visualPrompt: 'visualPrompt',
+  nameEmbedding: 'nameEmbedding',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NarrativeAssetScalarFieldEnum = (typeof NarrativeAssetScalarFieldEnum)[keyof typeof NarrativeAssetScalarFieldEnum]
+
+
+export const NarrativeAssetVersionScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  chapterId: 'chapterId',
+  snapshot: 'snapshot',
+  diff: 'diff',
+  createdAt: 'createdAt'
+} as const
+
+export type NarrativeAssetVersionScalarFieldEnum = (typeof NarrativeAssetVersionScalarFieldEnum)[keyof typeof NarrativeAssetVersionScalarFieldEnum]
+
+
+export const NarrativeAssetRelationScalarFieldEnum = {
+  id: 'id',
+  narrativeId: 'narrativeId',
+  sourceAssetId: 'sourceAssetId',
+  targetAssetId: 'targetAssetId',
+  relationType: 'relationType',
+  description: 'description',
+  createdAt: 'createdAt'
+} as const
+
+export type NarrativeAssetRelationScalarFieldEnum = (typeof NarrativeAssetRelationScalarFieldEnum)[keyof typeof NarrativeAssetRelationScalarFieldEnum]
+
+
 export const AgentSessionScalarFieldEnum = {
   id: 'id',
   worldId: 'worldId',
+  narrativeId: 'narrativeId',
+  chapterId: 'chapterId',
   kind: 'kind',
   title: 'title',
   status: 'status',

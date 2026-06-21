@@ -285,6 +285,7 @@ export type WorldWhereInput = {
   agentSuggestions?: Prisma.AgentSuggestionListRelationFilter
   agentSessions?: Prisma.AgentSessionListRelationFilter
   potentialAssets?: Prisma.PotentialAssetListRelationFilter
+  narratives?: Prisma.NarrativeListRelationFilter
   officialAssets?: Prisma.OfficialWorldAssetListRelationFilter
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionListRelationFilter
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexListRelationFilter
@@ -315,6 +316,7 @@ export type WorldOrderByWithRelationInput = {
   agentSuggestions?: Prisma.AgentSuggestionOrderByRelationAggregateInput
   agentSessions?: Prisma.AgentSessionOrderByRelationAggregateInput
   potentialAssets?: Prisma.PotentialAssetOrderByRelationAggregateInput
+  narratives?: Prisma.NarrativeOrderByRelationAggregateInput
   officialAssets?: Prisma.OfficialWorldAssetOrderByRelationAggregateInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionOrderByRelationAggregateInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexOrderByRelationAggregateInput
@@ -348,6 +350,7 @@ export type WorldWhereUniqueInput = Prisma.AtLeast<{
   agentSuggestions?: Prisma.AgentSuggestionListRelationFilter
   agentSessions?: Prisma.AgentSessionListRelationFilter
   potentialAssets?: Prisma.PotentialAssetListRelationFilter
+  narratives?: Prisma.NarrativeListRelationFilter
   officialAssets?: Prisma.OfficialWorldAssetListRelationFilter
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionListRelationFilter
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexListRelationFilter
@@ -418,6 +421,7 @@ export type WorldCreateInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -448,6 +452,7 @@ export type WorldUncheckedCreateInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -478,6 +483,7 @@ export type WorldUpdateInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -508,6 +514,7 @@ export type WorldUncheckedUpdateInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -628,6 +635,11 @@ export type WorldSumOrderByAggregateInput = {
 export type WorldScalarRelationFilter = {
   is?: Prisma.WorldWhereInput
   isNot?: Prisma.WorldWhereInput
+}
+
+export type WorldNullableScalarRelationFilter = {
+  is?: Prisma.WorldWhereInput | null
+  isNot?: Prisma.WorldWhereInput | null
 }
 
 export type WorldCreatetagsInput = {
@@ -761,6 +773,22 @@ export type WorldUpdateOneRequiredWithoutAgentSuggestionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WorldUpdateToOneWithWhereWithoutAgentSuggestionsInput, Prisma.WorldUpdateWithoutAgentSuggestionsInput>, Prisma.WorldUncheckedUpdateWithoutAgentSuggestionsInput>
 }
 
+export type WorldCreateNestedOneWithoutNarrativesInput = {
+  create?: Prisma.XOR<Prisma.WorldCreateWithoutNarrativesInput, Prisma.WorldUncheckedCreateWithoutNarrativesInput>
+  connectOrCreate?: Prisma.WorldCreateOrConnectWithoutNarrativesInput
+  connect?: Prisma.WorldWhereUniqueInput
+}
+
+export type WorldUpdateOneWithoutNarrativesNestedInput = {
+  create?: Prisma.XOR<Prisma.WorldCreateWithoutNarrativesInput, Prisma.WorldUncheckedCreateWithoutNarrativesInput>
+  connectOrCreate?: Prisma.WorldCreateOrConnectWithoutNarrativesInput
+  upsert?: Prisma.WorldUpsertWithoutNarrativesInput
+  disconnect?: Prisma.WorldWhereInput | boolean
+  delete?: Prisma.WorldWhereInput | boolean
+  connect?: Prisma.WorldWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WorldUpdateToOneWithWhereWithoutNarrativesInput, Prisma.WorldUpdateWithoutNarrativesInput>, Prisma.WorldUncheckedUpdateWithoutNarrativesInput>
+}
+
 export type WorldCreateNestedOneWithoutAgentSessionsInput = {
   create?: Prisma.XOR<Prisma.WorldCreateWithoutAgentSessionsInput, Prisma.WorldUncheckedCreateWithoutAgentSessionsInput>
   connectOrCreate?: Prisma.WorldCreateOrConnectWithoutAgentSessionsInput
@@ -881,6 +909,7 @@ export type WorldCreateWithoutArchiveEntriesInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -910,6 +939,7 @@ export type WorldUncheckedCreateWithoutArchiveEntriesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -955,6 +985,7 @@ export type WorldUpdateWithoutArchiveEntriesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -984,6 +1015,7 @@ export type WorldUncheckedUpdateWithoutArchiveEntriesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1013,6 +1045,7 @@ export type WorldCreateWithoutStorySeedsInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1042,6 +1075,7 @@ export type WorldUncheckedCreateWithoutStorySeedsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1087,6 +1121,7 @@ export type WorldUpdateWithoutStorySeedsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1116,6 +1151,7 @@ export type WorldUncheckedUpdateWithoutStorySeedsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1145,6 +1181,7 @@ export type WorldCreateWithoutConflictsInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1174,6 +1211,7 @@ export type WorldUncheckedCreateWithoutConflictsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1219,6 +1257,7 @@ export type WorldUpdateWithoutConflictsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1248,6 +1287,7 @@ export type WorldUncheckedUpdateWithoutConflictsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1277,6 +1317,7 @@ export type WorldCreateWithoutConsistencyIssuesInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1306,6 +1347,7 @@ export type WorldUncheckedCreateWithoutConsistencyIssuesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1351,6 +1393,7 @@ export type WorldUpdateWithoutConsistencyIssuesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1380,6 +1423,7 @@ export type WorldUncheckedUpdateWithoutConsistencyIssuesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1409,6 +1453,7 @@ export type WorldCreateWithoutAssetRelationsInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1438,6 +1483,7 @@ export type WorldUncheckedCreateWithoutAssetRelationsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1483,6 +1529,7 @@ export type WorldUpdateWithoutAssetRelationsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1512,6 +1559,7 @@ export type WorldUncheckedUpdateWithoutAssetRelationsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1541,6 +1589,7 @@ export type WorldCreateWithoutAgentRunsInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1570,6 +1619,7 @@ export type WorldUncheckedCreateWithoutAgentRunsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1615,6 +1665,7 @@ export type WorldUpdateWithoutAgentRunsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1644,6 +1695,7 @@ export type WorldUncheckedUpdateWithoutAgentRunsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1673,6 +1725,7 @@ export type WorldCreateWithoutAgentSuggestionsInput = {
   agentRuns?: Prisma.AgentRunCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1702,6 +1755,7 @@ export type WorldUncheckedCreateWithoutAgentSuggestionsInput = {
   agentRuns?: Prisma.AgentRunUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1747,6 +1801,7 @@ export type WorldUpdateWithoutAgentSuggestionsInput = {
   agentRuns?: Prisma.AgentRunUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1774,6 +1829,143 @@ export type WorldUncheckedUpdateWithoutAgentSuggestionsInput = {
   consistencyIssues?: Prisma.ConsistencyIssueUncheckedUpdateManyWithoutWorldNestedInput
   assetRelations?: Prisma.WorldAssetRelationUncheckedUpdateManyWithoutWorldNestedInput
   agentRuns?: Prisma.AgentRunUncheckedUpdateManyWithoutWorldNestedInput
+  agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
+  potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
+  officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
+  officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
+  officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
+  officialAssetPatches?: Prisma.WorldAssetPatchUncheckedUpdateManyWithoutWorldNestedInput
+  officialAssetBatches?: Prisma.WorldAssetPatchBatchUncheckedUpdateManyWithoutWorldNestedInput
+}
+
+export type WorldCreateWithoutNarrativesInput = {
+  id?: string
+  name: string
+  type: string
+  summary: string
+  tags?: Prisma.WorldCreatetagsInput | string[]
+  status?: string
+  visibility?: string
+  mode?: string
+  maturity?: number
+  coverObjectId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  archiveEntries?: Prisma.ArchiveEntryCreateNestedManyWithoutWorldInput
+  storySeeds?: Prisma.StorySeedCreateNestedManyWithoutWorldInput
+  conflicts?: Prisma.ConflictCreateNestedManyWithoutWorldInput
+  consistencyIssues?: Prisma.ConsistencyIssueCreateNestedManyWithoutWorldInput
+  assetRelations?: Prisma.WorldAssetRelationCreateNestedManyWithoutWorldInput
+  agentRuns?: Prisma.AgentRunCreateNestedManyWithoutWorldInput
+  agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
+  agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
+  potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
+  officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
+  officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
+  officialAssetPatches?: Prisma.WorldAssetPatchCreateNestedManyWithoutWorldInput
+  officialAssetBatches?: Prisma.WorldAssetPatchBatchCreateNestedManyWithoutWorldInput
+}
+
+export type WorldUncheckedCreateWithoutNarrativesInput = {
+  id?: string
+  name: string
+  type: string
+  summary: string
+  tags?: Prisma.WorldCreatetagsInput | string[]
+  status?: string
+  visibility?: string
+  mode?: string
+  maturity?: number
+  coverObjectId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  archiveEntries?: Prisma.ArchiveEntryUncheckedCreateNestedManyWithoutWorldInput
+  storySeeds?: Prisma.StorySeedUncheckedCreateNestedManyWithoutWorldInput
+  conflicts?: Prisma.ConflictUncheckedCreateNestedManyWithoutWorldInput
+  consistencyIssues?: Prisma.ConsistencyIssueUncheckedCreateNestedManyWithoutWorldInput
+  assetRelations?: Prisma.WorldAssetRelationUncheckedCreateNestedManyWithoutWorldInput
+  agentRuns?: Prisma.AgentRunUncheckedCreateNestedManyWithoutWorldInput
+  agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
+  agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
+  potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
+  officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
+  officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
+  officialAssetPatches?: Prisma.WorldAssetPatchUncheckedCreateNestedManyWithoutWorldInput
+  officialAssetBatches?: Prisma.WorldAssetPatchBatchUncheckedCreateNestedManyWithoutWorldInput
+}
+
+export type WorldCreateOrConnectWithoutNarrativesInput = {
+  where: Prisma.WorldWhereUniqueInput
+  create: Prisma.XOR<Prisma.WorldCreateWithoutNarrativesInput, Prisma.WorldUncheckedCreateWithoutNarrativesInput>
+}
+
+export type WorldUpsertWithoutNarrativesInput = {
+  update: Prisma.XOR<Prisma.WorldUpdateWithoutNarrativesInput, Prisma.WorldUncheckedUpdateWithoutNarrativesInput>
+  create: Prisma.XOR<Prisma.WorldCreateWithoutNarrativesInput, Prisma.WorldUncheckedCreateWithoutNarrativesInput>
+  where?: Prisma.WorldWhereInput
+}
+
+export type WorldUpdateToOneWithWhereWithoutNarrativesInput = {
+  where?: Prisma.WorldWhereInput
+  data: Prisma.XOR<Prisma.WorldUpdateWithoutNarrativesInput, Prisma.WorldUncheckedUpdateWithoutNarrativesInput>
+}
+
+export type WorldUpdateWithoutNarrativesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.StringFieldUpdateOperationsInput | string
+  summary?: Prisma.StringFieldUpdateOperationsInput | string
+  tags?: Prisma.WorldUpdatetagsInput | string[]
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  visibility?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  maturity?: Prisma.IntFieldUpdateOperationsInput | number
+  coverObjectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  archiveEntries?: Prisma.ArchiveEntryUpdateManyWithoutWorldNestedInput
+  storySeeds?: Prisma.StorySeedUpdateManyWithoutWorldNestedInput
+  conflicts?: Prisma.ConflictUpdateManyWithoutWorldNestedInput
+  consistencyIssues?: Prisma.ConsistencyIssueUpdateManyWithoutWorldNestedInput
+  assetRelations?: Prisma.WorldAssetRelationUpdateManyWithoutWorldNestedInput
+  agentRuns?: Prisma.AgentRunUpdateManyWithoutWorldNestedInput
+  agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
+  agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
+  potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
+  officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
+  officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
+  officialAssetPatches?: Prisma.WorldAssetPatchUpdateManyWithoutWorldNestedInput
+  officialAssetBatches?: Prisma.WorldAssetPatchBatchUpdateManyWithoutWorldNestedInput
+}
+
+export type WorldUncheckedUpdateWithoutNarrativesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.StringFieldUpdateOperationsInput | string
+  summary?: Prisma.StringFieldUpdateOperationsInput | string
+  tags?: Prisma.WorldUpdatetagsInput | string[]
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  visibility?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.StringFieldUpdateOperationsInput | string
+  maturity?: Prisma.IntFieldUpdateOperationsInput | number
+  coverObjectId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  archiveEntries?: Prisma.ArchiveEntryUncheckedUpdateManyWithoutWorldNestedInput
+  storySeeds?: Prisma.StorySeedUncheckedUpdateManyWithoutWorldNestedInput
+  conflicts?: Prisma.ConflictUncheckedUpdateManyWithoutWorldNestedInput
+  consistencyIssues?: Prisma.ConsistencyIssueUncheckedUpdateManyWithoutWorldNestedInput
+  assetRelations?: Prisma.WorldAssetRelationUncheckedUpdateManyWithoutWorldNestedInput
+  agentRuns?: Prisma.AgentRunUncheckedUpdateManyWithoutWorldNestedInput
+  agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
@@ -1805,6 +1997,7 @@ export type WorldCreateWithoutAgentSessionsInput = {
   agentRuns?: Prisma.AgentRunCreateNestedManyWithoutWorldInput
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1834,6 +2027,7 @@ export type WorldUncheckedCreateWithoutAgentSessionsInput = {
   agentRuns?: Prisma.AgentRunUncheckedCreateNestedManyWithoutWorldInput
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -1879,6 +2073,7 @@ export type WorldUpdateWithoutAgentSessionsInput = {
   agentRuns?: Prisma.AgentRunUpdateManyWithoutWorldNestedInput
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -1908,6 +2103,7 @@ export type WorldUncheckedUpdateWithoutAgentSessionsInput = {
   agentRuns?: Prisma.AgentRunUncheckedUpdateManyWithoutWorldNestedInput
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -1937,6 +2133,7 @@ export type WorldCreateWithoutPotentialAssetsInput = {
   agentRuns?: Prisma.AgentRunCreateNestedManyWithoutWorldInput
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -1966,6 +2163,7 @@ export type WorldUncheckedCreateWithoutPotentialAssetsInput = {
   agentRuns?: Prisma.AgentRunUncheckedCreateNestedManyWithoutWorldInput
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -2011,6 +2209,7 @@ export type WorldUpdateWithoutPotentialAssetsInput = {
   agentRuns?: Prisma.AgentRunUpdateManyWithoutWorldNestedInput
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -2040,6 +2239,7 @@ export type WorldUncheckedUpdateWithoutPotentialAssetsInput = {
   agentRuns?: Prisma.AgentRunUncheckedUpdateManyWithoutWorldNestedInput
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -2070,6 +2270,7 @@ export type WorldCreateWithoutOfficialAssetsInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
   officialAssetPatches?: Prisma.WorldAssetPatchCreateNestedManyWithoutWorldInput
@@ -2099,6 +2300,7 @@ export type WorldUncheckedCreateWithoutOfficialAssetsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
   officialAssetPatches?: Prisma.WorldAssetPatchUncheckedCreateNestedManyWithoutWorldInput
@@ -2144,6 +2346,7 @@ export type WorldUpdateWithoutOfficialAssetsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
   officialAssetPatches?: Prisma.WorldAssetPatchUpdateManyWithoutWorldNestedInput
@@ -2173,6 +2376,7 @@ export type WorldUncheckedUpdateWithoutOfficialAssetsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetPatches?: Prisma.WorldAssetPatchUncheckedUpdateManyWithoutWorldNestedInput
@@ -2202,6 +2406,7 @@ export type WorldCreateWithoutOfficialAssetRevisionsInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
   officialAssetPatches?: Prisma.WorldAssetPatchCreateNestedManyWithoutWorldInput
@@ -2231,6 +2436,7 @@ export type WorldUncheckedCreateWithoutOfficialAssetRevisionsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
   officialAssetPatches?: Prisma.WorldAssetPatchUncheckedCreateNestedManyWithoutWorldInput
@@ -2276,6 +2482,7 @@ export type WorldUpdateWithoutOfficialAssetRevisionsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
   officialAssetPatches?: Prisma.WorldAssetPatchUpdateManyWithoutWorldNestedInput
@@ -2305,6 +2512,7 @@ export type WorldUncheckedUpdateWithoutOfficialAssetRevisionsInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetPatches?: Prisma.WorldAssetPatchUncheckedUpdateManyWithoutWorldNestedInput
@@ -2334,6 +2542,7 @@ export type WorldCreateWithoutOfficialAssetIndexesInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetPatches?: Prisma.WorldAssetPatchCreateNestedManyWithoutWorldInput
@@ -2363,6 +2572,7 @@ export type WorldUncheckedCreateWithoutOfficialAssetIndexesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetPatches?: Prisma.WorldAssetPatchUncheckedCreateNestedManyWithoutWorldInput
@@ -2408,6 +2618,7 @@ export type WorldUpdateWithoutOfficialAssetIndexesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetPatches?: Prisma.WorldAssetPatchUpdateManyWithoutWorldNestedInput
@@ -2437,6 +2648,7 @@ export type WorldUncheckedUpdateWithoutOfficialAssetIndexesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetPatches?: Prisma.WorldAssetPatchUncheckedUpdateManyWithoutWorldNestedInput
@@ -2466,6 +2678,7 @@ export type WorldCreateWithoutOfficialAssetBatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -2495,6 +2708,7 @@ export type WorldUncheckedCreateWithoutOfficialAssetBatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -2540,6 +2754,7 @@ export type WorldUpdateWithoutOfficialAssetBatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -2569,6 +2784,7 @@ export type WorldUncheckedUpdateWithoutOfficialAssetBatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -2598,6 +2814,7 @@ export type WorldCreateWithoutOfficialAssetPatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexCreateNestedManyWithoutWorldInput
@@ -2627,6 +2844,7 @@ export type WorldUncheckedCreateWithoutOfficialAssetPatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedCreateNestedManyWithoutWorldInput
   agentSessions?: Prisma.AgentSessionUncheckedCreateNestedManyWithoutWorldInput
   potentialAssets?: Prisma.PotentialAssetUncheckedCreateNestedManyWithoutWorldInput
+  narratives?: Prisma.NarrativeUncheckedCreateNestedManyWithoutWorldInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedCreateNestedManyWithoutWorldInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedCreateNestedManyWithoutWorldInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedCreateNestedManyWithoutWorldInput
@@ -2672,6 +2890,7 @@ export type WorldUpdateWithoutOfficialAssetPatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUpdateManyWithoutWorldNestedInput
@@ -2701,6 +2920,7 @@ export type WorldUncheckedUpdateWithoutOfficialAssetPatchesInput = {
   agentSuggestions?: Prisma.AgentSuggestionUncheckedUpdateManyWithoutWorldNestedInput
   agentSessions?: Prisma.AgentSessionUncheckedUpdateManyWithoutWorldNestedInput
   potentialAssets?: Prisma.PotentialAssetUncheckedUpdateManyWithoutWorldNestedInput
+  narratives?: Prisma.NarrativeUncheckedUpdateManyWithoutWorldNestedInput
   officialAssets?: Prisma.OfficialWorldAssetUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetRevisions?: Prisma.OfficialWorldAssetRevisionUncheckedUpdateManyWithoutWorldNestedInput
   officialAssetIndexes?: Prisma.OfficialWorldAssetIndexUncheckedUpdateManyWithoutWorldNestedInput
@@ -2722,6 +2942,7 @@ export type WorldCountOutputType = {
   agentSuggestions: number
   agentSessions: number
   potentialAssets: number
+  narratives: number
   officialAssets: number
   officialAssetRevisions: number
   officialAssetIndexes: number
@@ -2739,6 +2960,7 @@ export type WorldCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   agentSuggestions?: boolean | WorldCountOutputTypeCountAgentSuggestionsArgs
   agentSessions?: boolean | WorldCountOutputTypeCountAgentSessionsArgs
   potentialAssets?: boolean | WorldCountOutputTypeCountPotentialAssetsArgs
+  narratives?: boolean | WorldCountOutputTypeCountNarrativesArgs
   officialAssets?: boolean | WorldCountOutputTypeCountOfficialAssetsArgs
   officialAssetRevisions?: boolean | WorldCountOutputTypeCountOfficialAssetRevisionsArgs
   officialAssetIndexes?: boolean | WorldCountOutputTypeCountOfficialAssetIndexesArgs
@@ -2822,6 +3044,13 @@ export type WorldCountOutputTypeCountPotentialAssetsArgs<ExtArgs extends runtime
 /**
  * WorldCountOutputType without action
  */
+export type WorldCountOutputTypeCountNarrativesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.NarrativeWhereInput
+}
+
+/**
+ * WorldCountOutputType without action
+ */
 export type WorldCountOutputTypeCountOfficialAssetsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.OfficialWorldAssetWhereInput
 }
@@ -2878,6 +3107,7 @@ export type WorldSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   agentSuggestions?: boolean | Prisma.World$agentSuggestionsArgs<ExtArgs>
   agentSessions?: boolean | Prisma.World$agentSessionsArgs<ExtArgs>
   potentialAssets?: boolean | Prisma.World$potentialAssetsArgs<ExtArgs>
+  narratives?: boolean | Prisma.World$narrativesArgs<ExtArgs>
   officialAssets?: boolean | Prisma.World$officialAssetsArgs<ExtArgs>
   officialAssetRevisions?: boolean | Prisma.World$officialAssetRevisionsArgs<ExtArgs>
   officialAssetIndexes?: boolean | Prisma.World$officialAssetIndexesArgs<ExtArgs>
@@ -2945,6 +3175,7 @@ export type WorldInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   agentSuggestions?: boolean | Prisma.World$agentSuggestionsArgs<ExtArgs>
   agentSessions?: boolean | Prisma.World$agentSessionsArgs<ExtArgs>
   potentialAssets?: boolean | Prisma.World$potentialAssetsArgs<ExtArgs>
+  narratives?: boolean | Prisma.World$narrativesArgs<ExtArgs>
   officialAssets?: boolean | Prisma.World$officialAssetsArgs<ExtArgs>
   officialAssetRevisions?: boolean | Prisma.World$officialAssetRevisionsArgs<ExtArgs>
   officialAssetIndexes?: boolean | Prisma.World$officialAssetIndexesArgs<ExtArgs>
@@ -2967,6 +3198,7 @@ export type $WorldPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     agentSuggestions: Prisma.$AgentSuggestionPayload<ExtArgs>[]
     agentSessions: Prisma.$AgentSessionPayload<ExtArgs>[]
     potentialAssets: Prisma.$PotentialAssetPayload<ExtArgs>[]
+    narratives: Prisma.$NarrativePayload<ExtArgs>[]
     officialAssets: Prisma.$OfficialWorldAssetPayload<ExtArgs>[]
     officialAssetRevisions: Prisma.$OfficialWorldAssetRevisionPayload<ExtArgs>[]
     officialAssetIndexes: Prisma.$OfficialWorldAssetIndexPayload<ExtArgs>[]
@@ -3390,6 +3622,7 @@ export interface Prisma__WorldClient<T, Null = never, ExtArgs extends runtime.Ty
   agentSuggestions<T extends Prisma.World$agentSuggestionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$agentSuggestionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentSuggestionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   agentSessions<T extends Prisma.World$agentSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$agentSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AgentSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   potentialAssets<T extends Prisma.World$potentialAssetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$potentialAssetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PotentialAssetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  narratives<T extends Prisma.World$narrativesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$narrativesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NarrativePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   officialAssets<T extends Prisma.World$officialAssetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$officialAssetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OfficialWorldAssetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   officialAssetRevisions<T extends Prisma.World$officialAssetRevisionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$officialAssetRevisionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OfficialWorldAssetRevisionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   officialAssetIndexes<T extends Prisma.World$officialAssetIndexesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.World$officialAssetIndexesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OfficialWorldAssetIndexPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -4043,6 +4276,30 @@ export type World$potentialAssetsArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.PotentialAssetScalarFieldEnum | Prisma.PotentialAssetScalarFieldEnum[]
+}
+
+/**
+ * World.narratives
+ */
+export type World$narrativesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Narrative
+   */
+  select?: Prisma.NarrativeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Narrative
+   */
+  omit?: Prisma.NarrativeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.NarrativeInclude<ExtArgs> | null
+  where?: Prisma.NarrativeWhereInput
+  orderBy?: Prisma.NarrativeOrderByWithRelationInput | Prisma.NarrativeOrderByWithRelationInput[]
+  cursor?: Prisma.NarrativeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.NarrativeScalarFieldEnum | Prisma.NarrativeScalarFieldEnum[]
 }
 
 /**

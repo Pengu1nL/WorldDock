@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   canUseFixtures,
+  confirmProgression,
   createAgentSession,
   createAgentSessionRun,
   getOfficialAsset,
+  getNarrative,
   listAgentSessions,
   listConsistencyIssues,
+  listNarratives,
+  listProgressions,
   listOfficialAssets,
   listPotentialAssetsForSession,
   createAgentRun,
   createArchiveEntry,
+  createChapter,
   createConflict,
+  createNarrative,
   createStorySeed,
   createWorld,
   createWorldAsset,
@@ -33,10 +39,13 @@ import {
   relateWorldAssets,
   reorderWorldAssets,
   saveHubConnection,
+  startChapterProgression,
   streamAgentEvents,
   streamAgentSessionRunEvents,
   testHubConnection,
   unrelateWorldAssets,
+  updateChapter,
+  updateNarrative,
   updateWorldAsset,
 } from "./api";
 
@@ -352,6 +361,46 @@ describe("worlddock local API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/worlds/world_1/export", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/exports/export_1", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/worlds/import", expect.objectContaining({ method: "POST" }));
+  });
+
+  it("uses story-first narrative and progression endpoints", async () => {
+    const fetcher = vi
+      .fn(async () => jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ narratives: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ narrative: { id: "narrative_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ narrative: { id: "narrative_1" }, chapters: [], assets: [] }))
+      .mockResolvedValueOnce(jsonResponse({ narrative: { id: "narrative_1", title: "新版" } }))
+      .mockResolvedValueOnce(jsonResponse({ chapter: { id: "chapter_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ chapter: { id: "chapter_1", title: "第一章" } }))
+      .mockResolvedValueOnce(jsonResponse({ sessionId: "session_1", session: { id: "session_1" } }))
+      .mockResolvedValueOnce(jsonResponse({ progressions: [{ id: "session_1" }] }))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "session_1" }, appliedAssets: [] }));
+
+    await listNarratives({ worldId: "world_1", fetcher });
+    await createNarrative({ worldId: "world_1", title: "雨巷档案", synopsis: "记忆会下雨。" }, { fetcher });
+    await getNarrative("narrative_1", { fetcher });
+    await updateNarrative("narrative_1", { title: "新版" }, { fetcher });
+    await createChapter("narrative_1", { title: "第一章", content: "正文" }, { fetcher });
+    await updateChapter("narrative_1", "chapter_1", { title: "第一章", status: "completed" }, { fetcher });
+    await startChapterProgression("narrative_1", "chapter_1", {}, { fetcher });
+    await listProgressions("narrative_1", { fetcher });
+    await confirmProgression("narrative_1", "session_1", { fetcher });
+
+    expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/narratives?worldId=world_1", {
+      method: "GET",
+      headers: {},
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(2, "http://localhost:4000/v1/narratives", expect.objectContaining({
+      method: "POST",
+      body: JSON.stringify({ worldId: "world_1", title: "雨巷档案", synopsis: "记忆会下雨。" }),
+    }));
+    expect(fetcher).toHaveBeenNthCalledWith(3, "http://localhost:4000/v1/narratives/narrative_1", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(4, "http://localhost:4000/v1/narratives/narrative_1", expect.objectContaining({ method: "PATCH" }));
+    expect(fetcher).toHaveBeenNthCalledWith(5, "http://localhost:4000/v1/narratives/narrative_1/chapters", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(6, "http://localhost:4000/v1/narratives/narrative_1/chapters/chapter_1", expect.objectContaining({ method: "PATCH" }));
+    expect(fetcher).toHaveBeenNthCalledWith(7, "http://localhost:4000/v1/narratives/narrative_1/chapters/chapter_1/progress", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(8, "http://localhost:4000/v1/narratives/narrative_1/progressions", expect.objectContaining({ method: "GET" }));
+    expect(fetcher).toHaveBeenNthCalledWith(9, "http://localhost:4000/v1/narratives/narrative_1/progressions/session_1/confirm", expect.objectContaining({ method: "POST" }));
   });
 
   it("uses Hub connection endpoints and saves with PUT", async () => {

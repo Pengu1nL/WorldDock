@@ -92,6 +92,31 @@ export type AgentSuggestion = Prisma.AgentSuggestionModel
  */
 export type ContextRef = Prisma.ContextRefModel
 /**
+ * Model Narrative
+ * 
+ */
+export type Narrative = Prisma.NarrativeModel
+/**
+ * Model Chapter
+ * 
+ */
+export type Chapter = Prisma.ChapterModel
+/**
+ * Model NarrativeAsset
+ * 
+ */
+export type NarrativeAsset = Prisma.NarrativeAssetModel
+/**
+ * Model NarrativeAssetVersion
+ * 
+ */
+export type NarrativeAssetVersion = Prisma.NarrativeAssetVersionModel
+/**
+ * Model NarrativeAssetRelation
+ * 
+ */
+export type NarrativeAssetRelation = Prisma.NarrativeAssetRelationModel
+/**
  * Model AgentSession
  * 
  */

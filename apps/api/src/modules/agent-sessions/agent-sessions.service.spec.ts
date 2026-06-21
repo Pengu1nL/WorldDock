@@ -157,6 +157,8 @@ function sessionRecord(overrides: Partial<AgentSessionRecord>): AgentSessionReco
   return {
     id: "session_1",
     worldId: "world_1",
+    narrativeId: null,
+    chapterId: null,
     kind: "world_exploration",
     title: "记忆交易推演",
     status: "active",
