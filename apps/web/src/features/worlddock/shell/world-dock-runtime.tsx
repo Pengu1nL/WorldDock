@@ -683,8 +683,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
     <div className="app">
       <WorldStatusBar
         world={currentWorld && view !== "worlds" && view !== "create" ? currentWorld : null}
-        mode={t.mode}
-        tokens={runTokens}
       />
       <div className="app-body">
         <WorldNavigationRail
@@ -730,7 +728,6 @@ export function WorldDockRuntime({ tweaks, children }: { tweaks: any; children?:
             worldState={{
               messages,
               agentBusy,
-              allSavedAssets,
             } satisfies WorldDockRuntimeState}
             actions={{
               setMessages,

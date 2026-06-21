@@ -54,7 +54,6 @@ import {
   type WorldAssetPatchBatch,
 } from "../api";
 import { Icon } from "../components";
-import { PublishView } from "../view-publish";
 import { SettingsView } from "../view-settings";
 import { Composer, Message } from "../view-workbench";
 import type { WorldDockView } from "./world-navigation";
@@ -62,7 +61,6 @@ import type { WorldDockView } from "./world-navigation";
 export type WorldDockRuntimeState = {
   messages: any[];
   agentBusy: boolean;
-  allSavedAssets: any[];
 };
 
 export type WorldDockActions = {
@@ -96,7 +94,6 @@ export function WorldWorkspace({
   const {
     messages,
     agentBusy,
-    allSavedAssets,
   } = worldState;
   const {
     setMessages,
@@ -131,14 +128,6 @@ export function WorldWorkspace({
         <ConsistencyWorkspace
           world={currentWorld}
           pushToast={pushToast}
-        />
-      )}
-      {view === "publish" && currentWorld && (
-        <PublishView
-          currentWorld={currentWorld}
-          assets={allSavedAssets}
-          onToast={pushToast}
-          onBack={() => setView("exploration")}
         />
       )}
       {view === "settings" && (

@@ -6,12 +6,12 @@ export type WorldDockView =
   | "exploration"
   | "asset-library"
   | "consistency"
-  | "publish"
   | "settings";
 
 export type LegacyWorldDockView =
   | WorldDockView
-  | "workbench";
+  | "workbench"
+  | "publish";
 
 export type WorldNavigationItem = {
   id: WorldDockView;
@@ -22,6 +22,7 @@ export type WorldNavigationItem = {
 
 const LEGACY_VIEW_MAP: Record<Exclude<LegacyWorldDockView, WorldDockView>, WorldDockView> = {
   workbench: "exploration",
+  publish: "exploration",
 };
 
 const WORLD_VIEWS = new Set<WorldDockView>([
@@ -30,7 +31,6 @@ const WORLD_VIEWS = new Set<WorldDockView>([
   "exploration",
   "asset-library",
   "consistency",
-  "publish",
   "settings",
 ]);
 
@@ -54,7 +54,6 @@ export function getWorldNavigationItems({
     { id: "exploration", label: "推演", icon: "session", badge: pendingCount },
     { id: "asset-library", label: "资产库", icon: "assets" },
     { id: "consistency", label: "矛盾", icon: "consistency", badge: consistencyIssueBadge },
-    { id: "publish", label: "发布", icon: "push" },
   ];
 }
 

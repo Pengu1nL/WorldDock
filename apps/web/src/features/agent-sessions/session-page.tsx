@@ -109,7 +109,6 @@ export function SessionPage({
 
         <SessionComposer
           busy={runState.status === "running"}
-          tokens={runState.tokens}
           onSend={onSend}
           onStop={onStop}
         />

@@ -64,7 +64,7 @@ export const Icon = ({ name, size = 16, className = "", style = {} }: any) => {
 };
 
 // ────────── Status Bar ──────────
-export const StatusBar = ({ world, mode, tokens }: any) => {
+export const StatusBar = ({ world }: any) => {
   return (
     <div className="statusbar">
       <div className="statusbar-section" style={{ paddingLeft: 4 }}>
@@ -79,24 +79,6 @@ export const StatusBar = ({ world, mode, tokens }: any) => {
           <div className="statusbar-section">
             <Icon name="layers" size={13} style={{ color: "var(--fg-3)" }}/>
             <span style={{ color: "var(--fg)" }}>{world.name}</span>
-            <span className="sb-mono sb-dim">@ren</span>
-          </div>
-          <div className="statusbar-section">
-            <span className="sb-mono sb-dim">maturity</span>
-            <span className="sb-mono" style={{ color: world.maturity > 60 ? "var(--sage)" : world.maturity > 35 ? "var(--amber)" : "var(--fg-2)" }}>
-              {world.maturity}%
-            </span>
-            <div style={{ width: 36, height: 4, background: "var(--surface-2)", borderRadius: 2, overflow: "hidden" }}>
-              <div style={{
-                width: world.maturity + "%", height: "100%",
-                background: world.maturity > 60 ? "var(--sage)" : world.maturity > 35 ? "var(--amber)" : "var(--fg-3)"
-              }}/>
-            </div>
-          </div>
-          <div className="statusbar-section">
-            {world.status === "published" && <span className="badge sage"><span className="dot sage" style={{width:5,height:5,boxShadow:"none"}}/>已公开</span>}
-            {world.status === "unpublished" && <span className="badge amber">未公开</span>}
-            {world.status === "draft" && <span className="badge"><span style={{color:"var(--fg-3)"}}>草稿</span></span>}
             {world.hasUnsaved && <span className="badge amber">未保存</span>}
             {world.hasUnpushed && <span className="badge slate">本地有改动</span>}
           </div>
@@ -104,20 +86,6 @@ export const StatusBar = ({ world, mode, tokens }: any) => {
       )}
 
       <div className="statusbar-section flex"/>
-
-      <div className="statusbar-section statusbar-technical">
-        <span className="dot statusbar-technical-dot"/>
-        <span className="sb-mono">{String(mode).toUpperCase()}</span>
-      </div>
-
-      <div className="statusbar-section statusbar-technical" title="本地模型连接">
-        <span className="sb-mono sb-dim statusbar-technical">model</span>
-        <span className="sb-mono">local API</span>
-      </div>
-      <div className="statusbar-section statusbar-technical">
-        <span className="sb-mono sb-dim statusbar-technical">run</span>
-        <span className="sb-mono">{tokens} tk</span>
-      </div>
     </div>
   );
 };
@@ -131,7 +99,6 @@ export const Rail = ({ view, onNav, world, pendingCount, items, worldItems }: an
     { id: "exploration", label: "推演", icon: "session", badge: pendingCount },
     { id: "asset-library", label: "资产库", icon: "assets" },
     { id: "consistency", label: "矛盾", icon: "consistency" },
-    { id: "publish", label: "发布", icon: "push" },
   ]) : [];
   return (
     <div className="rail">

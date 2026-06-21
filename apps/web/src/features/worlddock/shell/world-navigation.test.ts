@@ -9,19 +9,16 @@ describe("world navigation", () => {
       "推演",
       "资产库",
       "矛盾",
-      "发布",
     ]);
     expect(items.map((item) => item.id)).toEqual([
       "exploration",
       "asset-library",
       "consistency",
-      "publish",
     ]);
     expect(items.map((item) => item.icon)).toEqual([
       "session",
       "assets",
       "consistency",
-      "push",
     ]);
   });
 
@@ -39,6 +36,7 @@ describe("world navigation", () => {
 
   it("normalizes legacy view ids", () => {
     expect(normalizeWorldDockView("workbench")).toBe("exploration");
+    expect(normalizeWorldDockView("publish")).toBe("exploration");
   });
 
   it("does not map retired pool view ids", () => {

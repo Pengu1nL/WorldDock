@@ -4,12 +4,11 @@ import { Icon } from "../worlddock/components";
 
 type SessionComposerProps = {
   busy: boolean;
-  tokens: number;
   onSend: (text: string) => void;
   onStop: () => void;
 };
 
-export function SessionComposer({ busy, tokens, onSend, onStop }: SessionComposerProps) {
+export function SessionComposer({ busy, onSend, onStop }: SessionComposerProps) {
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
   const canSend = text.trim().length > 0 && !busy;
@@ -69,9 +68,6 @@ export function SessionComposer({ busy, tokens, onSend, onStop }: SessionCompose
             }}
           />
           <div className="row gap-2" style={{ marginTop: 4, alignItems: "center" }}>
-            <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
-              {tokens} tk
-            </span>
             <div style={{ flex: 1 }} />
             {busy ? (
               <button className="btn sm" type="button" onClick={onStop} style={{ color: "var(--brick)" }}>

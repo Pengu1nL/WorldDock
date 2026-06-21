@@ -120,6 +120,13 @@ describe("SessionPage", () => {
     expect(onSend).toHaveBeenCalledWith("继续确认许可制度");
   });
 
+  it("does not show a token counter inside the composer", () => {
+    renderSessionPage({ runState: { status: "idle", tokens: 42 } });
+
+    expect(screen.getByLabelText("继续推演")).toBeInTheDocument();
+    expect(screen.queryByText("42 tk")).not.toBeInTheDocument();
+  });
+
   it("renders markdown lists, code blocks, and streaming status", () => {
     renderSessionPage({
       messages: [
