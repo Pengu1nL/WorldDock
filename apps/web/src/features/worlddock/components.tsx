@@ -105,18 +105,18 @@ export const StatusBar = ({ world, mode, tokens }: any) => {
 
       <div className="statusbar-section flex"/>
 
-      <div className="statusbar-section">
-        <span className="dot sage"/>
-        <span className="sb-mono" style={{ color: "var(--sage)" }}>{String(mode).toUpperCase()}</span>
+      <div className="statusbar-section statusbar-technical">
+        <span className="dot statusbar-technical-dot"/>
+        <span className="sb-mono">{String(mode).toUpperCase()}</span>
       </div>
 
-      <div className="statusbar-section" title="本地模型连接">
-        <span className="sb-mono sb-dim">model</span>
+      <div className="statusbar-section statusbar-technical" title="本地模型连接">
+        <span className="sb-mono sb-dim statusbar-technical">model</span>
         <span className="sb-mono">local API</span>
       </div>
-      <div className="statusbar-section">
-        <span className="sb-mono sb-dim">run</span>
-        <span className="sb-mono" style={{ color: "var(--amber)" }}>{tokens} tk</span>
+      <div className="statusbar-section statusbar-technical">
+        <span className="sb-mono sb-dim statusbar-technical">run</span>
+        <span className="sb-mono">{tokens} tk</span>
       </div>
     </div>
   );

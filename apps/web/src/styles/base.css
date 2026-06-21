@@ -93,6 +93,9 @@ a:hover { color: var(--fg); }
 .statusbar-section.flex { flex: 1; min-width: 0; flex-shrink: 1; }
 .statusbar-section:last-child { border-right: 0; }
 .statusbar-section.right { margin-left: auto; }
+.statusbar-technical {
+  color: var(--fg-3);
+}
 
 .sb-btn {
   display: inline-flex; align-items: center; gap: 6px;
@@ -120,6 +123,10 @@ a:hover { color: var(--fg); }
 .dot {
   width: 7px; height: 7px; border-radius: 50%;
   display: inline-block; flex: none;
+}
+.statusbar-section.statusbar-technical .statusbar-technical-dot {
+  background: var(--fg-3);
+  box-shadow: none;
 }
 .dot.sage  { background: var(--sage); box-shadow: 0 0 0 3px var(--sage-bg); }
 .dot.amber { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-bg); }
@@ -792,6 +799,10 @@ p  { margin: 0; }
   .statusbar-section {
     height: 28px;
     padding: 0 6px;
+  }
+
+  .statusbar-section.statusbar-technical {
+    display: none;
   }
 
   .app-body {
