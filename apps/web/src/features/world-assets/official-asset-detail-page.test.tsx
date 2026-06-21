@@ -65,7 +65,7 @@ describe("OfficialAssetDetailPage", () => {
     const onBack = vi.fn();
     const onStartEdit = vi.fn();
 
-    render(
+    const { container } = render(
       <OfficialAssetDetailPage
         detail={detail}
         patches={[]}
@@ -74,6 +74,8 @@ describe("OfficialAssetDetailPage", () => {
       />,
     );
 
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/ ren \/ official-assets \/ 记忆交易许可/)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "记忆交易许可" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "概括" })).toBeInTheDocument();
     expect(screen.getByText("需要登记。")).toBeInTheDocument();

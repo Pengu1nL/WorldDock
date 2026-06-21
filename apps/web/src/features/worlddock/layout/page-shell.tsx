@@ -6,7 +6,6 @@ type PageShellProps = {
 };
 
 type PageHeaderProps = {
-  breadcrumb: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
   actions?: ReactNode;
@@ -32,11 +31,10 @@ export function PageShell({ children, className = "" }: PageShellProps) {
   return <div className={`page-shell view-scroll ${className}`.trim()}>{children}</div>;
 }
 
-export function PageHeader({ breadcrumb, title, subtitle, actions }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
     <header className="page-head page-shell-head">
       <div className="col page-shell-title-group">
-        <div className="crumb">{breadcrumb}</div>
         <h1>{title}</h1>
         {subtitle ? <div className="sub">{subtitle}</div> : null}
       </div>

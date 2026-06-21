@@ -7,11 +7,10 @@ import { describe, expect, it } from "vitest";
 import { PageBody, PageHeader, PageShell, PageToolbar } from "./page-shell";
 
 describe("PageShell", () => {
-  it("renders a consistent page header with title, breadcrumb, subtitle, and action", () => {
-    render(
+  it("renders a consistent page header with title, subtitle, and action without route breadcrumb text", () => {
+    const { container } = render(
       <PageShell>
         <PageHeader
-          breadcrumb="/ ren / worlds"
           title="我的世界"
           subtitle="2 个世界"
           actions={<button type="button">新建世界</button>}
@@ -19,7 +18,8 @@ describe("PageShell", () => {
       </PageShell>,
     );
 
-    expect(screen.getByText("/ ren / worlds")).toBeInTheDocument();
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText("/ ren / worlds")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "我的世界" })).toBeInTheDocument();
     expect(screen.getByText("2 个世界")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "新建世界" })).toBeInTheDocument();

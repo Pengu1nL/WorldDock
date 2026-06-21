@@ -46,9 +46,6 @@ export function OfficialAssetDetailPage({
     <div className="view-scroll" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <div className="page-head">
         <div className="col" style={{ minWidth: 0 }}>
-          <div className="crumb">
-            / ren / official-assets / <span style={{ color: "var(--fg-1)" }}>{asset?.name ?? "detail"}</span>
-          </div>
           <h1>{asset?.name ?? "官方资产"}</h1>
           <div className="sub">
             {loading && !asset ? "正在载入资产详情" : asset ? `${getAssetTypeLabel(asset.type)} · 当前版本 ${asset.version ?? 1}` : "查看官方 Markdown 文档"}

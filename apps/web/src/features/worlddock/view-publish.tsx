@@ -119,7 +119,6 @@ export function PublishView({
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
       <div className="page-head">
         <div className="col">
-          <div className="crumb">/ publish</div>
           <h1>发布</h1>
           <div className="sub">{currentWorld.name}</div>
         </div>

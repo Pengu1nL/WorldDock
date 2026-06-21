@@ -233,7 +233,6 @@ function ConsistencySummary({ issues }: { issues: ConsistencyIssue[] }) {
 }
 
 function ConsistencyIssuesContent({
-  world,
   issues = [],
   loading = false,
   loadingMore = false,
@@ -307,9 +306,6 @@ function ConsistencyIssuesContent({
     <div className="view-scroll" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <div className="page-head">
         <div className="col">
-          <div className="crumb">
-            / ren / {world.name ?? "world"} / <span style={{ color: "var(--fg-1)" }}>consistency</span>
-          </div>
           <h1>矛盾</h1>
           <div className="sub">
             {loading ? "正在载入一致性问题" : `${filteredIssues.length} 项${getStatusLabel(statusFilter)}问题`}

@@ -24,7 +24,7 @@ describe("SettingsView Hub connection", () => {
       testHubConnection: vi.fn(),
     };
 
-    render(
+    const { container } = render(
       <SettingsView
         currentWorld={null}
         onBack={() => undefined}
@@ -33,6 +33,8 @@ describe("SettingsView Hub connection", () => {
       />,
     );
 
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText("/ settings")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "界仓" }));
 
     expect(await screen.findByText("PAT wdpat_12...")).toBeInTheDocument();

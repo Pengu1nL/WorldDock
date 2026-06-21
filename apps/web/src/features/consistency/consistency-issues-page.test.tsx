@@ -31,7 +31,7 @@ describe("ConsistencyIssuesPage", () => {
     const onOpenIssue = vi.fn();
     const world = { id: "world_1", name: "潮汐之书" };
 
-    render(
+    const { container } = render(
       <ConsistencyIssuesPage
         world={world}
         issues={[
@@ -50,6 +50,8 @@ describe("ConsistencyIssuesPage", () => {
       />,
     );
 
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/ ren \/ 潮汐之书 \/ consistency/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /运行检查/ })).toBeInTheDocument();
     const statusFilter = screen.getByRole("group", { name: "状态筛选" });
     expect(within(statusFilter).getByRole("button", { name: "待处理" })).toHaveAttribute("aria-pressed", "true");

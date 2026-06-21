@@ -133,7 +133,6 @@ type OfficialAssetLibraryContentProps = {
 };
 
 function OfficialAssetLibraryContent({
-  world,
   assets,
   countSourceAssets,
   loading = false,
@@ -153,9 +152,6 @@ function OfficialAssetLibraryContent({
     <div className="view-scroll" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
       <div className="page-head">
         <div className="col">
-          <div className="crumb">
-            / ren / {world.name ?? "world"} / <span style={{ color: "var(--fg-1)" }}>assets</span>
-          </div>
           <h1>资产库</h1>
           <div className="sub">
             {loading ? "正在载入官方资产" : `${assets.length} 项官方资产`}

@@ -206,7 +206,6 @@ export const WorldsView = ({ worlds, onOpen, onCreate, savedDraft, onContinueDra
   return (
     <PageShell>
       <PageHeader
-        breadcrumb="/ ren / worlds"
         title="我的世界"
         subtitle={`${worlds.length} 个世界 · ${worlds.filter((w: any) => w.status === "published").length} 个已公开 · ${worlds.filter((w: any) => w.hasUnsaved || w.hasUnpushed).length} 个有未处理改动`}
         actions={(
@@ -352,7 +351,6 @@ export const CreateView = ({ initialInspiration, onConfirm, onCancel }: any) => 
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
       <div className="page-head">
         <div className="col">
-          <div className="crumb">/ ren / worlds / <span style={{ color: "var(--fg-1)" }}>new</span></div>
           <h1>创建世界</h1>
           <div className="sub">用一句灵感启动。其余的，让 Agent 先帮你推演出第一个雏形。</div>
         </div>

@@ -31,7 +31,7 @@ describe("OfficialAssetLibraryPage", () => {
     const onCreateAsset = vi.fn();
     const world = { id: "world_1", name: "记忆城邦" };
 
-    render(
+    const { container } = render(
       <OfficialAssetLibraryPage
         world={world}
         assets={[
@@ -58,6 +58,8 @@ describe("OfficialAssetLibraryPage", () => {
       />,
     );
 
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/ ren \/ 记忆城邦 \/ assets/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "全部2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "角色0" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "组织1" })).toBeInTheDocument();

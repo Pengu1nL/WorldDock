@@ -120,7 +120,6 @@ export function SettingsView({
     <div className="view-scroll" style={{ flex: 1, minHeight: 0 }}>
       <div className="page-head">
         <div className="col">
-          <div className="crumb">/ settings</div>
           <h1>设置</h1>
           <div className="sub">本地模型与世界包工具</div>
         </div>

@@ -54,6 +54,8 @@ describe("WorldsView layout", () => {
     );
 
     expect(screen.getByRole("heading", { name: "我的世界" })).toBeInTheDocument();
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText("/ ren / worlds")).not.toBeInTheDocument();
     expect(container.querySelector(".worlds-grid")).toBeInTheDocument();
     expect(screen.getByText("工作台概览")).toBeInTheDocument();
     expect(screen.getByText("未处理改动")).toBeInTheDocument();
@@ -78,6 +80,7 @@ describe("WorldsView layout", () => {
 
     render(<CreateView initialInspiration="潮汐反向" onConfirm={vi.fn()} onCancel={vi.fn()} />);
 
+    expect(screen.queryByText(/\/ ren \/ worlds \/ new/)).not.toBeInTheDocument();
     screen.getByRole("button", { name: /开始推演/ }).click();
 
     expect(await screen.findByText("雏形已生成")).toBeInTheDocument();

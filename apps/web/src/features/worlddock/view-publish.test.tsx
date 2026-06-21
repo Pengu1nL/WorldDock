@@ -24,6 +24,8 @@ describe("PublishView", () => {
     const readiness = screen.getByLabelText("发布准备");
     const pageBody = container.querySelector(".page-body");
 
+    expect(container.querySelector(".crumb")).not.toBeInTheDocument();
+    expect(screen.queryByText("/ publish")).not.toBeInTheDocument();
     expect(within(readiness).getByText("发布准备")).toBeInTheDocument();
     expect(within(readiness).getByRole("list")).toBeInTheDocument();
     expect(within(readiness).getByText("1/4")).toBeInTheDocument();
