@@ -195,6 +195,35 @@ type ConsistencyIssuesContentProps = ConsistencyIssuesPageProps & {
   onSearchChange: (search: string) => void;
 };
 
+function ConsistencySummary({ issues }: { issues: ConsistencyIssue[] }) {
+  const highCount = issues.filter((issue) => issue.severity === "critical" || issue.severity === "high").length;
+  const subjectCount = new Set(issues.flatMap((issue) => getSubjectAssetIds(issue))).size;
+  const openCount = issues.filter((issue) => issue.status === "open").length;
+
+  return (
+    <section className="card" aria-label="矛盾概览" style={{ padding: 14, marginBottom: 14 }}>
+      <div className="row gap-2" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+        <h2 className="title-font" style={{ fontSize: "var(--t-15)" }}>矛盾概览</h2>
+        <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>triage</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 8 }}>
+        <div className="card" style={{ padding: 10, background: "var(--surface-2)" }}>
+          <span className="badge brick">高优先级</span>
+          <div className="mono" style={{ marginTop: 8, fontSize: "var(--t-18)", color: "var(--fg)" }}>{highCount}</div>
+        </div>
+        <div className="card" style={{ padding: 10, background: "var(--surface-2)" }}>
+          <span className="badge amber">待处理</span>
+          <div className="mono" style={{ marginTop: 8, fontSize: "var(--t-18)", color: "var(--fg)" }}>{openCount}</div>
+        </div>
+        <div className="card" style={{ padding: 10, background: "var(--surface-2)" }}>
+          <span className="badge slate">涉及资产</span>
+          <div className="mono" style={{ marginTop: 8, fontSize: "var(--t-18)", color: "var(--fg)" }}>{subjectCount}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ConsistencyIssuesContent({
   world,
   issues = [],
@@ -249,6 +278,7 @@ function ConsistencyIssuesContent({
     });
   };
   const visibleActionError = localActionError ?? actionError ?? null;
+  const showSummary = !loading && !error;
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -323,53 +353,56 @@ function ConsistencyIssuesContent({
         </div>
       ) : null}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-          gap: 16,
-          padding: "20px 32px 40px",
-          flex: 1,
-          minHeight: 0,
-          alignItems: "start",
-        }}
-      >
-        <section style={{ minWidth: 0 }}>
-          {error ? (
-            <ConsistencyIssuesError error={error} />
-          ) : loading ? (
-            <ConsistencyIssuesLoading />
-          ) : filteredIssues.length === 0 ? (
-            <ConsistencyIssuesEmpty status={statusFilter} />
-          ) : (
-            <div className="col gap-2">
-              {filteredIssues.map((issue) => (
-                <ConsistencyIssueRow
-                  active={issue.id === activeIssueId}
-                  issue={issue}
-                  key={issue.id}
-                  onOpenIssue={handleOpenIssue}
-                />
-              ))}
-            </div>
-          )}
-          {nextCursor ? (
-            <ConsistencyIssuesPaginationNotice
-              loadedCount={issues.length}
-              loadingMore={loadingMore}
-              onLoadMore={onLoadMore ? () => handleAction(onLoadMore) : undefined}
-            />
-          ) : null}
-        </section>
+      <div className="page-body page-body-fluid">
+        {showSummary ? <ConsistencySummary issues={filteredIssues} /> : null}
 
-        <ConsistencyIssueDetail
-          actionPending={actionPending}
-          issue={activeIssue}
-          loading={detailLoading}
-          onCreateRepairSession={onCreateRepairSession ? (issue) => handleAction(() => onCreateRepairSession(issue)) : undefined}
-          onIgnoreIssue={onIgnoreIssue ? (issueId) => handleAction(() => onIgnoreIssue(issueId)) : undefined}
-          onReopenIssue={onReopenIssue ? (issueId) => handleAction(() => onReopenIssue(issueId)) : undefined}
-        />
+        <div
+          className="page-split"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            alignItems: "start",
+          }}
+        >
+          <section aria-label="矛盾列表" className="page-split-main">
+            {error ? (
+              <ConsistencyIssuesError error={error} />
+            ) : loading ? (
+              <ConsistencyIssuesLoading />
+            ) : filteredIssues.length === 0 ? (
+              <ConsistencyIssuesEmpty status={statusFilter} />
+            ) : (
+              <div className="col gap-2">
+                {filteredIssues.map((issue) => (
+                  <ConsistencyIssueRow
+                    active={issue.id === activeIssueId}
+                    issue={issue}
+                    key={issue.id}
+                    onOpenIssue={handleOpenIssue}
+                  />
+                ))}
+              </div>
+            )}
+            {nextCursor ? (
+              <ConsistencyIssuesPaginationNotice
+                loadedCount={issues.length}
+                loadingMore={loadingMore}
+                onLoadMore={onLoadMore ? () => handleAction(onLoadMore) : undefined}
+              />
+            ) : null}
+          </section>
+
+          <div className="page-split-aside">
+            <ConsistencyIssueDetail
+              actionPending={actionPending}
+              issue={activeIssue}
+              loading={detailLoading}
+              onCreateRepairSession={onCreateRepairSession ? (issue) => handleAction(() => onCreateRepairSession(issue)) : undefined}
+              onIgnoreIssue={onIgnoreIssue ? (issueId) => handleAction(() => onIgnoreIssue(issueId)) : undefined}
+              onReopenIssue={onReopenIssue ? (issueId) => handleAction(() => onReopenIssue(issueId)) : undefined}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
