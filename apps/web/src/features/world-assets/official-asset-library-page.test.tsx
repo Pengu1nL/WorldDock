@@ -5,6 +5,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { OfficialWorldAsset } from "../worlddock/api";
 import { getOfficialAssetCardSummary } from "./official-asset-card";
 import { OfficialAssetLibraryPage } from "./official-asset-library-page";
 
@@ -45,12 +46,14 @@ describe("OfficialAssetLibraryPage", () => {
       />,
     );
 
-    expect(screen.getByText("全部")).toBeInTheDocument();
-    expect(screen.getByText("角色")).toBeInTheDocument();
-    expect(screen.getByText("组织")).toBeInTheDocument();
-    expect(screen.getByText("地点")).toBeInTheDocument();
-    expect(screen.getByText("事件")).toBeInTheDocument();
-    expect(screen.getByText("规则")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "全部2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "角色0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "组织1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "地点0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "事件0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "规则1" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "画廊视图" }));
+
     const assetButton = screen.getByRole("button", { name: /记忆交易许可/ });
     const coverImage = assetButton.querySelector("img");
 
@@ -92,4 +95,42 @@ describe("OfficialAssetLibraryPage", () => {
     expect(screen.queryByText("摘要")).not.toBeInTheDocument();
     expect(screen.queryByText(longSummary)).not.toBeInTheDocument();
   });
+
+  it("defaults to a compact list view with a gallery toggle", () => {
+    render(
+      <OfficialAssetLibraryPage
+        world={{ id: "world_1", name: "潮汐之书" }}
+        assets={[buildAsset({ id: "asset_1", name: "潮汐律", type: "rule" })]}
+        loading={false}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "资产库视图切换" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "列表视图" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "画廊视图" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("潮汐律")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开资产 潮汐律" })).toBeInTheDocument();
+    expect(screen.getByText("潮汐律定义文明周期。")).toBeInTheDocument();
+    expect(screen.getByText("v1")).toBeInTheDocument();
+    expect(screen.getByText("0 项问题")).toBeInTheDocument();
+  });
 });
+
+function buildAsset(overrides: Partial<OfficialWorldAsset> = {}): OfficialWorldAsset {
+  return {
+    id: "asset_1",
+    worldId: "world_1",
+    type: "rule",
+    name: "潮汐律",
+    summary: "潮汐律定义文明周期。",
+    documentKey: "rules/tide-law.md",
+    status: "active",
+    version: 1,
+    tags: ["制度"],
+    metadata: {},
+    createdAt: "2026-06-20T10:00:00.000Z",
+    updatedAt: "2026-06-20T10:00:00.000Z",
+    archivedAt: null,
+    ...overrides,
+  };
+}

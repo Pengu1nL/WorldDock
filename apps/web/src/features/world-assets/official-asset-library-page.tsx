@@ -6,6 +6,7 @@ import { Icon } from "../worlddock/components";
 import {
   OFFICIAL_ASSET_FILTERS,
   OfficialAssetCard,
+  OfficialAssetRow,
   getOfficialAssetTypeLabel,
   type OfficialAssetFilter,
   type OfficialAssetType,
@@ -147,6 +148,7 @@ function OfficialAssetLibraryContent({
 }: OfficialAssetLibraryContentProps) {
   const counts = useMemo(() => countOfficialAssetsByType(countSourceAssets), [countSourceAssets]);
   const createType = selectedType === "all" ? "rule" : selectedType;
+  const [viewMode, setViewMode] = useState<"list" | "gallery">("list");
 
   return (
     <div className="view-scroll" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -199,6 +201,24 @@ function OfficialAssetLibraryContent({
           </button>
         ))}
         <div className="flex" />
+        <div className="row gap-2" aria-label="资产库视图切换" role="group">
+          <button
+            aria-pressed={viewMode === "list"}
+            className={"sb-btn " + (viewMode === "list" ? "primary" : "")}
+            onClick={() => setViewMode("list")}
+            type="button"
+          >
+            列表视图
+          </button>
+          <button
+            aria-pressed={viewMode === "gallery"}
+            className={"sb-btn " + (viewMode === "gallery" ? "primary" : "")}
+            onClick={() => setViewMode("gallery")}
+            type="button"
+          >
+            画廊视图
+          </button>
+        </div>
         <input
           aria-label="搜索官方资产"
           className="input"
@@ -216,20 +236,16 @@ function OfficialAssetLibraryContent({
           <OfficialAssetLibraryLoading />
         ) : assets.length === 0 ? (
           <OfficialAssetLibraryEmpty selectedType={selectedType} />
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-              gap: 12,
-            }}
-          >
+        ) : viewMode === "gallery" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
             {assets.map((asset) => (
-              <OfficialAssetCard
-                asset={asset}
-                key={asset.id}
-                onOpenAsset={onOpenAsset}
-              />
+              <OfficialAssetCard asset={asset} key={asset.id} onOpenAsset={onOpenAsset} />
+            ))}
+          </div>
+        ) : (
+          <div className="col gap-2">
+            {assets.map((asset) => (
+              <OfficialAssetRow asset={asset} key={asset.id} onOpenAsset={onOpenAsset} />
             ))}
           </div>
         )}

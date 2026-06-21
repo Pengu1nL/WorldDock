@@ -202,6 +202,89 @@ export function OfficialAssetCard({
   );
 }
 
+export function OfficialAssetRow({
+  asset,
+  issueCount = 0,
+  onOpenAsset,
+}: OfficialAssetCardProps) {
+  const meta = OFFICIAL_ASSET_TYPE_META[asset.type];
+  const tags = Array.isArray(asset.tags) ? asset.tags : [];
+  const summary = getOfficialAssetCardSummary(asset.summary);
+
+  return (
+    <button
+      aria-label={`打开资产 ${asset.name}`}
+      className="card hover"
+      onClick={() => onOpenAsset?.(asset.id)}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        padding: 12,
+        cursor: "pointer",
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        gap: 12,
+        alignItems: "start",
+      }}
+      type="button"
+    >
+      <span className="col" style={{ gap: 6, minWidth: 0 }}>
+        <span className="row gap-2" style={{ flexWrap: "wrap", minWidth: 0 }}>
+          <span className="tag plain">
+            <Icon name={meta.icon} size={11} />
+            {meta.label}
+          </span>
+          <span
+            className="title-font"
+            style={{
+              color: "var(--fg)",
+              fontSize: "var(--t-15)",
+              fontWeight: 650,
+              minWidth: 0,
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+            }}
+            title={asset.name}
+          >
+            {asset.name}
+          </span>
+          <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>
+            v{asset.version ?? 1}
+          </span>
+        </span>
+        <span
+          className="prose"
+          style={{
+            color: "var(--fg-2)",
+            fontSize: "var(--t-12)",
+            lineHeight: 1.55,
+            minWidth: 0,
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
+          }}
+        >
+          {summary}
+        </span>
+        {tags.length > 0 ? (
+          <span className="row gap-2" style={{ flexWrap: "wrap" }}>
+            {tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="tag plain">
+                {tag}
+              </span>
+            ))}
+          </span>
+        ) : null}
+      </span>
+      <span
+        className="mono"
+        style={{ color: issueCount ? "var(--brick)" : "var(--fg-3)", fontSize: 11 }}
+      >
+        {issueCount} 项问题
+      </span>
+    </button>
+  );
+}
+
 export function getOfficialAssetTypeLabel(type: OfficialAssetType) {
   return OFFICIAL_ASSET_TYPE_META[type].label;
 }
