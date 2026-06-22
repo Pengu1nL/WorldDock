@@ -31,13 +31,24 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
   const progressionsQuery = useQuery({
     queryKey: ["narrative-progressions", narrativeId],
     queryFn: () => worlddockApi.listProgressions(narrativeId),
+    refetchInterval: (query) => {
+      const data = query.state.data as { progressions?: worlddockApi.AgentSession[] } | undefined;
+      return readReviewStatus(readLatestProgression(data?.progressions ?? [])) === "running" ? 1500 : false;
+    },
   });
 
   const chapters = narrativeQuery.data?.chapters ?? [];
   const assets = narrativeQuery.data?.assets ?? [];
-  const latestProgressionOutput = useMemo(
-    () => readLatestProgressionOutput(progressionsQuery.data?.progressions ?? []),
+  const latestProgression = useMemo(
+    () => readLatestProgression(progressionsQuery.data?.progressions ?? []),
     [progressionsQuery.data?.progressions],
+  );
+  const latestReviewStatus = readReviewStatus(latestProgression);
+  const shouldPollProgression = latestReviewStatus === "running";
+  const latestProgressionOutput = useMemo(
+    () => readProgressionOutput(latestProgression?.metadata?.progressionOutput)
+      ?? readLatestProgressionOutput(progressionsQuery.data?.progressions ?? []),
+    [latestProgression, progressionsQuery.data?.progressions],
   );
   const selectedChapter = useMemo(
     () => chapters.find((chapter) => chapter.id === selectedChapterId) ?? chapters[0] ?? null,
@@ -101,8 +112,19 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
   });
 
   const startProgression = useMutation({
-    mutationFn: async (chapter: Chapter) => worlddockApi.startChapterProgression(narrativeId, chapter.id),
+    mutationFn: async (chapter: Chapter) => {
+      const saved = await worlddockApi.updateChapter(narrativeId, chapter.id, {
+        title: draftTitle.trim() || chapter.title,
+        content: draftContent,
+        status: chapter.status,
+      });
+      const result = await worlddockApi.startChapterProgression(narrativeId, saved.chapter.id);
+      return { ...result, chapter: saved.chapter };
+    },
     onSuccess: async (result) => {
+      setSelectedChapterId(result.chapter.id);
+      setDraftTitle(result.chapter.title);
+      setDraftContent(result.chapter.content);
       setNotice(`推演已创建 · ${result.sessionId}`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["narrative", narrativeId] }),
@@ -147,13 +169,14 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
         </div>
         <div className="row gap-2">
           {notice && <span className="badge sage">{notice}</span>}
+          {shouldPollProgression && <span className="badge">推演运行中</span>}
           <button
             className="btn primary"
             disabled={!selectedChapter || startProgression.isPending}
             onClick={() => selectedChapter && startProgression.mutate(selectedChapter)}
           >
             <Icon name="spark" size={13} />
-            <span>{startProgression.isPending ? "推演中" : "推演本章"}</span>
+            <span>{startProgression.isPending ? "保存并推演中" : "推演本章"}</span>
           </button>
         </div>
       </header>
@@ -273,6 +296,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
               </button>
             ))}
           </div>
+          <ProgressionReviewCard progression={latestProgression} output={latestProgressionOutput} />
           {panel === "assets" && <AssetsPanel assets={assets} />}
           {panel === "snapshot" && <WorldSnapshotPanel snapshot={worldSnapshot} />}
           {panel === "arc" && <NarrativeArcPanel observations={arcObservations} chapters={chapters} />}
@@ -280,6 +304,29 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
         </aside>
       </section>
     </main>
+  );
+}
+
+function ProgressionReviewCard({
+  progression,
+  output,
+}: {
+  progression: worlddockApi.AgentSession | null;
+  output: ProgressionOutput | null;
+}) {
+  const reviewStatus = readReviewStatus(progression);
+  if (!progression || reviewStatus !== "pending_review" || !output) return null;
+
+  return (
+    <section style={{ border: "1px solid var(--hairline)", borderRadius: 6, padding: 10, marginBottom: 10, background: "var(--surface)" }}>
+      <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "center" }}>
+        <strong style={{ fontSize: 13 }}>待确认推演</strong>
+        <span className="mono" style={{ color: "var(--fg-3)", fontSize: 11 }}>{progression.id}</span>
+      </div>
+      <p style={{ margin: "8px 0 0", color: "var(--fg-2)", fontSize: 12, lineHeight: 1.55 }}>
+        {output.assetChanges.length} 项资产变化 · {output.consistencyFlags.length} 个一致性标记 · {output.narrativeObservations.length} 条弧光观察
+      </p>
+    </section>
   );
 }
 
@@ -384,6 +431,16 @@ function PanelBlock({ title, children }: { title: string; children: string }) {
 
 function EmptyPanelText({ children }: { children: string }) {
   return <div style={{ color: "var(--fg-2)", fontSize: 13, lineHeight: 1.6 }}>{children}</div>;
+}
+
+function readLatestProgression(progressions: worlddockApi.AgentSession[]) {
+  return [...progressions].sort((left, right) =>
+    String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? ""))
+  )[0] ?? null;
+}
+
+function readReviewStatus(progression: worlddockApi.AgentSession | null) {
+  return typeof progression?.metadata?.reviewStatus === "string" ? progression.metadata.reviewStatus : null;
 }
 
 function readLatestProgressionOutput(progressions: worlddockApi.AgentSession[]): ProgressionOutput | null {
