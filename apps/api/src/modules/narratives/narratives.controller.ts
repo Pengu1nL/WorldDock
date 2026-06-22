@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query } from "@nestjs/common";
 import { z } from "zod";
 import {
   type AgentSessionContextItemRecord,
@@ -58,7 +58,7 @@ const startProgressionSchema = z.object({}).passthrough().default({});
 
 @Controller("narratives")
 export class NarrativesController {
-  constructor(private readonly narratives: NarrativesService) {}
+  constructor(@Inject(NarrativesService) private readonly narratives: NarrativesService) {}
 
   @Post()
   async create(@Body() body: unknown) {

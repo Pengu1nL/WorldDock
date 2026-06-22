@@ -1602,8 +1602,10 @@ function getLatestCompletedContextRefs(messages: any[]) {
 const StoriesWorkspace = ({ world }: { world: any }) => {
   const worldId = world?.id as string | undefined;
   const queryClient = useQueryClient();
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const narrativesQuery = useQuery({
     queryKey: ["narratives", worldId],
@@ -1614,12 +1616,21 @@ const StoriesWorkspace = ({ world }: { world: any }) => {
   const narratives = narrativesQuery.data?.narratives ?? [];
 
   const handleCreate = useCallback(async () => {
-    if (!title.trim() || creating) return;
+    if (creating) return;
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      setCreateError("先输入故事标题");
+      titleInputRef.current?.focus();
+      return;
+    }
     setCreating(true);
+    setCreateError(null);
     try {
-      await createNarrative({ worldId, title: title.trim() });
+      await createNarrative({ worldId, title: nextTitle });
       setTitle("");
       await queryClient.invalidateQueries({ queryKey: ["narratives", worldId] });
+    } catch (error) {
+      setCreateError(getActionErrorMessage(error, "创建故事失败，请重试"));
     } finally {
       setCreating(false);
     }
@@ -1637,18 +1648,29 @@ const StoriesWorkspace = ({ world }: { world: any }) => {
 
         <div className="row gap-2" style={{ marginBottom: 20 }}>
           <input
+            ref={titleInputRef}
             className="input"
             placeholder="新故事标题"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (createError) setCreateError(null);
+            }}
             onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
+            aria-invalid={Boolean(createError)}
+            aria-describedby={createError ? "story-create-error" : undefined}
             style={{ flex: 1 }}
           />
-          <button className="btn primary" disabled={!title.trim() || creating} onClick={() => void handleCreate()}>
+          <button className="btn primary" disabled={creating} onClick={() => void handleCreate()}>
             <Icon name="plus" size={13} />
             <span>{creating ? "创建中" : "创建故事"}</span>
           </button>
         </div>
+        {createError ? (
+          <div id="story-create-error" role="alert" style={{ color: "var(--brick)", fontSize: 12, margin: "-12px 0 20px" }}>
+            {createError}
+          </div>
+        ) : null}
 
         {narrativesQuery.isPending ? (
           <div className="row gap-2" style={{ color: "var(--fg-3)", fontSize: 13 }}>
