@@ -7,6 +7,9 @@ import * as worlddockApi from "../worlddock/api";
 import type { Chapter, NarrativeAsset, NarrativeDetail, ProgressionOutput, VisualStyleGuide, WorldSnapshot } from "../worlddock/api";
 
 const routeQueryClient = new QueryClient();
+const EMPTY_CHAPTERS: Chapter[] = [];
+const EMPTY_ASSETS: NarrativeAsset[] = [];
+const EMPTY_PROGRESSIONS: worlddockApi.AgentSession[] = [];
 
 export function StoryWorkbenchRoute({ narrativeId }: { narrativeId: string }) {
   return (
@@ -37,17 +40,18 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
     },
   });
 
-  const chapters = narrativeQuery.data?.chapters ?? [];
-  const assets = narrativeQuery.data?.assets ?? [];
+  const progressions = progressionsQuery.data?.progressions ?? EMPTY_PROGRESSIONS;
+  const chapters = narrativeQuery.data?.chapters ?? EMPTY_CHAPTERS;
+  const assets = narrativeQuery.data?.assets ?? EMPTY_ASSETS;
   const latestProgression = useMemo(
-    () => readLatestProgression(progressionsQuery.data?.progressions ?? []),
-    [progressionsQuery.data?.progressions],
+    () => readLatestProgression(progressions),
+    [progressions],
   );
   const latestPendingReviewProgression = useMemo(
-    () => readLatestPendingReviewProgression(progressionsQuery.data?.progressions ?? []),
-    [progressionsQuery.data?.progressions],
+    () => readLatestPendingReviewProgression(progressions),
+    [progressions],
   );
-  const shouldPollProgression = hasRunningProgression(progressionsQuery.data?.progressions ?? []);
+  const shouldPollProgression = hasRunningProgression(progressions);
   const latestProgressionReviewOutput = useMemo(
     () => readProgressionOutput(latestProgression?.metadata?.progressionOutput),
     [latestProgression],
@@ -57,24 +61,28 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
     [latestPendingReviewProgression],
   );
   const latestProgressionOutput = useMemo(
-    () => latestProgressionReviewOutput ?? readLatestProgressionOutput(progressionsQuery.data?.progressions ?? []),
-    [latestProgressionReviewOutput, progressionsQuery.data?.progressions],
+    () => latestProgressionReviewOutput ?? readLatestProgressionOutput(progressions),
+    [latestProgressionReviewOutput, progressions],
   );
   const selectedChapter = useMemo(
     () => chapters.find((chapter) => chapter.id === selectedChapterId) ?? chapters[0] ?? null,
     [chapters, selectedChapterId],
   );
 
+  const selectedChapterSyncId = selectedChapter?.id ?? null;
+  const selectedChapterSyncTitle = selectedChapter?.title ?? "";
+  const selectedChapterSyncContent = selectedChapter?.content ?? "";
+
   useEffect(() => {
-    if (!selectedChapter) {
+    if (!selectedChapterSyncId) {
       setDraftTitle("");
       setDraftContent("");
       return;
     }
-    setSelectedChapterId(selectedChapter.id);
-    setDraftTitle(selectedChapter.title);
-    setDraftContent(selectedChapter.content);
-  }, [selectedChapter?.id]);
+    setSelectedChapterId(selectedChapterSyncId);
+    setDraftTitle(selectedChapterSyncTitle);
+    setDraftContent(selectedChapterSyncContent);
+  }, [selectedChapterSyncId, selectedChapterSyncTitle, selectedChapterSyncContent]);
 
   const createChapter = useMutation({
     mutationFn: async () => worlddockApi.createChapter(narrativeId, {
