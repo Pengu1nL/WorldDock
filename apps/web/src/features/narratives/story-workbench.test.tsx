@@ -2,13 +2,143 @@
 
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoryWorkbench } from "./story-workbench";
 import * as api from "../worlddock/api";
 
 describe("StoryWorkbench", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("creates the first chapter from an empty narrative", async () => {
+    vi.spyOn(api, "getNarrative").mockResolvedValue({
+      narrative: {
+        id: "narrative_1",
+        worldId: "world_1",
+        title: "囚笼",
+        synopsis: null,
+        status: "draft",
+        chapterCount: 0,
+        assetCount: 0,
+        metadata: {},
+        visualStyle: {
+          artDirection: "",
+          characterBase: "",
+          environmentBase: "",
+          forbidden: [],
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+      chapters: [],
+      assets: [],
+    });
+    vi.spyOn(api, "listProgressions").mockResolvedValue({ progressions: [] });
+    const create = vi.spyOn(api, "createChapter").mockResolvedValue({
+      chapter: {
+        id: "chapter_1",
+        narrativeId: "narrative_1",
+        order: 1,
+        title: "第一章",
+        content: "",
+        wordCount: 0,
+        status: "draft",
+        metadata: {},
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "囚笼" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "新建章节" }));
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith("narrative_1", {
+        title: "第一章",
+        content: "",
+        status: "draft",
+      });
+    });
+  });
+
+  it("saves edits to the selected chapter", async () => {
+    vi.spyOn(api, "getNarrative").mockResolvedValue({
+      narrative: {
+        id: "narrative_1",
+        worldId: "world_1",
+        title: "囚笼",
+        synopsis: null,
+        status: "in_progress",
+        chapterCount: 1,
+        assetCount: 0,
+        metadata: {},
+        visualStyle: {
+          artDirection: "",
+          characterBase: "",
+          environmentBase: "",
+          forbidden: [],
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+      chapters: [{
+        id: "chapter_1",
+        narrativeId: "narrative_1",
+        order: 1,
+        title: "醒来",
+        content: "旧正文",
+        wordCount: 3,
+        status: "draft",
+        metadata: {},
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      }],
+      assets: [],
+    });
+    vi.spyOn(api, "listProgressions").mockResolvedValue({ progressions: [] });
+    const update = vi.spyOn(api, "updateChapter").mockResolvedValue({
+      chapter: {
+        id: "chapter_1",
+        narrativeId: "narrative_1",
+        order: 1,
+        title: "醒来",
+        content: "新正文",
+        wordCount: 3,
+        status: "draft",
+        metadata: {},
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    const editor = await screen.findByLabelText("章节正文");
+    fireEvent.change(editor, { target: { value: "新正文" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存章节" }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith("narrative_1", "chapter_1", {
+        title: "醒来",
+        content: "新正文",
+        status: "draft",
+      });
+    });
+  });
 
   it("renders chapters, writing editor, assets, and starts progression", async () => {
     vi.spyOn(api, "getNarrative").mockResolvedValue({

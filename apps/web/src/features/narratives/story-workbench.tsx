@@ -19,6 +19,7 @@ export function StoryWorkbenchRoute({ narrativeId }: { narrativeId: string }) {
 export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
   const queryClient = useQueryClient();
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const [notice, setNotice] = useState("");
   const [panel, setPanel] = useState<"assets" | "snapshot" | "arc" | "style">("assets");
@@ -44,10 +45,45 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
   );
 
   useEffect(() => {
-    if (!selectedChapter) return;
+    if (!selectedChapter) {
+      setDraftTitle("");
+      setDraftContent("");
+      return;
+    }
     setSelectedChapterId(selectedChapter.id);
+    setDraftTitle(selectedChapter.title);
     setDraftContent(selectedChapter.content);
   }, [selectedChapter?.id]);
+
+  const createChapter = useMutation({
+    mutationFn: async () => worlddockApi.createChapter(narrativeId, {
+      title: chapters.length === 0 ? "第一章" : `第 ${chapters.length + 1} 章`,
+      content: "",
+      status: "draft",
+    }),
+    onSuccess: async (result) => {
+      setSelectedChapterId(result.chapter.id);
+      setDraftTitle(result.chapter.title);
+      setDraftContent(result.chapter.content);
+      setNotice("章节已创建");
+      await queryClient.invalidateQueries({ queryKey: ["narrative", narrativeId] });
+    },
+  });
+
+  const saveChapter = useMutation({
+    mutationFn: async (chapter: Chapter) => worlddockApi.updateChapter(narrativeId, chapter.id, {
+      title: draftTitle.trim() || chapter.title,
+      content: draftContent,
+      status: chapter.status,
+    }),
+    onSuccess: async (result) => {
+      setSelectedChapterId(result.chapter.id);
+      setDraftTitle(result.chapter.title);
+      setDraftContent(result.chapter.content);
+      setNotice("章节已保存");
+      await queryClient.invalidateQueries({ queryKey: ["narrative", narrativeId] });
+    },
+  });
 
   const startProgression = useMutation({
     mutationFn: async (chapter: Chapter) => worlddockApi.startChapterProgression(narrativeId, chapter.id),
@@ -113,7 +149,17 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
         gridTemplateColumns: "240px minmax(360px, 1fr) 320px",
       }}>
         <aside style={{ borderRight: "1px solid var(--hairline)", padding: 12, overflow: "auto" }}>
-          <div className="label" style={{ marginBottom: 8 }}>章节</div>
+          <div className="row gap-2" style={{ marginBottom: 8, justifyContent: "space-between" }}>
+            <div className="label">章节</div>
+            <button
+              className="sb-btn"
+              disabled={createChapter.isPending}
+              onClick={() => createChapter.mutate()}
+              type="button"
+            >
+              新建章节
+            </button>
+          </div>
           <div className="col" style={{ gap: 6 }}>
             {chapters.map((chapter) => (
               <button
@@ -138,17 +184,42 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
             alignItems: "center",
             gap: 12,
           }}>
-            <div>
-              <div className="title-font" style={{ fontSize: "var(--t-16)", fontWeight: 650 }}>
-                {selectedChapter?.title ?? "选择章节"}
-              </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <input
+                aria-label="章节标题"
+                className="title-font"
+                disabled={!selectedChapter}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                placeholder="选择章节"
+                value={draftTitle}
+                style={{
+                  width: "100%",
+                  border: 0,
+                  outline: "none",
+                  background: "transparent",
+                  color: "var(--fg)",
+                  fontSize: "var(--t-16)",
+                  fontWeight: 650,
+                  padding: 0,
+                }}
+              />
               <div className="mono" style={{ fontSize: 11, color: "var(--fg-3)", marginTop: 3 }}>
                 {selectedChapter ? `${selectedChapter.wordCount} words · ${selectedChapter.status}` : "no chapter"}
               </div>
             </div>
+            <button
+              className="sb-btn"
+              disabled={!selectedChapter || saveChapter.isPending}
+              onClick={() => selectedChapter && saveChapter.mutate(selectedChapter)}
+              type="button"
+            >
+              {saveChapter.isPending ? "保存中" : "保存章节"}
+            </button>
           </div>
           <textarea
             aria-label="章节正文"
+            disabled={!selectedChapter}
+            placeholder={selectedChapter ? "" : "先新建章节，再开始写作。"}
             value={draftContent}
             onChange={(event) => setDraftContent(event.target.value)}
             style={{
