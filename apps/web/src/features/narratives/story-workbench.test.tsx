@@ -216,6 +216,101 @@ describe("StoryWorkbench", () => {
     });
   });
 
+  it("keeps polling while any progression is running", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(api, "getNarrative").mockResolvedValue({
+        narrative: {
+          id: "narrative_1",
+          worldId: "world_1",
+          title: "囚笼",
+          synopsis: null,
+          status: "in_progress",
+          chapterCount: 1,
+          assetCount: 0,
+          metadata: {},
+          visualStyle: {
+            artDirection: "",
+            characterBase: "",
+            environmentBase: "",
+            forbidden: [],
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:00.000Z",
+        },
+        chapters: [{
+          id: "chapter_1",
+          narrativeId: "narrative_1",
+          order: 1,
+          title: "醒来",
+          content: "旧正文",
+          wordCount: 3,
+          status: "draft",
+          metadata: {},
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:00.000Z",
+        }],
+        assets: [],
+      });
+      const list = vi.spyOn(api, "listProgressions").mockResolvedValue({
+        progressions: [{
+          id: "session_latest",
+          worldId: "world_1",
+          kind: "story_progression",
+          status: "completed",
+          current: false,
+          title: "Progress latest",
+          metadata: {
+            reviewStatus: "pending_review",
+            progressionOutput: {
+              assetChanges: [],
+              consistencyFlags: [],
+              narrativeObservations: [{
+                observation: "最新推演已待确认。",
+                implication: "旧推演仍在运行。",
+                arcStage: "setup",
+              }],
+            },
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:02.000Z",
+        } as any, {
+          id: "session_running",
+          worldId: "world_1",
+          kind: "story_progression",
+          status: "active",
+          current: true,
+          title: "Progress running",
+          metadata: {
+            reviewStatus: "running",
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:01.000Z",
+        } as any],
+      });
+
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <StoryWorkbench narrativeId="narrative_1" />
+        </QueryClientProvider>,
+      );
+
+      await vi.advanceTimersByTimeAsync(0);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(list).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1600);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(list).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("推演运行中")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("polls running progression until it is pending review", async () => {
     vi.useFakeTimers();
     try {
@@ -313,6 +408,83 @@ describe("StoryWorkbench", () => {
       expect(screen.getByText("待确认推演")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("disables progression while a chapter save is pending", async () => {
+    vi.spyOn(api, "getNarrative").mockResolvedValue({
+      narrative: {
+        id: "narrative_1",
+        worldId: "world_1",
+        title: "囚笼",
+        synopsis: null,
+        status: "in_progress",
+        chapterCount: 1,
+        assetCount: 0,
+        metadata: {},
+        visualStyle: {
+          artDirection: "",
+          characterBase: "",
+          environmentBase: "",
+          forbidden: [],
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+      chapters: [{
+        id: "chapter_1",
+        narrativeId: "narrative_1",
+        order: 1,
+        title: "醒来",
+        content: "旧正文",
+        wordCount: 3,
+        status: "draft",
+        metadata: {},
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      }],
+      assets: [],
+    });
+    vi.spyOn(api, "listProgressions").mockResolvedValue({ progressions: [] });
+    const savedChapter = {
+      id: "chapter_1",
+      narrativeId: "narrative_1",
+      order: 1,
+      title: "醒来",
+      content: "旧正文",
+      wordCount: 3,
+      status: "draft",
+      metadata: {},
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    let resolveUpdate: (value: { chapter: typeof savedChapter }) => void = () => undefined;
+    const update = vi.spyOn(api, "updateChapter").mockImplementation(() => new Promise((resolve) => {
+      resolveUpdate = resolve;
+    }));
+    const start = vi.spyOn(api, "startChapterProgression").mockResolvedValue({
+      sessionId: "session_1",
+      session: { id: "session_1", worldId: "world_1", kind: "story_progression", status: "active" } as any,
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByLabelText("章节正文")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存章节" }));
+
+    try {
+      await waitFor(() => {
+        expect(update).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole("button", { name: /推演本章/ })).toBeDisabled();
+      });
+      fireEvent.click(screen.getByRole("button", { name: /推演本章/ }));
+      expect(start).not.toHaveBeenCalled();
+    } finally {
+      resolveUpdate({ chapter: savedChapter });
     }
   });
 

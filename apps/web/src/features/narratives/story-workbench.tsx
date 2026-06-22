@@ -33,7 +33,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
     queryFn: () => worlddockApi.listProgressions(narrativeId),
     refetchInterval: (query) => {
       const data = query.state.data as { progressions?: worlddockApi.AgentSession[] } | undefined;
-      return readReviewStatus(readLatestProgression(data?.progressions ?? [])) === "running" ? 1500 : false;
+      return hasRunningProgression(data?.progressions ?? []) ? 1500 : false;
     },
   });
 
@@ -43,8 +43,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
     () => readLatestProgression(progressionsQuery.data?.progressions ?? []),
     [progressionsQuery.data?.progressions],
   );
-  const latestReviewStatus = readReviewStatus(latestProgression);
-  const shouldPollProgression = latestReviewStatus === "running";
+  const shouldPollProgression = hasRunningProgression(progressionsQuery.data?.progressions ?? []);
   const latestProgressionReviewOutput = useMemo(
     () => readProgressionOutput(latestProgression?.metadata?.progressionOutput),
     [latestProgression],
@@ -95,7 +94,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
       setDraftTitle(result.chapter.title);
       setDraftContent(result.chapter.content);
       setNotice("章节已创建");
-      await queryClient.invalidateQueries({ queryKey: ["narrative", narrativeId] });
+      void queryClient.invalidateQueries({ queryKey: ["narrative", narrativeId] });
     },
   });
 
@@ -135,6 +134,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
       ]);
     },
   });
+  const isChapterWritePending = createChapter.isPending || saveChapter.isPending || startProgression.isPending;
 
   if (narrativeQuery.isPending) {
     return <main style={{ padding: 24 }} role="status">正在读取故事...</main>;
@@ -175,7 +175,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
           {shouldPollProgression && <span className="badge">推演运行中</span>}
           <button
             className="btn primary"
-            disabled={!selectedChapter || startProgression.isPending}
+            disabled={!selectedChapter || isChapterWritePending}
             onClick={() => selectedChapter && startProgression.mutate(selectedChapter)}
           >
             <Icon name="spark" size={13} />
@@ -194,7 +194,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
             <div className="label">章节</div>
             <button
               className="sb-btn"
-              disabled={createChapter.isPending}
+              disabled={isChapterWritePending}
               onClick={() => createChapter.mutate()}
               type="button"
             >
@@ -250,7 +250,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
             </div>
             <button
               className="sb-btn"
-              disabled={!selectedChapter || saveChapter.isPending}
+              disabled={!selectedChapter || isChapterWritePending}
               onClick={() => selectedChapter && saveChapter.mutate(selectedChapter)}
               type="button"
             >
@@ -444,6 +444,10 @@ function readLatestProgression(progressions: worlddockApi.AgentSession[]) {
 
 function readReviewStatus(progression: worlddockApi.AgentSession | null) {
   return typeof progression?.metadata?.reviewStatus === "string" ? progression.metadata.reviewStatus : null;
+}
+
+function hasRunningProgression(progressions: worlddockApi.AgentSession[]) {
+  return progressions.some((progression) => readReviewStatus(progression) === "running");
 }
 
 function readLatestProgressionOutput(progressions: worlddockApi.AgentSession[]): ProgressionOutput | null {
