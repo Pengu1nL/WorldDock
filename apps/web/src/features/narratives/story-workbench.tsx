@@ -45,10 +45,13 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
   );
   const latestReviewStatus = readReviewStatus(latestProgression);
   const shouldPollProgression = latestReviewStatus === "running";
+  const latestProgressionReviewOutput = useMemo(
+    () => readProgressionOutput(latestProgression?.metadata?.progressionOutput),
+    [latestProgression],
+  );
   const latestProgressionOutput = useMemo(
-    () => readProgressionOutput(latestProgression?.metadata?.progressionOutput)
-      ?? readLatestProgressionOutput(progressionsQuery.data?.progressions ?? []),
-    [latestProgression, progressionsQuery.data?.progressions],
+    () => latestProgressionReviewOutput ?? readLatestProgressionOutput(progressionsQuery.data?.progressions ?? []),
+    [latestProgressionReviewOutput, progressionsQuery.data?.progressions],
   );
   const selectedChapter = useMemo(
     () => chapters.find((chapter) => chapter.id === selectedChapterId) ?? chapters[0] ?? null,
@@ -296,7 +299,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
               </button>
             ))}
           </div>
-          <ProgressionReviewCard progression={latestProgression} output={latestProgressionOutput} />
+          <ProgressionReviewCard progression={latestProgression} output={latestProgressionReviewOutput} />
           {panel === "assets" && <AssetsPanel assets={assets} />}
           {panel === "snapshot" && <WorldSnapshotPanel snapshot={worldSnapshot} />}
           {panel === "arc" && <NarrativeArcPanel observations={arcObservations} chapters={chapters} />}

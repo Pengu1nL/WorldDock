@@ -316,6 +316,90 @@ describe("StoryWorkbench", () => {
     }
   });
 
+  it("does not show the review card when the latest pending review progression has no output", async () => {
+    vi.spyOn(api, "getNarrative").mockResolvedValue({
+      narrative: {
+        id: "narrative_1",
+        worldId: "world_1",
+        title: "囚笼",
+        synopsis: null,
+        status: "in_progress",
+        chapterCount: 1,
+        assetCount: 0,
+        metadata: {},
+        visualStyle: {
+          artDirection: "",
+          characterBase: "",
+          environmentBase: "",
+          forbidden: [],
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+      chapters: [{
+        id: "chapter_1",
+        narrativeId: "narrative_1",
+        order: 1,
+        title: "醒来",
+        content: "旧正文",
+        wordCount: 3,
+        status: "draft",
+        metadata: {},
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      }],
+      assets: [],
+    });
+    vi.spyOn(api, "listProgressions").mockResolvedValue({
+      progressions: [{
+        id: "session_latest",
+        worldId: "world_1",
+        kind: "story_progression",
+        status: "completed",
+        current: false,
+        title: "Progress latest",
+        metadata: {
+          reviewStatus: "pending_review",
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:02.000Z",
+      } as any, {
+        id: "session_old",
+        worldId: "world_1",
+        kind: "story_progression",
+        status: "completed",
+        current: false,
+        title: "Progress old",
+        metadata: {
+          reviewStatus: "confirmed",
+          progressionOutput: {
+            assetChanges: [],
+            consistencyFlags: [],
+            narrativeObservations: [{
+              observation: "旧弧光仍可展示。",
+              implication: "普通面板保留旧 output fallback。",
+              arcStage: "setup",
+            }],
+          },
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:01.000Z",
+      } as any],
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "囚笼" })).toBeInTheDocument();
+    expect(screen.queryByText("待确认推演")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "弧光" }));
+    expect(screen.getByText("旧弧光仍可展示。")).toBeInTheDocument();
+  });
+
   it("keeps a newly created chapter selected before the narrative refetch returns", async () => {
     const staleNarrative = {
       narrative: {
