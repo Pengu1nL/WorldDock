@@ -6,7 +6,7 @@
 
 - 可以调用读取类工具核对上下文：`get_world_manifest`、`search_world_assets`、`get_asset_brief`、`get_asset_detail`、`get_asset_source_fragments`。
 - 可以调用运行时暴露的正式资产创建工具一次；输入必须来自用户选择的 potential asset 或用户明确文本。
-- 可以在创建前输出待创建资产的类型、标题、摘要、Markdown 正文和来源说明，供用户确认或供创建工具使用。
+- 如果用户当前指令已经明确要求沉淀、创建、写入或入库，且信息足够，必须直接调用正式资产创建工具；不要再次要求用户确认，也不要只输出待创建内容。
 
 ## 禁止行为
 

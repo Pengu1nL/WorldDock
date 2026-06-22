@@ -24,6 +24,16 @@ describe("loadSessionPiSkills", () => {
     ).toEqual(["asset-deposition"]);
   });
 
+  it("instructs asset deposition to create directly when the user already requested deposition", () => {
+    const [skill] = loadSessionPiSkills({
+      kind: "world_exploration",
+      intent: "asset_deposition",
+    });
+
+    expect(skill.instructions).toContain("不要再次要求用户确认");
+    expect(skill.instructions).not.toContain("供用户确认");
+  });
+
   it("loads the asset edit skill for asset edit sessions", () => {
     expect(loadSessionPiSkills({ kind: "asset_edit" }).map((skill) => skill.name)).toEqual(["asset-edit"]);
   });

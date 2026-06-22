@@ -3,6 +3,7 @@ import type { TokenUsage } from "@worlddock/domain";
 import type { AgentProvider, AgentProviderInput } from "./agent.provider";
 import { AgentService } from "./agent.service";
 import type { AgentEventRecord, AgentRepository, AgentRunRecord } from "./agent.repository";
+import type { AgentSessionMessageRecord, AgentSessionRecord, AgentSessionsRepository } from "../agent-sessions/agent-sessions.repository";
 import type { WorldRecord, WorldRepository } from "../worlds/world.repository";
 
 describe("AgentService cancellation", () => {
@@ -132,6 +133,64 @@ describe("AgentService cancellation", () => {
   });
 });
 
+describe("AgentService session asset deposition", () => {
+  it("keeps asset deposition intent when the user confirms a drafted formal asset", async () => {
+    const now = new Date();
+    let run: AgentRunRecord = {
+      id: "run_confirm",
+      worldId: "world_1",
+      sessionId: "session_1",
+      status: "running",
+      mode: "expand",
+      prompt: "确认",
+      model: "test-model",
+      provider: "pi",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const events: AgentEventRecord[] = [];
+    const agents = createAgentRepository({
+      getRun: () => run,
+      setRun: (input) => {
+        run = { ...run, ...input, updatedAt: new Date() };
+        return run;
+      },
+      events,
+    });
+    const provider = new CapturingProvider();
+    const sessions = createAgentSessionsRepository({
+      session: createAgentSession({ id: "session_1", worldId: "world_1", kind: "world_exploration" }),
+      messages: [
+        createAgentSessionMessage(1, "user", "沉淀势力资产：太空农业基因安全联合委员会"),
+        createAgentSessionMessage(
+          2,
+          "assistant",
+          [
+            "按照设定要求，我先输出待创建资产的完整内容供确认：",
+            "类型：势力",
+            "名称：太空农业基因安全联合委员会（SAGSC）",
+            "摘要：由地球航天大国、大型太空企业和联合国粮农组织共同组成的跨国监管机构。",
+          ].join("\n"),
+        ),
+        createAgentSessionMessage(3, "user", "确认"),
+      ],
+    });
+    const service = new AgentService(agents, provider, createWorldRepository(), sessions);
+
+    for await (const _event of service.streamSessionRunEvents(run.id)) {
+      // Exhaust the generator so provider input is captured and the run completes.
+    }
+
+    expect(provider.input?.policy).toEqual({ kind: "world_exploration", intent: "asset_deposition" });
+    expect(provider.input?.tools?.map((tool) => tool.name)).toContain("create_world_asset");
+    expect(provider.input?.tools?.map((tool) => tool.name)).not.toContain("propose_setting");
+    expect(provider.input?.skills?.map((skill) => skill.name)).toEqual(["asset-deposition"]);
+    expect(provider.input?.prompt).toContain("当前用户明确要求沉淀一个正式世界资产。");
+    expect(provider.input?.prompt).toContain("当前指令：确认");
+    expect(provider.input?.prompt).toContain("太空农业基因安全联合委员会");
+  });
+});
+
 class PausingProvider implements AgentProvider {
   aborted = false;
 
@@ -165,6 +224,15 @@ class PendingProvider implements AgentProvider {
     this.startedCalled = true;
     this.started.resolve();
     await new Promise<never>(() => {});
+  }
+}
+
+class CapturingProvider implements AgentProvider {
+  input?: AgentProviderInput;
+
+  async *stream(input: AgentProviderInput) {
+    this.input = input;
+    yield { type: "delta" as const, text: "ok" };
   }
 }
 
@@ -214,6 +282,110 @@ function createAgentRepository(input: {
     },
     async updateSuggestion() {
       return null;
+    },
+  };
+}
+
+function createAgentSession(input: Partial<AgentSessionRecord> = {}): AgentSessionRecord {
+  const now = new Date();
+  return {
+    id: "session_1",
+    worldId: "world_1",
+    narrativeId: null,
+    chapterId: null,
+    kind: "world_exploration",
+    title: "测试世界 推演",
+    status: "active",
+    current: true,
+    metadata: {},
+    createdAt: now,
+    updatedAt: now,
+    ...input,
+  };
+}
+
+function createAgentSessionMessage(
+  sequence: number,
+  role: AgentSessionMessageRecord["role"],
+  content: string,
+): AgentSessionMessageRecord {
+  const now = new Date();
+  return {
+    id: `message_${sequence}`,
+    sessionId: "session_1",
+    sequence,
+    role,
+    content,
+    status: "complete",
+    metadata: {},
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createAgentSessionsRepository(input: {
+  session: AgentSessionRecord;
+  messages: AgentSessionMessageRecord[];
+}): AgentSessionsRepository {
+  return {
+    async createSession() {
+      throw new Error("Not used in this test.");
+    },
+    async createSessionWithSubject() {
+      throw new Error("Not used in this test.");
+    },
+    async findSessionById(id) {
+      return input.session.id === id ? input.session : null;
+    },
+    async findSessionForWorld(worldId, sessionId) {
+      return input.session.worldId === worldId && input.session.id === sessionId ? input.session : null;
+    },
+    async listSessions() {
+      return { sessions: [input.session], nextCursor: null };
+    },
+    async updateSession() {
+      return input.session;
+    },
+    async clearCurrentWorldExploration() {},
+    async setCurrentWorldExploration() {
+      return input.session;
+    },
+    async createSubject() {
+      throw new Error("Not used in this test.");
+    },
+    async listSubjects() {
+      return [];
+    },
+    async createContextItem(contextItem) {
+      const now = new Date();
+      return {
+        id: "context_1",
+        sessionId: contextItem.sessionId,
+        kind: contextItem.kind,
+        targetId: contextItem.targetId,
+        title: contextItem.title ?? null,
+        summary: contextItem.summary ?? null,
+        metadata: contextItem.metadata ?? {},
+        createdAt: now,
+        updatedAt: now,
+      };
+    },
+    async listContextItems() {
+      return [];
+    },
+    async appendMessage(message) {
+      const created = createAgentSessionMessage(message.sequence, message.role, message.content);
+      input.messages.push({ ...created, status: message.status ?? "complete", metadata: message.metadata ?? {} });
+      return input.messages[input.messages.length - 1];
+    },
+    async appendMessageAtEnd(message) {
+      const nextSequence = Math.max(0, ...input.messages.map((item) => item.sequence)) + 1;
+      const created = createAgentSessionMessage(nextSequence, message.role, message.content);
+      input.messages.push({ ...created, status: message.status ?? "complete", metadata: message.metadata ?? {} });
+      return input.messages[input.messages.length - 1];
+    },
+    async listMessages() {
+      return input.messages;
     },
   };
 }

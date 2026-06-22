@@ -55,7 +55,11 @@ function policyForSession(
 ): PiSessionPolicy {
   if (
     session.kind === "world_exploration" &&
-    (isAssetDepositionPrompt(prompt) || isContextualAssetDepositionPrompt(prompt, messages))
+    (
+      isAssetDepositionPrompt(prompt)
+      || isContextualAssetDepositionPrompt(prompt, messages)
+      || isContextualAssetDepositionConfirmationPrompt(prompt, messages)
+    )
   ) {
     return { kind: "world_exploration", intent: "asset_deposition" };
   }
@@ -82,6 +86,32 @@ function isContextualAssetDepositionPrompt(prompt: string, messages: AgentSessio
       .join("\n"),
   );
   return hasAssetTarget(recentContext);
+}
+
+function isContextualAssetDepositionConfirmationPrompt(prompt: string, messages: AgentSessionMessageRecord[]) {
+  if (!isAssetDepositionConfirmationPrompt(prompt)) return false;
+
+  const latestAssistantDraft = [...recentMessagesBeforeCurrentPrompt(messages, prompt)]
+    .reverse()
+    .find((message) => message.role === "assistant" && message.status === "complete");
+  if (!latestAssistantDraft) return false;
+
+  return hasFormalAssetDraft(normalizePromptText(latestAssistantDraft.content));
+}
+
+function isAssetDepositionConfirmationPrompt(prompt: string) {
+  const normalized = normalizePromptText(prompt).replace(/[。！!？?，,、.]/g, "");
+  return /^(确认|确认创建|确认沉淀|确认入库|同意|可以|没问题|按这个来|就这样)$/.test(normalized);
+}
+
+function hasFormalAssetDraft(normalizedText: string) {
+  if (!hasAssetTarget(normalizedText)) return false;
+
+  const hasFormalCreationLanguage = /(待创建|待沉淀|正式资产|正式写入|写入资产库|创建正式|沉淀为正式|待创建资产|确认后)/.test(normalizedText);
+  const structuredFieldCount = ["类型", "分类", "名称", "标题", "摘要", "正文"]
+    .filter((label) => new RegExp(`${label}.{0,8}[:：]`).test(normalizedText)).length;
+
+  return hasFormalCreationLanguage && structuredFieldCount >= 2;
 }
 
 function hasAssetDepositionVerb(normalizedText: string) {
@@ -121,6 +151,7 @@ function buildSessionProviderPrompt(
     [
       "请只沉淀一个资产。",
       "资产标题、类型、摘要和 Markdown 正文必须来自当前指令与最近会话上下文。",
+      "如果当前指令是“确认”等短确认，请把它理解为确认最近会话上下文中的待创建资产草稿，并直接调用 create_world_asset；不要再次要求用户确认。",
       "如果信息足够，请调用 create_world_asset 创建正式资产；不要改用 pending suggestion。",
       "如果信息不足，请直接说明缺少哪些字段，不要声称已经沉淀。",
     ].join("\n"),
