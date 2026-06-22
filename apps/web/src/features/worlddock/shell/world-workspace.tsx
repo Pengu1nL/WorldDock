@@ -43,8 +43,10 @@ import {
 import {
   cancelAgentRun,
   createConsistencyRepairSession,
+  createNarrative,
   getAgentSession,
   getOfficialAsset,
+  listNarratives,
   revertConsistencyPatchBatch,
   type AgentSessionDetail,
   type AgentSessionRunEvent,
@@ -129,6 +131,9 @@ export function WorldWorkspace({
           world={currentWorld}
           pushToast={pushToast}
         />
+      )}
+      {view === "stories" && currentWorld && (
+        <StoriesWorkspace world={currentWorld} />
       )}
       {view === "settings" && (
         <SettingsView
@@ -1593,3 +1598,96 @@ function getLatestCompletedContextRefs(messages: any[]) {
   }
   return 0;
 }
+
+const StoriesWorkspace = ({ world }: { world: any }) => {
+  const worldId = world?.id as string | undefined;
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const narrativesQuery = useQuery({
+    queryKey: ["narratives", worldId],
+    queryFn: () => listNarratives({ worldId }),
+    enabled: Boolean(worldId),
+  });
+
+  const narratives = narrativesQuery.data?.narratives ?? [];
+
+  const handleCreate = useCallback(async () => {
+    if (!title.trim() || creating) return;
+    setCreating(true);
+    try {
+      await createNarrative({ worldId, title: title.trim() });
+      setTitle("");
+      await queryClient.invalidateQueries({ queryKey: ["narratives", worldId] });
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, queryClient, title, worldId]);
+
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "24px 32px" }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>
+        <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "baseline", marginBottom: 20 }}>
+          <h1 className="title-font" style={{ fontSize: "var(--t-22)", margin: 0 }}>故事</h1>
+          <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>
+            {world.name}
+          </span>
+        </div>
+
+        <div className="row gap-2" style={{ marginBottom: 20 }}>
+          <input
+            className="input"
+            placeholder="新故事标题"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleCreate(); }}
+            style={{ flex: 1 }}
+          />
+          <button className="btn primary" disabled={!title.trim() || creating} onClick={() => void handleCreate()}>
+            <Icon name="plus" size={13} />
+            <span>{creating ? "创建中" : "创建故事"}</span>
+          </button>
+        </div>
+
+        {narrativesQuery.isPending ? (
+          <div className="row gap-2" style={{ color: "var(--fg-3)", fontSize: 13 }}>
+            <span className="dot amber pulse" />
+            <span>正在载入故事</span>
+          </div>
+        ) : narratives.length === 0 ? (
+          <div style={{ color: "var(--fg-3)", fontSize: 13, lineHeight: 1.6, textAlign: "center", padding: "40px 0" }}>
+            还没有故事。在上面创建第一个。
+          </div>
+        ) : (
+          <div className="col" style={{ gap: 8 }}>
+            {narratives.map((n: any) => (
+              <a
+                key={n.id}
+                href={`/narratives/${n.id}`}
+                style={{
+                  display: "block",
+                  padding: "14px 16px",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: 8,
+                  background: "var(--surface)",
+                  color: "var(--fg)",
+                  textDecoration: "none",
+                }}
+              >
+                <div className="row gap-2" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+                  <strong style={{ fontSize: 15 }}>{n.title}</strong>
+                  <span className="badge">{n.status}</span>
+                </div>
+                <div className="row gap-3" style={{ marginTop: 8 }}>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{n.chapterCount} 章</span>
+                  <span className="mono" style={{ fontSize: 11, color: "var(--fg-3)" }}>{n.assetCount} 资产</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -7,16 +7,19 @@ describe("world navigation", () => {
 
     expect(items.map((item) => item.label)).toEqual([
       "推演",
+      "故事",
       "资产库",
       "矛盾",
     ]);
     expect(items.map((item) => item.id)).toEqual([
       "exploration",
+      "stories",
       "asset-library",
       "consistency",
     ]);
     expect(items.map((item) => item.icon)).toEqual([
       "session",
+      "explore",
       "assets",
       "consistency",
     ]);

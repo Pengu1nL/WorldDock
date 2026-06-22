@@ -6,6 +6,7 @@ export type WorldDockView =
   | "exploration"
   | "asset-library"
   | "consistency"
+  | "stories"
   | "settings";
 
 export type LegacyWorldDockView =
@@ -31,6 +32,7 @@ const WORLD_VIEWS = new Set<WorldDockView>([
   "exploration",
   "asset-library",
   "consistency",
+  "stories",
   "settings",
 ]);
 
@@ -52,6 +54,7 @@ export function getWorldNavigationItems({
   if (!hasWorld) return [];
   return [
     { id: "exploration", label: "推演", icon: "session", badge: pendingCount },
+    { id: "stories", label: "故事", icon: "explore" },
     { id: "asset-library", label: "资产库", icon: "assets" },
     { id: "consistency", label: "矛盾", icon: "consistency", badge: consistencyIssueBadge },
   ];
