@@ -640,34 +640,42 @@ describe("StoryWorkbench", () => {
           updatedAt: "2026-06-22T00:00:01.000Z",
         }],
       });
-    vi.spyOn(api, "listProgressions").mockResolvedValue({
-      progressions: [{
-        id: "session_1",
-        worldId: "world_1",
-        kind: "story_progression",
-        status: "completed",
-        current: false,
-        title: "Progress 醒来",
-        metadata: {
-          reviewStatus: "pending_review",
-          progressionOutput: {
-            assetChanges: [{
-              kind: "character",
-              name: "囚徒甲",
-              summary: "在囚笼中醒来的角色。",
-            }],
-            consistencyFlags: [],
-            narrativeObservations: [{
-              observation: "囚徒甲在囚笼中醒来。",
-              implication: "角色资产等待确认入库。",
-              arcStage: "setup",
-            }],
-          },
+    const pendingProgression = {
+      id: "session_1",
+      worldId: "world_1",
+      kind: "story_progression",
+      status: "completed",
+      current: false,
+      title: "Progress 醒来",
+      metadata: {
+        reviewStatus: "pending_review",
+        progressionOutput: {
+          assetChanges: [{
+            kind: "character",
+            name: "囚徒甲",
+            summary: "在囚笼中醒来的角色。",
+          }],
+          consistencyFlags: [],
+          narrativeObservations: [{
+            observation: "囚徒甲在囚笼中醒来。",
+            implication: "角色资产等待确认入库。",
+            arcStage: "setup",
+          }],
         },
-        createdAt: "2026-06-22T00:00:00.000Z",
-        updatedAt: "2026-06-22T00:00:01.000Z",
-      } as any],
-    });
+      },
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:01.000Z",
+    } as any;
+    const list = vi.spyOn(api, "listProgressions")
+      .mockResolvedValueOnce({ progressions: [pendingProgression] })
+      .mockResolvedValue({
+        progressions: [{
+          ...pendingProgression,
+          metadata: {
+            reviewStatus: "confirmed",
+          },
+        }],
+      });
     const confirm = vi.spyOn(api, "confirmProgression").mockResolvedValue({
       session: { id: "session_1", metadata: { reviewStatus: "confirmed" } } as any,
       appliedAssets: [],
@@ -687,6 +695,102 @@ describe("StoryWorkbench", () => {
       expect(confirm).toHaveBeenCalledWith("narrative_1", "session_1");
     });
     expect(await screen.findByText("囚徒甲")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText("待确认推演")).not.toBeInTheDocument();
+    });
+  });
+
+  it("blocks starting a new progression while confirmation is pending", async () => {
+    const chapter = {
+      id: "chapter_1",
+      narrativeId: "narrative_1",
+      order: 1,
+      title: "醒来",
+      content: "旧正文",
+      wordCount: 3,
+      status: "draft",
+      metadata: {},
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    vi.spyOn(api, "getNarrative").mockResolvedValue({
+      narrative: {
+        id: "narrative_1",
+        worldId: "world_1",
+        title: "囚笼",
+        synopsis: null,
+        status: "in_progress",
+        chapterCount: 1,
+        assetCount: 0,
+        metadata: {},
+        visualStyle: {
+          artDirection: "",
+          characterBase: "",
+          environmentBase: "",
+          forbidden: [],
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+      chapters: [chapter],
+      assets: [],
+    });
+    vi.spyOn(api, "listProgressions").mockResolvedValue({
+      progressions: [{
+        id: "session_1",
+        worldId: "world_1",
+        kind: "story_progression",
+        status: "completed",
+        current: false,
+        title: "Progress 醒来",
+        metadata: {
+          reviewStatus: "pending_review",
+          progressionOutput: {
+            assetChanges: [],
+            consistencyFlags: [],
+            narrativeObservations: [{
+              observation: "囚徒甲在囚笼中醒来。",
+              implication: "角色资产等待确认入库。",
+              arcStage: "setup",
+            }],
+          },
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:01.000Z",
+      } as any],
+    });
+    let resolveConfirm: (value: { session: any; appliedAssets: [] }) => void = () => undefined;
+    vi.spyOn(api, "confirmProgression").mockImplementation(() => new Promise((resolve) => {
+      resolveConfirm = resolve;
+    }));
+    vi.spyOn(api, "updateChapter").mockResolvedValue({ chapter });
+    const start = vi.spyOn(api, "startChapterProgression").mockResolvedValue({
+      sessionId: "session_2",
+      session: { id: "session_2", worldId: "world_1", kind: "story_progression", status: "active" } as any,
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("待确认推演")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认推演" }));
+
+    const progressionButton = screen.getByRole("button", { name: /推演本章/ });
+    await waitFor(() => {
+      expect(progressionButton).toBeDisabled();
+    });
+    fireEvent.click(progressionButton);
+    expect(start).not.toHaveBeenCalled();
+
+    resolveConfirm({
+      session: { id: "session_1", metadata: { reviewStatus: "confirmed" } } as any,
+      appliedAssets: [],
+    });
   });
 
   it("rejects a pending review progression without applying assets", async () => {
@@ -785,6 +889,9 @@ describe("StoryWorkbench", () => {
       expect(reject).toHaveBeenCalledWith("narrative_1", "session_1");
     });
     expect(await screen.findByText("推演已拒绝")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("待确认推演")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps a newly created chapter selected before the narrative refetch returns", async () => {

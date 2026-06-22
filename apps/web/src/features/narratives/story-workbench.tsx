@@ -152,6 +152,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
     },
   });
   const isChapterWritePending = createChapter.isPending || saveChapter.isPending || startProgression.isPending;
+  const isProgressionReviewPending = confirmProgression.isPending || rejectProgression.isPending;
 
   if (narrativeQuery.isPending) {
     return <main style={{ padding: 24 }} role="status">正在读取故事...</main>;
@@ -192,7 +193,7 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
           {shouldPollProgression && <span className="badge">推演运行中</span>}
           <button
             className="btn primary"
-            disabled={!selectedChapter || isChapterWritePending}
+            disabled={!selectedChapter || isChapterWritePending || isProgressionReviewPending}
             onClick={() => selectedChapter && startProgression.mutate(selectedChapter)}
           >
             <Icon name="spark" size={13} />
