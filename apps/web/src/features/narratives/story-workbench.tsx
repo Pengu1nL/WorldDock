@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Icon } from "../worlddock/components";
 import * as worlddockApi from "../worlddock/api";
-import type { Chapter, NarrativeAsset, ProgressionOutput, VisualStyleGuide, WorldSnapshot } from "../worlddock/api";
+import type { Chapter, NarrativeAsset, NarrativeDetail, ProgressionOutput, VisualStyleGuide, WorldSnapshot } from "../worlddock/api";
 
 const routeQueryClient = new QueryClient();
 
@@ -62,6 +62,21 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
       status: "draft",
     }),
     onSuccess: async (result) => {
+      queryClient.setQueryData<NarrativeDetail>(["narrative", narrativeId], (current) => {
+        if (!current) return current;
+        const chaptersWithCreated = current.chapters.some((chapter) => chapter.id === result.chapter.id)
+          ? current.chapters
+          : [...current.chapters, result.chapter];
+
+        return {
+          ...current,
+          chapters: chaptersWithCreated,
+          narrative: {
+            ...current.narrative,
+            chapterCount: Math.max(current.narrative.chapterCount, chaptersWithCreated.length),
+          },
+        };
+      });
       setSelectedChapterId(result.chapter.id);
       setDraftTitle(result.chapter.title);
       setDraftContent(result.chapter.content);
