@@ -565,6 +565,17 @@ export async function confirmProgression(
   });
 }
 
+export async function rejectProgression(
+  narrativeId: string,
+  sessionId: string,
+  options: ApiClientOptions = {},
+): Promise<{ session: AgentSession }> {
+  return requestJson(`/v1/narratives/${narrativeId}/progressions/${sessionId}/reject`, {
+    method: "POST",
+    ...options,
+  });
+}
+
 export async function generateWorldDraft(
   input: WorldDraftGenerationInput,
   options: ApiClientOptions = {},

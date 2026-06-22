@@ -37,6 +37,7 @@ import {
   listWorlds,
   pushWorldRelease,
   relateWorldAssets,
+  rejectProgression,
   reorderWorldAssets,
   saveHubConnection,
   startChapterProgression,
@@ -374,7 +375,8 @@ describe("worlddock local API client", () => {
       .mockResolvedValueOnce(jsonResponse({ chapter: { id: "chapter_1", title: "第一章" } }))
       .mockResolvedValueOnce(jsonResponse({ sessionId: "session_1", session: { id: "session_1" } }))
       .mockResolvedValueOnce(jsonResponse({ progressions: [{ id: "session_1" }] }))
-      .mockResolvedValueOnce(jsonResponse({ session: { id: "session_1" }, appliedAssets: [] }));
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "session_1" }, appliedAssets: [] }))
+      .mockResolvedValueOnce(jsonResponse({ session: { id: "session_2" } }));
 
     await listNarratives({ worldId: "world_1", fetcher });
     await createNarrative({ worldId: "world_1", title: "雨巷档案", synopsis: "记忆会下雨。" }, { fetcher });
@@ -385,6 +387,7 @@ describe("worlddock local API client", () => {
     await startChapterProgression("narrative_1", "chapter_1", {}, { fetcher });
     await listProgressions("narrative_1", { fetcher });
     await confirmProgression("narrative_1", "session_1", { fetcher });
+    await rejectProgression("narrative_1", "session_2", { fetcher });
 
     expect(fetcher).toHaveBeenNthCalledWith(1, "http://localhost:4000/v1/narratives?worldId=world_1", {
       method: "GET",
@@ -401,6 +404,7 @@ describe("worlddock local API client", () => {
     expect(fetcher).toHaveBeenNthCalledWith(7, "http://localhost:4000/v1/narratives/narrative_1/chapters/chapter_1/progress", expect.objectContaining({ method: "POST" }));
     expect(fetcher).toHaveBeenNthCalledWith(8, "http://localhost:4000/v1/narratives/narrative_1/progressions", expect.objectContaining({ method: "GET" }));
     expect(fetcher).toHaveBeenNthCalledWith(9, "http://localhost:4000/v1/narratives/narrative_1/progressions/session_1/confirm", expect.objectContaining({ method: "POST" }));
+    expect(fetcher).toHaveBeenNthCalledWith(10, "http://localhost:4000/v1/narratives/narrative_1/progressions/session_2/reject", expect.objectContaining({ method: "POST" }));
   });
 
   it("uses Hub connection endpoints and saves with PUT", async () => {
