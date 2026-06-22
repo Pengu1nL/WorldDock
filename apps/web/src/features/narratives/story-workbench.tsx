@@ -43,10 +43,18 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
     () => readLatestProgression(progressionsQuery.data?.progressions ?? []),
     [progressionsQuery.data?.progressions],
   );
+  const latestPendingReviewProgression = useMemo(
+    () => readLatestPendingReviewProgression(progressionsQuery.data?.progressions ?? []),
+    [progressionsQuery.data?.progressions],
+  );
   const shouldPollProgression = hasRunningProgression(progressionsQuery.data?.progressions ?? []);
   const latestProgressionReviewOutput = useMemo(
     () => readProgressionOutput(latestProgression?.metadata?.progressionOutput),
     [latestProgression],
+  );
+  const latestPendingReviewProgressionOutput = useMemo(
+    () => readProgressionOutput(latestPendingReviewProgression?.metadata?.progressionOutput),
+    [latestPendingReviewProgression],
   );
   const latestProgressionOutput = useMemo(
     () => latestProgressionReviewOutput ?? readLatestProgressionOutput(progressionsQuery.data?.progressions ?? []),
@@ -318,8 +326,8 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
             ))}
           </div>
           <ProgressionReviewCard
-            progression={latestProgression}
-            output={latestProgressionReviewOutput}
+            progression={latestPendingReviewProgression}
+            output={latestPendingReviewProgressionOutput}
             confirming={confirmProgression.isPending}
             rejecting={rejectProgression.isPending}
             onConfirm={(sessionId) => confirmProgression.mutate(sessionId)}
@@ -488,9 +496,19 @@ function EmptyPanelText({ children }: { children: string }) {
 }
 
 function readLatestProgression(progressions: worlddockApi.AgentSession[]) {
+  return readSortedProgressions(progressions)[0] ?? null;
+}
+
+function readLatestPendingReviewProgression(progressions: worlddockApi.AgentSession[]) {
+  return readSortedProgressions(progressions).find((progression) =>
+    readReviewStatus(progression) === "pending_review"
+  ) ?? null;
+}
+
+function readSortedProgressions(progressions: worlddockApi.AgentSession[]) {
   return [...progressions].sort((left, right) =>
     String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? ""))
-  )[0] ?? null;
+  );
 }
 
 function readReviewStatus(progression: worlddockApi.AgentSession | null) {

@@ -572,6 +572,92 @@ describe("StoryWorkbench", () => {
     expect(screen.getByText("旧弧光仍可展示。")).toBeInTheDocument();
   });
 
+  it.each(["running", "failed"] as const)(
+    "keeps an older pending review progression visible when a newer %s progression has no output",
+    async (newerReviewStatus) => {
+      vi.spyOn(api, "getNarrative").mockResolvedValue({
+        narrative: {
+          id: "narrative_1",
+          worldId: "world_1",
+          title: "囚笼",
+          synopsis: null,
+          status: "in_progress",
+          chapterCount: 1,
+          assetCount: 0,
+          metadata: {},
+          visualStyle: {
+            artDirection: "",
+            characterBase: "",
+            environmentBase: "",
+            forbidden: [],
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:00.000Z",
+        },
+        chapters: [{
+          id: "chapter_1",
+          narrativeId: "narrative_1",
+          order: 1,
+          title: "醒来",
+          content: "旧正文",
+          wordCount: 3,
+          status: "draft",
+          metadata: {},
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:00.000Z",
+        }],
+        assets: [],
+      });
+      vi.spyOn(api, "listProgressions").mockResolvedValue({
+        progressions: [{
+          id: "session_newer",
+          worldId: "world_1",
+          kind: "story_progression",
+          status: newerReviewStatus === "running" ? "active" : "failed",
+          current: newerReviewStatus === "running",
+          title: "Progress newer",
+          metadata: {
+            reviewStatus: newerReviewStatus,
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:03.000Z",
+        } as any, {
+          id: "session_pending",
+          worldId: "world_1",
+          kind: "story_progression",
+          status: "completed",
+          current: false,
+          title: "Progress pending",
+          metadata: {
+            reviewStatus: "pending_review",
+            progressionOutput: {
+              assetChanges: [],
+              consistencyFlags: [],
+              narrativeObservations: [{
+                observation: "旧待确认推演仍应出现。",
+                implication: "用户需要先确认或拒绝它。",
+                arcStage: "setup",
+              }],
+            },
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:01.000Z",
+        } as any],
+      });
+
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <StoryWorkbench narrativeId="narrative_1" />
+        </QueryClientProvider>,
+      );
+
+      expect(await screen.findByText("待确认推演")).toBeInTheDocument();
+      expect(screen.getByText("session_pending")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "确认推演" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "拒绝推演" })).toBeInTheDocument();
+    },
+  );
+
   it("confirms a pending review progression and refreshes accepted assets", async () => {
     const chapter = {
       id: "chapter_1",
