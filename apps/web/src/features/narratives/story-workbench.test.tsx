@@ -572,6 +572,221 @@ describe("StoryWorkbench", () => {
     expect(screen.getByText("旧弧光仍可展示。")).toBeInTheDocument();
   });
 
+  it("confirms a pending review progression and refreshes accepted assets", async () => {
+    const chapter = {
+      id: "chapter_1",
+      narrativeId: "narrative_1",
+      order: 1,
+      title: "醒来",
+      content: "旧正文",
+      wordCount: 3,
+      status: "draft",
+      metadata: {},
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    const baseNarrative = {
+      id: "narrative_1",
+      worldId: "world_1",
+      title: "囚笼",
+      synopsis: null,
+      status: "in_progress",
+      chapterCount: 1,
+      assetCount: 0,
+      metadata: {},
+      visualStyle: {
+        artDirection: "",
+        characterBase: "",
+        environmentBase: "",
+        forbidden: [],
+      },
+      createdAt: "2026-06-22T00:00:00.000Z",
+      updatedAt: "2026-06-22T00:00:00.000Z",
+    };
+    vi.spyOn(api, "getNarrative")
+      .mockResolvedValueOnce({
+        narrative: baseNarrative,
+        chapters: [chapter],
+        assets: [],
+      })
+      .mockResolvedValue({
+        narrative: {
+          ...baseNarrative,
+          assetCount: 1,
+          metadata: {
+            worldSnapshot: {
+              timestamp: "after chapter 1",
+              activeCharacters: [{ name: "囚徒甲", location: "囚笼", status: "醒来" }],
+              unresolvedConflicts: [],
+              ongoingEvents: ["囚徒甲醒来"],
+            },
+          },
+        },
+        chapters: [chapter],
+        assets: [{
+          id: "asset_1",
+          narrativeId: "narrative_1",
+          kind: "character",
+          name: "囚徒甲",
+          summary: "在囚笼中醒来的角色。",
+          body: null,
+          tags: [],
+          appearance: null,
+          mood: null,
+          visualPrompt: null,
+          nameEmbedding: null,
+          metadata: {},
+          createdAt: "2026-06-22T00:00:01.000Z",
+          updatedAt: "2026-06-22T00:00:01.000Z",
+        }],
+      });
+    vi.spyOn(api, "listProgressions").mockResolvedValue({
+      progressions: [{
+        id: "session_1",
+        worldId: "world_1",
+        kind: "story_progression",
+        status: "completed",
+        current: false,
+        title: "Progress 醒来",
+        metadata: {
+          reviewStatus: "pending_review",
+          progressionOutput: {
+            assetChanges: [{
+              kind: "character",
+              name: "囚徒甲",
+              summary: "在囚笼中醒来的角色。",
+            }],
+            consistencyFlags: [],
+            narrativeObservations: [{
+              observation: "囚徒甲在囚笼中醒来。",
+              implication: "角色资产等待确认入库。",
+              arcStage: "setup",
+            }],
+          },
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:01.000Z",
+      } as any],
+    });
+    const confirm = vi.spyOn(api, "confirmProgression").mockResolvedValue({
+      session: { id: "session_1", metadata: { reviewStatus: "confirmed" } } as any,
+      appliedAssets: [],
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("待确认推演")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "确认推演" }));
+
+    await waitFor(() => {
+      expect(confirm).toHaveBeenCalledWith("narrative_1", "session_1");
+    });
+    expect(await screen.findByText("囚徒甲")).toBeInTheDocument();
+  });
+
+  it("rejects a pending review progression without applying assets", async () => {
+    vi.spyOn(api, "getNarrative").mockResolvedValue({
+      narrative: {
+        id: "narrative_1",
+        worldId: "world_1",
+        title: "囚笼",
+        synopsis: null,
+        status: "in_progress",
+        chapterCount: 1,
+        assetCount: 0,
+        metadata: {},
+        visualStyle: {
+          artDirection: "",
+          characterBase: "",
+          environmentBase: "",
+          forbidden: [],
+        },
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      },
+      chapters: [{
+        id: "chapter_1",
+        narrativeId: "narrative_1",
+        order: 1,
+        title: "醒来",
+        content: "旧正文",
+        wordCount: 3,
+        status: "draft",
+        metadata: {},
+        createdAt: "2026-06-22T00:00:00.000Z",
+        updatedAt: "2026-06-22T00:00:00.000Z",
+      }],
+      assets: [],
+    });
+    vi.spyOn(api, "listProgressions")
+      .mockResolvedValueOnce({
+        progressions: [{
+          id: "session_1",
+          worldId: "world_1",
+          kind: "story_progression",
+          status: "completed",
+          current: false,
+          title: "Progress 醒来",
+          metadata: {
+            reviewStatus: "pending_review",
+            progressionOutput: {
+              assetChanges: [{
+                kind: "character",
+                name: "囚徒甲",
+                summary: "在囚笼中醒来的角色。",
+              }],
+              consistencyFlags: [],
+              narrativeObservations: [{
+                observation: "囚徒甲在囚笼中醒来。",
+                implication: "角色资产等待确认入库。",
+                arcStage: "setup",
+              }],
+            },
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:01.000Z",
+        } as any],
+      })
+      .mockResolvedValue({
+        progressions: [{
+          id: "session_1",
+          worldId: "world_1",
+          kind: "story_progression",
+          status: "completed",
+          current: false,
+          title: "Progress 醒来",
+          metadata: {
+            reviewStatus: "rejected",
+          },
+          createdAt: "2026-06-22T00:00:00.000Z",
+          updatedAt: "2026-06-22T00:00:01.000Z",
+        } as any],
+      });
+    const reject = vi.spyOn(api, "rejectProgression").mockResolvedValue({
+      session: { id: "session_1", metadata: { reviewStatus: "rejected" } } as any,
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <StoryWorkbench narrativeId="narrative_1" />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("待确认推演")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "拒绝推演" }));
+
+    await waitFor(() => {
+      expect(reject).toHaveBeenCalledWith("narrative_1", "session_1");
+    });
+    expect(await screen.findByText("推演已拒绝")).toBeInTheDocument();
+  });
+
   it("keeps a newly created chapter selected before the narrative refetch returns", async () => {
     const staleNarrative = {
       narrative: {

@@ -134,6 +134,23 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
       ]);
     },
   });
+  const confirmProgression = useMutation({
+    mutationFn: async (sessionId: string) => worlddockApi.confirmProgression(narrativeId, sessionId),
+    onSuccess: async () => {
+      setNotice("推演已确认");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["narrative", narrativeId] }),
+        queryClient.invalidateQueries({ queryKey: ["narrative-progressions", narrativeId] }),
+      ]);
+    },
+  });
+  const rejectProgression = useMutation({
+    mutationFn: async (sessionId: string) => worlddockApi.rejectProgression(narrativeId, sessionId),
+    onSuccess: async () => {
+      setNotice("推演已拒绝");
+      await queryClient.invalidateQueries({ queryKey: ["narrative-progressions", narrativeId] });
+    },
+  });
   const isChapterWritePending = createChapter.isPending || saveChapter.isPending || startProgression.isPending;
 
   if (narrativeQuery.isPending) {
@@ -299,7 +316,14 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
               </button>
             ))}
           </div>
-          <ProgressionReviewCard progression={latestProgression} output={latestProgressionReviewOutput} />
+          <ProgressionReviewCard
+            progression={latestProgression}
+            output={latestProgressionReviewOutput}
+            confirming={confirmProgression.isPending}
+            rejecting={rejectProgression.isPending}
+            onConfirm={(sessionId) => confirmProgression.mutate(sessionId)}
+            onReject={(sessionId) => rejectProgression.mutate(sessionId)}
+          />
           {panel === "assets" && <AssetsPanel assets={assets} />}
           {panel === "snapshot" && <WorldSnapshotPanel snapshot={worldSnapshot} />}
           {panel === "arc" && <NarrativeArcPanel observations={arcObservations} chapters={chapters} />}
@@ -313,9 +337,17 @@ export function StoryWorkbench({ narrativeId }: { narrativeId: string }) {
 function ProgressionReviewCard({
   progression,
   output,
+  confirming,
+  rejecting,
+  onConfirm,
+  onReject,
 }: {
   progression: worlddockApi.AgentSession | null;
   output: ProgressionOutput | null;
+  confirming: boolean;
+  rejecting: boolean;
+  onConfirm: (sessionId: string) => void;
+  onReject: (sessionId: string) => void;
 }) {
   const reviewStatus = readReviewStatus(progression);
   if (!progression || reviewStatus !== "pending_review" || !output) return null;
@@ -329,6 +361,24 @@ function ProgressionReviewCard({
       <p style={{ margin: "8px 0 0", color: "var(--fg-2)", fontSize: 12, lineHeight: 1.55 }}>
         {output.assetChanges.length} 项资产变化 · {output.consistencyFlags.length} 个一致性标记 · {output.narrativeObservations.length} 条弧光观察
       </p>
+      <div className="row gap-2" style={{ marginTop: 10 }}>
+        <button
+          className="btn primary"
+          disabled={confirming || rejecting}
+          onClick={() => onConfirm(progression.id)}
+          type="button"
+        >
+          确认推演
+        </button>
+        <button
+          className="sb-btn"
+          disabled={confirming || rejecting}
+          onClick={() => onReject(progression.id)}
+          type="button"
+        >
+          拒绝推演
+        </button>
+      </div>
     </section>
   );
 }
